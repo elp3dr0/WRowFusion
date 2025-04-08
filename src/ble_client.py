@@ -1,6 +1,8 @@
 import asyncio
 import threading
 import logging
+import contextlib
+
 from bleak import BleakClient, BleakScanner, BleakError
 from src.heart_rate import HeartRateMonitor
 
@@ -170,7 +172,7 @@ class HeartRateBLEScanner(threading.Thread):
                     logger.debug(f"  Characteristic: {char.uuid} — {char.description}")
         except Exception as e:
             logger.warning(f"Failed to log GATT services: {e}")
-            
+
     def handle_heart_rate(self, sender, data: bytearray):
         """
         Handle incoming heart rate data, including optional parameters like RR intervals

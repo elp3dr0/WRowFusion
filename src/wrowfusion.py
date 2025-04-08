@@ -2,7 +2,8 @@ import threading
 import signal
 import sys
 from src.s4 import s4_heart_beat_task
-from src.heart_rate import bluetooth_hrm_task
+from src.heart_rate import HeartRateMonitor
+from src.ble_client import HeartRateBLEScanner
 
 # List to keep track of running threads
 threads = []
