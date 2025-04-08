@@ -1,0 +1,6 @@
+bleak>=0.21.0
+gpiozero>=1.6.2
+pytest>=7.0
+pytest-asyncio>=0.20.0
+pyserial>=3.5        # For interacting with serial devices
+async-timeout>=4.0   # Good practice for async tasks

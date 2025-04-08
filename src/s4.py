@@ -9,7 +9,7 @@ heartbeat_signal = DigitalOutputDevice(HEARTBEAT_PIN, active_high=True, initial_
 
 
 def s4_heart_beat_task(hrm: HeartRateMonitor):
-    """Simulate continuous ANT+ heart rate signal."""
+    """Simulate continuous ANT+ heart rate signal to transmit to the S4 via 3.5mm jack."""
     while True:
         hr = hrm.get_heart_rate
 

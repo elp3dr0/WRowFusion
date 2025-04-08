@@ -113,7 +113,9 @@ SIZE_PARSE_MAP = {'single': lambda cmd: cmd[6:8],
                   'double': lambda cmd: cmd[6:10],
                   'triple': lambda cmd: cmd[6:12]}
 
-
+# DELAYS
+PORT_SCAN_RETRY_DELAY = 5
+SERIAL_OPEN_RETRY_DELAY = 5
 
 def find_port():
     attempts = 0
@@ -129,7 +131,7 @@ def find_port():
         if ((attempts - 1) % 360) == 0: # message every ~30 minutes
           logger.warning("port not found in %d attempts; retrying every 5s",
               attempts)
-        time.sleep(5)
+        time.sleep(PORT_SCAN_RETRY_DELAY)
 
 
 def build_daemon(target):
@@ -223,7 +225,7 @@ class Rower(object):
             logger.info("serial open")
         except serial.SerialException as e:
             print("serial open error waiting")
-            time.sleep(5)
+            time.sleep(SERIAL_OPEN_RETRY_DELAY)
             self._serial.close()
             self._find_serial()
 

@@ -57,6 +57,9 @@ class HeartRateBLEScanner(threading.Thread):
                 if not await client.is_connected():
                     logger.warning("Failed to connect to BLE HRM.")
                     return
+                
+                logger.info("Connected to BLE HRM. Logging GATT services and characteristics...")
+                await self.log_services_and_characteristics(client)
 
                 logger.info("Connected to BLE HRM. Fetching static BLE data...")
                 await self.fetch_static_info(client)
@@ -154,6 +157,20 @@ class HeartRateBLEScanner(threading.Thread):
 
             await asyncio.sleep(LOW_FREQ_POLL_DELAY)
 
+    async def log_services_and_characteristics(self, client):
+        if not client or not client.is_connected:
+            logger.warning("Cannot log services — HRM not connected.")
+            return
+
+        try:
+            services = await client.get_services()
+            for service in services:
+                logger.debug(f"Service: {service.uuid} — {service.description}")
+                for char in service.characteristics:
+                    logger.debug(f"  Characteristic: {char.uuid} — {char.description}")
+        except Exception as e:
+            logger.warning(f"Failed to log GATT services: {e}")
+            
     def handle_heart_rate(self, sender, data: bytearray):
         """
         Handle incoming heart rate data, including optional parameters like RR intervals
