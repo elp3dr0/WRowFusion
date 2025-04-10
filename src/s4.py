@@ -52,7 +52,7 @@ POWER_AVG_STROKES = 4
 def s4_heart_beat_task(hrm: HeartRateMonitor):
     """Simulate continuous ANT+ heart rate signal to transmit to the S4 via 3.5mm jack."""
     while True:
-        hr = hrm.get_heart_rate
+        hr = hrm.get_heart_rate()
 
         if hr > 0:
             hr_period = 60000 / hr  # Convert BPM to ms

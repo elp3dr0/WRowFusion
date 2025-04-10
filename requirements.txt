@@ -1,5 +1,6 @@
 bleak>=0.21.0
 gpiozero>=1.6.2
+RPi.GPIO>=0.7.1
 pytest>=7.0
 pytest-asyncio>=0.20.0
 PyGObject==3.50.0
