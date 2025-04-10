@@ -21,10 +21,12 @@ def start_threads():
     ant_q = deque(maxlen=1)
 
     # Thread to connect as a client to BLE heart rate monitor
+    # This is an object that manages its own lifecycle with asyncio
     ble_hrm_scanner = HeartRateBLEScanner(hr_monitor)
     threads.append(ble_hrm_scanner)
     
     # Thread for simulating heart beat to send to S4 
+    # This construct is an explicit request to run a function in a separate thread (unlike ble_hrm_scanner).
     s4_heartbeat_thread = threading.Thread(target=s4_heart_beat_task, args=(hr_monitor,), daemon=True)
     threads.append(s4_heartbeat_thread)
 
