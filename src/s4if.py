@@ -14,62 +14,66 @@ import serial.tools.list_ports
 
 logger = logging.getLogger(__name__)
 
-MEMORY_MAP = {'055': {'type': 'total_distance_m', 'size': 'double', 'base': 16},
-              '140': {'type': 'total_strokes', 'size': 'double', 'base': 16},
-              '088': {'type': 'watts', 'size': 'double', 'base': 16},
-              '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16},
-              '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16},
-              '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16},
-              '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10},
-              '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10},
-              '1E2': {'type': 'display_min', 'size': 'single', 'base': 10},
-              '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10},
-              # from zone math
-              '1A0': {'type': 'heart_rate', 'size': 'double', 'base': 16},
-              '1A6': {'type': '500mps', 'size': 'double', 'base': 16},
-              '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16},
-              # explore
-              '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16},
-              '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16},
-              #other
-              '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'not_in_loop': True},
+MEMORY_MAP = {
+                '055': {'type': 'total_distance_m', 'size': 'double', 'base': 16},
+                '140': {'type': 'total_strokes', 'size': 'double', 'base': 16},
+                '088': {'type': 'watts', 'size': 'double', 'base': 16},
+                '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16},
+                '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16},
+                '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16},
+                '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10},
+                '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10},
+                '1E2': {'type': 'display_min', 'size': 'single', 'base': 10},
+                '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10},
+                # from zone math
+                '1A0': {'type': 'heart_rate', 'size': 'double', 'base': 16},
+                '1A6': {'type': '500mps', 'size': 'double', 'base': 16},
+                '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16},
+                # explore
+                # Stroke_pull is first subtracted from stroke_average then a modifier of 
+                # 1.25 multiplied by the result to generate the ratio value for display.
+                '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16},
+                '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16},
+                #other
+                '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'not_in_loop': True},
              }
 
+# Packet identifiers as speicified in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
 
 # ACH values = Ascii coded hexadecimal
 # REQUEST sent from PC to device
 # RESPONSE sent from device to PC
 
-USB_REQUEST = "USB"                # Application starting communication’s
-WR_RESPONSE = "_WR_"               # Hardware Type, Accept USB start sending packets
+USB_REQUEST = "USB"                # First packet to be sent in order to instruct S4 to establish communications
+WR_RESPONSE = "_WR_"               # Hardware Type response to acknowledge USB_REQUEST and initiate sending packets
 EXIT_REQUEST = "EXIT"              # Application is exiting, stop sending packets
-OK_RESPONSE = "OK"                 # Packet Accepted
-ERROR_RESPONSE = "ERROR"           # Unknown packet
-PING_RESPONSE = "PING"             # Ping
-RESET_REQUEST = "RESET"            # Request the rowing computer to reset, disable interactive mode
+OK_RESPONSE = "OK"                 # Packet Accepted - Sent in cases where no other reply would otherwise be given.
+ERROR_RESPONSE = "ERROR"           # Unknown packet recieved.
+PING_RESPONSE = "PING"             # Ping sent once per second while no rowing is occuring
+RESET_REQUEST = "RESET"            # Request the rowing computer to reset (equivalent to user holding on button for 2 secs), disable interactive mode
 MODEL_INFORMATION_REQUEST = "IV?"  # Request Model Information
-MODEL_INFORMATION_RESPONSE = "IV"  # Current model information IV+Model+Version High+Version Low
-READ_MEMORY_REQUEST = "IR"         # Read a memory location IR+(S=Single,D=Double,T=Triple) + XXX
+MODEL_INFORMATION_RESPONSE = "IV"  # Current model information IV+Model(4 or 5)+Firmware Version High+Firmware Version Low (e.g for Firmware 02.10, High is 02, low is 10)
+READ_MEMORY_REQUEST = "IR"         # Read a memory location IR+(S=Single,D=Double,T=Triple) + XXX (XXX is in ACH format)
 READ_MEMORY_RESPONSE = "ID"        # Value from a memory location ID +(type) + Y3 Y2 Y1
-STROKE_START_RESPONSE = "SS"       # Start of stroke
-STROKE_END_RESPONSE = "SE"         # End of stroke
-PULSE_COUNT_RESPONSE = "P"         # Pulse Count XX in the last 25mS, ACH value
+STROKE_START_RESPONSE = "SS"       # Start of stroke (just a packet - no data. Can be sent with very minor movement of paddle even if no rowing is occuring.)
+STROKE_END_RESPONSE = "SE"         # End of stroke (just a packet - no data. Can be sent with very minor movement of paddle even if no rowing is occuring.)
+PULSE_COUNT_RESPONSE = "P"         # Pulse Count XX in the last 25mS, ACH value. Pulses are triggered by pins on the pulley and so pulse count corresponds to pulley rotation.
 
-# Display Settings (not used)
-DISPLAY_SET_INTENSITY_MPS_REQUEST = "DIMS"
-DISPLAY_SET_INTENSITY_MPH_REQUEST = "DIMPH"
-DISPLAY_SET_INTENSITY_500M_REQUEST = "DI500"
-DISPLAY_SET_INTENSITY_2KM_REQUEST = "DI2KM"
-DISPLAY_SET_INTENSITY_WATTS_REQUEST = "DIWA"
-DISPLAY_SET_INTENSITY_CALHR_REQUEST = "DICH"
-DISPLAY_SET_INTENSITY_AVG_MPS_REQUEST = "DAMS"
-DISPLAY_SET_INTENSITY_AVG_MPH_REQUEST = "DAMPH"
-DISPLAY_SET_INTENSITY_AVG_500M_REQUEST = "DA500"
-DISPLAY_SET_INTENSITY_AVG_2KM_REQUEST = "DA2KM"
-DISPLAY_SET_DISTANCE_METERS_REQUEST = "DDME"
-DISPLAY_SET_DISTANCE_MILES_REQUEST = "DDMI"
-DISPLAY_SET_DISTANCE_KM_REQUEST = "DDKM"
-DISPLAY_SET_DISTANCE_STROKES_REQUEST = "DDST"
+# Display Settings (not used) allow the PC to set the required display parameters.
+DISPLAY_SET_INTENSITY_MPS_REQUEST = "DIMS"          # Set Intensity - Metres per second
+DISPLAY_SET_INTENSITY_MPH_REQUEST = "DIMPH"         # Set Intenisty - MPH
+DISPLAY_SET_INTENSITY_500M_REQUEST = "DI500"        # Set Intensity - 500m split
+DISPLAY_SET_INTENSITY_2KM_REQUEST = "DI2KM"         # Set Intensity - 2km split
+DISPLAY_SET_INTENSITY_WATTS_REQUEST = "DIWA"        # Set Intensity - Watts
+DISPLAY_SET_INTENSITY_CALHR_REQUEST = "DICH"        # Set Intensity - Cal/Hr
+DISPLAY_SET_INTENSITY_AVG_MPS_REQUEST = "DAMS"      # Set Intensity - Average metres per sec
+DISPLAY_SET_INTENSITY_AVG_MPH_REQUEST = "DAMPH"     # Set Intensity - Average MPH
+DISPLAY_SET_INTENSITY_AVG_500M_REQUEST = "DA500"    # Set Intensity - Average 500m split
+DISPLAY_SET_INTENSITY_AVG_2KM_REQUEST = "DA2KM"     # Set Intensity - Average 2km split
+DISPLAY_SET_DISTANCE_METERS_REQUEST = "DDME"        # Set Distance - Metres 
+DISPLAY_SET_DISTANCE_MILES_REQUEST = "DDMI"         # Set Distance - Miles
+DISPLAY_SET_DISTANCE_KM_REQUEST = "DDKM"            # Set Distance - Km
+DISPLAY_SET_DISTANCE_STROKES_REQUEST = "DDST"       # Set Distance - Strokes
 
 # Interactive mode
 
@@ -113,7 +117,7 @@ SIZE_PARSE_MAP = {'single': lambda cmd: cmd[6:8],
                   'double': lambda cmd: cmd[6:10],
                   'triple': lambda cmd: cmd[6:12]}
 
-# DELAYS
+# PROGRAM CONTROL DELAYS
 PORT_SCAN_RETRY_DELAY = 5
 SERIAL_OPEN_RETRY_DELAY = 5
 
@@ -169,26 +173,26 @@ def read_reply(cmd):
 def event_from(line):
     try:
         cmd = line.strip()  # to ensure no space are in front or at the back call the function strip()
-        cmd = cmd.decode('utf8')  # encode it to utf8 ro remove b'
-        if cmd == STROKE_START_RESPONSE:  # with is "SS" from the waterrower
-            return build_event(type='stroke_start', raw=cmd)  # Call the methode to create a dict with the name stroke_start and the row command used for it "SS"
-        elif cmd == STROKE_END_RESPONSE:  # with is "SE" from the waterrower
-            return build_event(type='stroke_end', raw=cmd)  # Call the methode to create a dict with the name stroke_end and the row command used for it "SE"
-        elif cmd == OK_RESPONSE:  # If waterrower responce "OK" do nothing
+        cmd = cmd.decode('utf8')  # decode from bytes to utf8 string to remove b' prefix
+        logger.debug(f"Reading line captured from S4: {cmd}")
+        if cmd == STROKE_START_RESPONSE:  # "SS" packet received from waterrower
+            return build_event(type='stroke_start', raw=cmd)  # Create a dict with the name stroke_start and the raw command used for it "SS"
+        elif cmd == STROKE_END_RESPONSE:  # "SE" packet received from waterrower
+            return build_event(type='stroke_end', raw=cmd)  # Create a dict with the name stroke_end and the raw command used for it "SE"
+        elif cmd == OK_RESPONSE:  # If waterrower response "OK" do nothing
             return None
         elif cmd[:2] == MODEL_INFORMATION_RESPONSE:  # If MODEL information has been request, the model responce would be "IV"
-            return build_event(type='model', raw=cmd)  # Call the methode to create a dict with the model and the row command used for it "SE"
-        elif cmd[:2] == READ_MEMORY_RESPONSE:  # if after memory request the responce comes from the waterrower
+            return build_event(type='model', raw=cmd)
+        elif cmd[:2] == READ_MEMORY_RESPONSE:  # if after memory request the response comes from the waterrower
             return read_reply(cmd)  # proced to the function read_reply which strips away everything and keeps the value and create the event dict for that request
-        elif cmd[:4] == PING_RESPONSE:  # if Ping responce is recived which is all the time the rower is in standstill
-            return build_event(type='ping', raw=cmd)  # do nothing
-        elif cmd[:1] == PULSE_COUNT_RESPONSE:  # Pluse count count the amount of 25 teeth passed 25teeth passed = P1
-            return build_event(type='pulse', raw=cmd)  # do nothing
-        elif cmd == ERROR_RESPONSE:  # If Waterrower responce with an error
-            return build_event(type='error', raw=cmd)  # crate an event with the dict entry error and the raw command
-        elif cmd[:2] == STROKE_START_RESPONSE:  # Pluse count count the amount of 25 teeth passed 25teeth passed = P1
-            print(cmd)
+        elif cmd[:4] == PING_RESPONSE:  # WaterRower sends PING every second when the the rower is in standstill
+            return build_event(type='ping', raw=cmd)
+        elif cmd[:1] == PULSE_COUNT_RESPONSE:  # Pulse count the amount of 25 teeth passed 25teeth passed = P1
+            return build_event(type='pulse', raw=cmd)
+        elif cmd == ERROR_RESPONSE:  # If Waterrower responds with an error
+            return build_event(type='error', raw=cmd) 
         else:
+            logger.debug(f"Unhandled line captured from S4: {cmd}")
             return None
     except Exception as e:
         logger.error('could not build event for: %s %s', line, e)
@@ -221,7 +225,6 @@ class Rower(object):
             self._serial.port = find_port()
         try:
             self._serial.open()
-            #print("serial open")
             logger.info("serial open")
         except serial.SerialException as e:
             print("serial open error waiting")
