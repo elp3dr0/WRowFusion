@@ -58,15 +58,15 @@ def s4_heart_beat_task(hrm: HeartRateMonitor):
 
             # Generate a 10ms pulse
             heartbeat_signal.on()
-            sleep(0.01)  # 10ms pulse
+            time.sleep(0.01)  # 10ms pulse
             heartbeat_signal.off()
 
             # Wait for the rest of the heartbeat interval
-            sleep((hr_period - 10) / 1000.0)
+            time.sleep((hr_period - 10) / 1000.0)
         else:
             # If no valid HR data, keep the signal off and wait 500ms
             heartbeat_signal.off()
-            sleep(0.5)
+            time.sleep(0.5)
 
 
 class DataLogger(object):
@@ -264,18 +264,23 @@ class DataLogger(object):
         return values
 
     def inject_HR(self, values, hrm: HeartRateMonitor):
+        if not isinstance(values, dict):
+            logger.warning("inject_HR recieved invalid values input: %s", values)
+            return None
+        
         if values['heart_rate'] == 0 and (ext_hr := hrm.get_heart_rate()) != 0:
             values['heart_rate'] = ext_hr
         return values
 
     def CueBLEANT(self, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
         values = self.get_WRValues()
-        values = self.inject_HR(values, hrm)
-        with self._wr_lock:
-            self.BLEvalues = values
-            self.ANTvalues = values
-        ble_out_q.append(values)
-        ant_out_q.append(values)
+        if values:
+            values = self.inject_HR(values, hrm)
+            with self._wr_lock:
+                self.BLEvalues = values
+                self.ANTvalues = values
+            ble_out_q.append(values)
+            ant_out_q.append(values)
 
 def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
     S4 = Rower()
