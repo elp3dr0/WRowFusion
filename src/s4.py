@@ -1,9 +1,8 @@
 import threading
 import logging
+import time
 from gpiozero import DigitalOutputDevice
-from time import sleep
 from copy import deepcopy
-from time import time
 from datetime import timedelta
 
 from src.s4if import Rower
@@ -265,7 +264,7 @@ class DataLogger(object):
         return values
 
     def inject_HR(self, values, hrm: HeartRateMonitor):
-        if values['heart_rate'] == 0 and (ext_hr := hrm.get_heart_rate) != 0:
+        if values['heart_rate'] == 0 and (ext_hr := hrm.get_heart_rate()) != 0:
             values['heart_rate'] = ext_hr
         return values
 
