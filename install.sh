@@ -6,7 +6,7 @@ echo " "
 echo " "
 echo " "
 echo "  WRowFusion for Waterrower"
-echo "                                                            
+echo " "                                                             
 echo " "
 echo " This script will install all the needed packages and modules "
 echo " to make the Waterrower Ant and BLE Raspbery Pi Module working"
@@ -91,7 +91,7 @@ unset IFS
 
 echo "----------------------------------------------"
 echo " Add current user to bluetooth and dialout groups"
-echo " (pirowflo should be run by this user) "
+echo " (wrowfusion should be run by this user) "
 echo "----------------------------------------------"
 
 CURRENT_USER=$(whoami)
