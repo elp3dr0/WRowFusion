@@ -278,9 +278,7 @@ class DataLogger(object):
         ble_out_q.append(values)
         ant_out_q.append(values)
 
-def main(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
-    global ext_hr
-    global ext_hr_time
+def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
     S4 = Rower()
     S4.open()
     #S4.reset_request()
