@@ -78,6 +78,8 @@ class DataLogger(object):
         self._rower_interface.register_callback(self.on_rower_event)
         self._stop_event = threading.Event()
 
+        self._wr_lock = threading.Lock()
+
         self._InstaPowerStroke = None
         self.maxpowerStroke = None
         self._StrokeStart = None        # Our _StrokeStart is set to True at when the S4 determines pulley accelleration
@@ -106,84 +108,85 @@ class DataLogger(object):
         #self._reset_state()
 
     def _reset_state(self):
-        self._InstaPowerStroke = []
-        self.maxpowerStroke = 0
-        self._StrokeStart = False
-        self._StrokeTotal = 0
-        self.Watts = 0
-        self.AvgInstaPower = 0
-        self.Lastcheckforpulse = 0
-        self.PulseEventTime = 0
-        self.InstantaneousPace = 0
-        self.DeltaPulse = 0
-        self.PaddleTurning = False
-        self.rowerreset = True
-        self.WRValues_rst = {
-                'stroke_rate': 0,
-                'total_strokes': 0,
-                'total_distance_m': 0,
-                'instantaneous pace': 0,
-                'speed': 0,
-                'watts': 0,
-                'total_kcal': 0,
-                'total_kcal_hour': 0,
-                'total_kcal_min': 0,
-                'heart_rate': 0,
-                'elapsedtime': 0.0,
-            }
-        self.WRValues = deepcopy(self.WRValues_rst)
-        self.WRValues_standstill = deepcopy(self.WRValues_rst)
-        self.BLEvalues = deepcopy(self.WRValues_rst)
-        self.ANTvalues = deepcopy(self.WRValues_rst)
-        self.secondsWR = 0
-        self.minutesWR = 0
-        self.hoursWR = 0
-        self.elapsetime = 0
-        self.elapsetimeprevious = 0
+        with self._wr_lock:
+            self._InstaPowerStroke = []
+            self.maxpowerStroke = 0
+            self._StrokeStart = False
+            self._StrokeTotal = 0
+            self.Watts = 0
+            self.AvgInstaPower = 0
+            self.Lastcheckforpulse = 0
+            self.PulseEventTime = 0
+            self.InstantaneousPace = 0
+            self.DeltaPulse = 0
+            self.PaddleTurning = False
+            self.rowerreset = True
+            self.WRValues_rst = {
+                    'stroke_rate': 0,
+                    'total_strokes': 0,
+                    'total_distance_m': 0,
+                    'instantaneous pace': 0,
+                    'speed': 0,
+                    'watts': 0,
+                    'total_kcal': 0,
+                    'total_kcal_hour': 0,
+                    'total_kcal_min': 0,
+                    'heart_rate': 0,
+                    'elapsedtime': 0.0,
+                }
+            self.WRValues = deepcopy(self.WRValues_rst)
+            self.WRValues_standstill = deepcopy(self.WRValues_rst)
+            self.BLEvalues = deepcopy(self.WRValues_rst)
+            self.ANTvalues = deepcopy(self.WRValues_rst)
+            self.secondsWR = 0
+            self.minutesWR = 0
+            self.hoursWR = 0
+            self.elapsetime = 0
+            self.elapsetimeprevious = 0
 
     def on_rower_event(self, event):
 
         logger.debug(f"Received event: {event}")
-
-        if event['type'] in IGNORE_LIST:
-            return
-        if event['type'] == 'stroke_start':
-            self._StrokeStart = True
-        if event['type'] == 'stroke_end':
-            self._StrokeStart = False
-        if event['type'] == 'stroke_rate':
-            self.WRValues.update({'stroke_rate': (event['value']*2)})
-        if event['type'] == 'total_strokes':
-            self._StrokeTotal = event['value']
-            self.WRValues.update({'total_strokes': event['value']})
-        if event['type'] == 'total_distance_m':
-            self.WRValues.update({'total_distance_m': (event['value'])})
-        if event['type'] == 'avg_distance_cmps':
-            if event['value'] == 0:
-                self.WRValues.update({'instantaneous pace': 0})
-                self.WRValues.update({'speed':0})
-            else:
-                self.InstantaneousPace = (500 * 100) / event['value']
-                #print(self.InstantaneousPace)
-                self.WRValues.update({'instantaneous pace': self.InstantaneousPace})
-                self.WRValues.update({'speed':event['value']})
-        if event['type'] == 'watts':
-            self.Watts = event['value']
-            self.avgInstaPowercalc(self.Watts)
-        if event['type'] == 'total_kcal':
-            self.WRValues.update({'total_kcal': (event['value']/1000)})  # in cal now in kcal
-        if event['type'] == 'total_kcal_h':  # must calclatre it first
-            self.WRValues.update({'total_kcal': 0})
-        if event['type'] == 'total_kcal_min':  # must calclatre it first
-            self.WRValues.update({'total_kcal': 0})
-        if event['type'] == 'heart_rate':
-            self.WRValues.update({'heart_rate': (event['value'])})
-        if event['type'] == 'display_sec':
-            self.secondsWR = event['value']
-        if event['type'] == 'display_min':
-            self.minutesWR = event['value']
-        if event['type'] == 'display_hr':
-            self.hoursWR = event['value']
+        with self._wr_lock:
+            if event['type'] in IGNORE_LIST:
+                return
+            if event['type'] == 'stroke_start':
+                self._StrokeStart = True
+            if event['type'] == 'stroke_end':
+                self._StrokeStart = False
+            if event['type'] == 'stroke_rate':
+                self.WRValues.update({'stroke_rate': (event['value']*2)})
+            if event['type'] == 'total_strokes':
+                self._StrokeTotal = event['value']
+                self.WRValues.update({'total_strokes': event['value']})
+            if event['type'] == 'total_distance_m':
+                self.WRValues.update({'total_distance_m': (event['value'])})
+            if event['type'] == 'avg_distance_cmps':
+                if event['value'] == 0:
+                    self.WRValues.update({'instantaneous pace': 0})
+                    self.WRValues.update({'speed':0})
+                else:
+                    self.InstantaneousPace = (500 * 100) / event['value']
+                    #print(self.InstantaneousPace)
+                    self.WRValues.update({'instantaneous pace': self.InstantaneousPace})
+                    self.WRValues.update({'speed':event['value']})
+            if event['type'] == 'watts':
+                self.Watts = event['value']
+                self.avgInstaPowercalc(self.Watts)
+            if event['type'] == 'total_kcal':
+                self.WRValues.update({'total_kcal': (event['value']/1000)})  # in cal now in kcal
+            if event['type'] == 'total_kcal_h':  # must calclatre it first
+                self.WRValues.update({'total_kcal': 0})
+            if event['type'] == 'total_kcal_min':  # must calclatre it first
+                self.WRValues.update({'total_kcal': 0})
+            if event['type'] == 'heart_rate':
+                self.WRValues.update({'heart_rate': (event['value'])})
+            if event['type'] == 'display_sec':
+                self.secondsWR = event['value']
+            if event['type'] == 'display_min':
+                self.minutesWR = event['value']
+            if event['type'] == 'display_hr':
+                self.hoursWR = event['value']
         self.TimeElapsedcreator()
 
 
@@ -198,74 +201,84 @@ class DataLogger(object):
         # longer than the NO_ROWING_PULSE_GAP in milliseconds (e.g. 300ms), then the 
         # paddle is assumed to be stationary and no rowing is taking place.
         self.Lastcheckforpulse = int(round(time.time() * 1000))
-        if event['type'] == 'pulse':
-            self.PulseEventTime = event['at']
-            self.rowerreset = False
-        self.DeltaPulse = self.Lastcheckforpulse - self.PulseEventTime
-        if self.DeltaPulse <= NO_ROWING_PULSE_GAP:
-            self.PaddleTurning = True
-        else:
-            self.PaddleTurning = False
-            self._StrokeStart = False
-            self.PulseEventTime = 0
-            self._InstaPowerStroke = []
-            self.AvgInstaPower = 0
-            self.WRValuesStandstill()
+        with self._wr_lock:
+            if event['type'] == 'pulse':
+                self.PulseEventTime = event['at']
+                self.rowerreset = False
+            self.DeltaPulse = self.Lastcheckforpulse - self.PulseEventTime
+            if self.DeltaPulse <= NO_ROWING_PULSE_GAP:
+                self.PaddleTurning = True
+            else:
+                self.PaddleTurning = False
+                self._StrokeStart = False
+                self.PulseEventTime = 0
+                self._InstaPowerStroke = []
+                self.AvgInstaPower = 0
+                self.WRValuesStandstill()
 
     def reset_requested(self,event):
-        if event['type'] == 'reset':
-            self._reset_state()
-            logger.info("value reseted")
+        with self._wr_lock:
+            if event['type'] == 'reset':
+                self._reset_state()
+                logger.info("value reseted")
 
     def TimeElapsedcreator(self):
-        self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
-        self.elapsetime = int(self.elapsetime.total_seconds())
-        # print('sec:{0};min:{1};hr:{2}'.format(self.secondsWR,self.minutesWR,self.hoursWR))
-        self.WRValues.update({'elapsedtime': self.elapsetime})
-        self.elapsetimeprevious = self.elapsetime
+        with self._wr_lock:
+            self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
+            self.elapsetime = int(self.elapsetime.total_seconds())
+            # print('sec:{0};min:{1};hr:{2}'.format(self.secondsWR,self.minutesWR,self.hoursWR))
+            self.WRValues.update({'elapsedtime': self.elapsetime})
+            self.elapsetimeprevious = self.elapsetime
 
     def WRValuesStandstill(self):
-        self.WRValues_standstill = deepcopy(self.WRValues)
-        self.WRValues_standstill.update({'stroke_rate': 0})
-        self.WRValues_standstill.update({'instantaneous pace': 0})
-        self.WRValues_standstill.update({'heart_rate': 0})
-        self.WRValues_standstill.update({'speed': 0})
-        self.WRValues_standstill.update({'watts': 0})
+        with self._wr_lock:
+            self.WRValues_standstill = deepcopy(self.WRValues)
+            self.WRValues_standstill.update({'stroke_rate': 0})
+            self.WRValues_standstill.update({'instantaneous pace': 0})
+            self.WRValues_standstill.update({'heart_rate': 0})
+            self.WRValues_standstill.update({'speed': 0})
+            self.WRValues_standstill.update({'watts': 0})
 
     def avgInstaPowercalc(self,watts):
-        if self._StrokeStart:
-            self.maxpowerStroke = max(self.maxpowerStroke, watts)
-        else:
-            if self.maxpowerStroke:
-                self._InstaPowerStroke.append(self.maxpowerStroke)
-                self.maxpowerStroke = 0
-            while len(self._InstaPowerStroke) > POWER_AVG_STROKES:
-                self._InstaPowerStroke.pop(0)
-            if len(self._InstaPowerStroke) == POWER_AVG_STROKES:
-                self.AvgInstaPower = int(sum(self._InstaPowerStroke) / len(self._InstaPowerStroke))
-                self.WRValues.update({'watts': self.AvgInstaPower})
+        with self._wr_lock:
+            if self._StrokeStart:
+                self.maxpowerStroke = max(self.maxpowerStroke, watts)
+            else:
+                if self.maxpowerStroke:
+                    self._InstaPowerStroke.append(self.maxpowerStroke)
+                    self.maxpowerStroke = 0
+                while len(self._InstaPowerStroke) > POWER_AVG_STROKES:
+                    self._InstaPowerStroke.pop(0)
+                if len(self._InstaPowerStroke) == POWER_AVG_STROKES:
+                    self.AvgInstaPower = int(sum(self._InstaPowerStroke) / len(self._InstaPowerStroke))
+                    self.WRValues.update({'watts': self.AvgInstaPower})
 
 
-    def get_WRValues(self):                
-        if self.rowerreset:
-            values = deepcopy(self.WRValues_rst)
-        elif self.PaddleTurning:
-            values = deepcopy(self.WRValues)
-        else:
-            values = deepcopy(self.WRValues_standstill)
-        if values['heart_rate'] == 0:
-            if ext_hr != 0 and time.time() - ext_hr_time < 30: # don't report stale values
-                values['heart_rate'] = ext_hr
+    def get_WRValues(self):
+        with self._wr_lock:                
+            if self.rowerreset:
+                values = deepcopy(self.WRValues_rst)
+            elif self.PaddleTurning:
+                values = deepcopy(self.WRValues)
+            else:
+                values = deepcopy(self.WRValues_standstill)
         return values
 
-    def SendToBLE(self):
-        self.BLEvalues = self.get_WRValues()
-        #logger.debug("Watts: %4.1f Strokes: %5d Strokes/s: %5f Dist: %5g", self.BLEvalues['watts'], self.BLEvalues['total_strokes'], self.BLEvalues['stroke_rate'], self.BLEvalues['total_distance_m'])
+    def inject_HR(self, values, hrm: HeartRateMonitor):
+        if values['heart_rate'] == 0 and (ext_hr := hrm.get_heart_rate) != 0:
+            values['heart_rate'] = ext_hr
+        return values
 
-    def SendToANT(self):
-        self.ANTvalues = self.get_WRValues()
+    def CueBLEANT(self, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
+        values = self.get_WRValues()
+        values = self.inject_HR(values, hrm)
+        with self._wr_lock:
+            self.BLEvalues = values
+            self.ANTvalues = values
+        ble_out_q.append(values)
+        ant_out_q.append(values)
 
-def main(in_q, ble_out_q,ant_out_q):
+def main(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
     global ext_hr
     global ext_hr_time
     S4 = Rower()
@@ -276,23 +289,21 @@ def main(in_q, ble_out_q,ant_out_q):
     while True:
         if not in_q.empty():
             ResetRequest_ble = in_q.get()
-            #print(ResetRequest_ble)
             parts = ResetRequest_ble.split()
             cmd = parts[0]
             if cmd == "reset_ble":
                 S4.reset_request()
-            elif cmd == "hr":
-                new_hr = int(parts[1])
-                if new_hr != ext_hr:
-                    ext_hr = new_hr
-                    ext_hr_time = time.time()
-                    print("ext_hr", ext_hr) 
+            #elif cmd == "hr":
+            #    new_hr = int(parts[1])
+            #    if new_hr != ext_hr:
+            #        ext_hr = new_hr
+            #        ext_hr_time = time.time()
+            #        print("ext_hr", ext_hr)
+
         else:
             pass
-        WRtoBLEANT.SendToBLE()
-        WRtoBLEANT.SendToANT()
-        ble_out_q.append(WRtoBLEANT.BLEvalues)
-        ant_out_q.append(WRtoBLEANT.ANTvalues) # here it is a class deque
+        WRtoBLEANT.CueBLEANT(ble_out_q, ant_out_q, hrm)
+
         #print(type(ant_out_q))
         #print(ant_out_q)
         #logger.info(WRtoBLEANT.BLEvalues)
