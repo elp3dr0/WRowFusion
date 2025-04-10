@@ -204,7 +204,12 @@ class DataLogger(object):
             if event['type'] == 'pulse':
                 self.PulseEventTime = event['at']
                 self.rowerreset = False
-            self.DeltaPulse = self.Lastcheckforpulse - self.PulseEventTime
+
+            if self.PulseEventTime is not None:
+                self.DeltaPulse = self.Lastcheckforpulse - self.PulseEventTime
+            else:
+                self.DeltaPulse = float('inf')  # Assume paddle is not turning yet
+
             if self.DeltaPulse <= NO_ROWING_PULSE_GAP:
                 self.PaddleTurning = True
             else:

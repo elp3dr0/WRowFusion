@@ -33,13 +33,22 @@ class HeartRateMonitor:
         now = time.time()
         
         with self._lock:
-            bt_age = f"{now - self._bluetooth_ts:.2f}" if self._bluetooth_ts else "N/A"
             bt_hr = self._bluetooth_hr
-            bt_valid = now - self._bluetooth_ts < HRM_TIMEOUT and bt_hr > 0
+            if self._bluetooth_ts is not None:
+                bt_age = f"{now - self._bluetooth_ts:.2f}"
+                bt_valid = (now - self._bluetooth_ts < HRM_TIMEOUT) and bt_hr > 0
+            else:
+                bt_age = "N/A"
+                bt_valid = False
 
-            ant_age = f"{now - self._ant_ts:.2f}" if self._ant_ts else "N/A"
-            ant_hr = self._ant_hr 
-            ant_valid = now - self._ant_ts < HRM_TIMEOUT and ant_hr > 0
+            ant_hr = self._ant_hr
+            if self._ant_ts is not None:
+                ant_age = f"{now - self._ant_ts:.2f}"
+                ant_valid = (now - self._ant_ts < HRM_TIMEOUT) and ant_hr > 0
+            else:
+                ant_age = "N/A"
+                ant_valid = False
+
 
             if bt_valid and (not ant_valid or self._bluetooth_ts >= self._ant_ts):
                 hr = bt_hr
