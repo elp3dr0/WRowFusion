@@ -466,7 +466,7 @@ WaterrowerValuesRaw_polled = None
 def Waterrower_poll():
     global WaterrowerValuesRaw
     global WaterrowerValuesRaw_polled
-    print("Running Waterrower_poll...")
+    #print("Running Waterrower_poll...")
     if ble_in_q_value:
         print("...ble_q is not none")
         WaterrowerValuesRaw = ble_in_q_value.pop()
@@ -477,7 +477,7 @@ def Waterrower_poll():
             WaterrowerValuesRaw_polled = WaterrowerValuesRaw
             print("rower", WaterrowerValuesRaw_polled)
     else:
-        print("...ble_q is empty")
+        #print("...ble_q is empty")
     return True
 
 
