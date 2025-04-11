@@ -476,7 +476,7 @@ def Waterrower_poll():
     return True
 
 
-def main(out_q,ble_in_q): #out_q
+def ble_server_task(out_q,ble_in_q): #out_q
     global mainloop
     global out_q_reset
     global ble_in_q_value

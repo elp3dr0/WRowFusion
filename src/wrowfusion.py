@@ -5,8 +5,10 @@ from queue import Queue
 from collections import deque
 from src.s4 import s4_heart_beat_task
 from src.s4 import s4_data_task
+from src.ble_server import ble_server_task
 from src.heart_rate import HeartRateMonitor
 from src.ble_client import HeartRateBLEScanner
+
 
 # List to keep track of running threads
 threads = []
@@ -21,7 +23,8 @@ def start_threads():
     ant_q = deque(maxlen=1)
 
     # Thread to connect as a client to BLE heart rate monitor
-    # This is an object that manages its own lifecycle with asyncio
+    # This is an object that manages its own lifecycle with asyncio so can be started using a different
+    # syntax to the other threads    
     ble_hrm_scanner = HeartRateBLEScanner(hr_monitor)
     threads.append(ble_hrm_scanner)
     
@@ -30,9 +33,14 @@ def start_threads():
     s4_heartbeat_thread = threading.Thread(target=s4_heart_beat_task, args=(hr_monitor,), daemon=True)
     threads.append(s4_heartbeat_thread)
 
-    # Thread for S4 polling and BLE/ANT output
+    # Thread for S4 polling and collating data for transmission via BLE/ANT 
     s4_data_thread = threading.Thread(target=s4_data_task, args=(q, ble_q, ant_q, hr_monitor), daemon=True)
     threads.append(s4_data_thread)
+
+    # Thread for advertising and connecting the RPi to external clients and sending the data
+    # to connected clients 
+    ble_server_thread = threading.Thread(target=ble_server_task, args=(q, ble_q), daemon=True)
+    threads.append(ble_server_thread)
 
 
     for thread in threads:
