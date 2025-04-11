@@ -88,7 +88,7 @@ def request_reset_ble():
     out_q_reset.put("reset_ble")
 
 def Convert_Waterrower_raw_to_byte():
-
+    print("Running Convert_Waterrower_raw_to_byte")
     WRBytearray = []
     #print("Ble Values: {0}".format(WaterrowerValuesRaw))
     #todo refactor this part with the correct struct.pack e.g. 2 bytes use "H" instand of bitshifiting ?
@@ -294,6 +294,7 @@ class RowerData(Characteristic):
         self.iter = 0
 
     def Waterrower_cb(self):
+        print("Running RowerData Waterrower_cb")
         Waterrower_byte_values = Convert_Waterrower_raw_to_byte()
         if self.last_values != Waterrower_byte_values:
             self.last_values = Waterrower_byte_values 
@@ -310,7 +311,7 @@ class RowerData(Characteristic):
         return self.notifying
 
     def _update_Waterrower_cb_value(self):
-        print('Update Waterrower Rower Data')
+        print('Running RowerData _update_Waterrower_cb_value')
 
         if not self.notifying:
             return
@@ -318,6 +319,7 @@ class RowerData(Characteristic):
         GLib.timeout_add(200, self.Waterrower_cb)
 
     def StartNotify(self):
+        print("Running RowerData StartNotify")
         if self.notifying:
             print('Already notifying, nothing to do')
             return
@@ -326,6 +328,7 @@ class RowerData(Characteristic):
         self._update_Waterrower_cb_value()
 
     def StopNotify(self):
+        print("Running RowerData StopNotify")
         if not self.notifying:
             print('Not notifying, nothing to do')
             return
@@ -463,8 +466,9 @@ WaterrowerValuesRaw_polled = None
 def Waterrower_poll():
     global WaterrowerValuesRaw
     global WaterrowerValuesRaw_polled
-
+    print("Running Waterrower_poll...")
     if ble_in_q_value:
+        print("...ble_q is not none")
         WaterrowerValuesRaw = ble_in_q_value.pop()
         for keys in WaterrowerValuesRaw:
             WaterrowerValuesRaw[keys] = int(WaterrowerValuesRaw[keys])
@@ -472,7 +476,8 @@ def Waterrower_poll():
         if WaterrowerValuesRaw_polled != WaterrowerValuesRaw:
             WaterrowerValuesRaw_polled = WaterrowerValuesRaw
             print("rower", WaterrowerValuesRaw_polled)
-
+    else:
+        print("...ble_q is empty")
     return True
 
 
