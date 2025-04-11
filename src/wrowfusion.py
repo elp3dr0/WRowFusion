@@ -1,3 +1,4 @@
+import logging
 import threading
 import signal
 import sys
@@ -9,6 +10,8 @@ from src.ble_server import ble_server_task
 from src.heart_rate import HeartRateMonitor
 from src.ble_client import HeartRateBLEScanner
 
+loggerconfigpath = str(pathlib.Path(__file__).parent.absolute()) +'/' +'logging.conf'
+logger = logging.getLogger(__name__)
 
 # List to keep track of running threads
 threads = []
