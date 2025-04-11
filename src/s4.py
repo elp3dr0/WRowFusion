@@ -278,14 +278,17 @@ class DataLogger(object):
         return values
 
     def CueBLEANT(self, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
-        print("CueBLEANT")
+        logger.debug("CueBLEANT calling get_WRValues")
         values = self.get_WRValues()
+        logger.debug("CueBLEANT returning from get_WRValues")
         if values:
+            logger.debug("CueBLEANT calling inject_HR")
             values = self.inject_HR(values, hrm)
+            logger.debug("CueBLEANT returning from inject_HR")
             with self._wr_lock:
                 self.BLEvalues = values
                 self.ANTvalues = values
-            print(f"values from S4: {values}")
+            logger.debug(f"CueBLEANT got values from S4: {values}")
             ble_out_q.append(values)
             ant_out_q.append(values)
 
