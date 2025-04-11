@@ -196,11 +196,15 @@ echo " "
 cp src/logging.conf.orig src/logging.conf
 sed -i 's@#REPO_DIR#@'"$repo_dir"'@g' src/logging.conf
 
-echo " "
+#echo " "
+#echo "----------------------------------------------"
+#echo " installation done ! rebooting in 3, 2, 1 "
+#echo "----------------------------------------------"
+#sleep 3
+#sudo reboot
 echo "----------------------------------------------"
-echo " installation done ! rebooting in 3, 2, 1 "
+echo " Installation done: Please reboot your system!"
 echo "----------------------------------------------"
-sleep 3
-sudo reboot
-echo " "
-exit 0
+
+#echo " "
+#exit 0
