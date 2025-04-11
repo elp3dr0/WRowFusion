@@ -67,7 +67,7 @@ class HeartRateBLEScanner(threading.Thread):
                 await self.fetch_static_info(client)
 
                 logger.info("Subscribing to heart rate notifications...")
-                #await client.start_notify(HRM_MEASUREMENT_CHAR_UUID, self.handle_heart_rate)
+                await client.start_notify(HRM_MEASUREMENT_CHAR_UUID, self.handle_heart_rate)
 
                 # Start low-frequency polling as a background task
                 low_freq_task = asyncio.create_task(self.poll_low_frequency_data(client))
