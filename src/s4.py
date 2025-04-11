@@ -296,22 +296,30 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
     WRtoBLEANT = DataLogger(S4)
     logger.info("Waterrower Ready and sending data to BLE and ANT Thread")
     while True:
-        if not in_q.empty():
-            ResetRequest_ble = in_q.get()
-            parts = ResetRequest_ble.split()
-            cmd = parts[0]
-            if cmd == "reset_ble":
-                S4.reset_request()
-            #elif cmd == "hr":
-            #    new_hr = int(parts[1])
-            #    if new_hr != ext_hr:
-            #        ext_hr = new_hr
-            #        ext_hr_time = time.time()
-            #        print("ext_hr", ext_hr)
+        start = time.time()
+        try:
+            if not in_q.empty():
+                ResetRequest_ble = in_q.get()
+                parts = ResetRequest_ble.split()
+                cmd = parts[0]
+                if cmd == "reset_ble":
+                    S4.reset_request()
+                #elif cmd == "hr":
+                #    new_hr = int(parts[1])
+                #    if new_hr != ext_hr:
+                #        ext_hr = new_hr
+                #        ext_hr_time = time.time()
+                #        print("ext_hr", ext_hr)
 
-        else:
-            pass
-        WRtoBLEANT.CueBLEANT(ble_out_q, ant_out_q, hrm)
+            logger.debug("Calling CueBLEANT")
+            WRtoBLEANT.CueBLEANT(ble_out_q, ant_out_q, hrm)
+            logger.debug("Returned from CueBLEANT")
+        except Exception as e:
+            logger.exception(f"Exception in s4_data_task loop: {e}")
+        
+        duration = time.time() - start
+        if duration > 1:
+            logger.warning(f"CueBLEANT took too long: {duration:.2f}s")
 
         #print(type(ant_out_q))
         #print(ant_out_q)
