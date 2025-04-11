@@ -278,12 +278,14 @@ class DataLogger(object):
         return values
 
     def CueBLEANT(self, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
+        print("CueBLEANT")
         values = self.get_WRValues()
         if values:
             values = self.inject_HR(values, hrm)
             with self._wr_lock:
                 self.BLEvalues = values
                 self.ANTvalues = values
+            print(f"values from S4: {values}")
             ble_out_q.append(values)
             ant_out_q.append(values)
 

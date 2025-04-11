@@ -515,6 +515,7 @@ def ble_server_task(out_q,ble_in_q): #out_q
     app.add_service(FTMservice(bus, 2))
     app.add_service(HeartRate(bus,3))
 
+    # Set a callback function to poll the WaterRower data every 100ms 
     GLib.timeout_add(100, Waterrower_poll)
 
     mainloop = MainLoop()
