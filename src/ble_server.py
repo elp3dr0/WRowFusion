@@ -476,7 +476,7 @@ def Waterrower_poll():
         if WaterrowerValuesRaw_polled != WaterrowerValuesRaw:
             WaterrowerValuesRaw_polled = WaterrowerValuesRaw
             print("rower", WaterrowerValuesRaw_polled)
-    else:
+    #else:
         #print("...ble_q is empty")
     return True
 
