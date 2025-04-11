@@ -259,13 +259,20 @@ class DataLogger(object):
 
 
     def get_WRValues(self):
-        with self._wr_lock:                
+        logger.debug("getWRValues starting lock")
+        with self._wr_lock:
+            logger.debug("getWRValues lock started")                
             if self.rowerreset:
+                logger.debug("getWRValues handling rowerreset")
                 values = deepcopy(self.WRValues_rst)
             elif self.PaddleTurning:
+                logger.debug("getWRValues handling PaddleTurning")
                 values = deepcopy(self.WRValues)
             else:
+                logger.debug("getWRValues handling standstill")
                 values = deepcopy(self.WRValues_standstill)
+            logger.debug("getWRValues ending lock")
+        logger.debug("getWRValues lock ended")
         return values
 
     def inject_HR(self, values, hrm: HeartRateMonitor):
