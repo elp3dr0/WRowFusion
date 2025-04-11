@@ -32,28 +32,43 @@ def start_threads():
     # This is an object that manages its own lifecycle with asyncio so can be started using a different
     # syntax to the other threads    
     ble_hrm_scanner = HeartRateBLEScanner(hr_monitor)
+    ble_hrm_scanner.name = "BLEHRMScannerThread"
     threads.append(ble_hrm_scanner)
     
     # Thread for simulating heart beat to send to S4 
     # This construct is an explicit request to run a function in a separate thread (unlike ble_hrm_scanner).
-    s4_heartbeat_thread = threading.Thread(target=s4_heart_beat_task, args=(hr_monitor,), daemon=True)
+    s4_heartbeat_thread = threading.Thread(target=s4_heart_beat_task, args=(hr_monitor,), daemon=True, name="S4HeatbeatThread")
     threads.append(s4_heartbeat_thread)
 
     # Thread for S4 polling and collating data for transmission via BLE/ANT 
-    s4_data_thread = threading.Thread(target=s4_data_task, args=(q, ble_q, ant_q, hr_monitor), daemon=True)
+    s4_data_thread = threading.Thread(target=s4_data_task, args=(q, ble_q, ant_q, hr_monitor), daemon=True, name="S4DataThread")
     threads.append(s4_data_thread)
 
     # Thread for advertising and connecting the RPi to external clients and sending the data
     # to connected clients 
-    ble_server_thread = threading.Thread(target=ble_server_task, args=(q, ble_q), daemon=True)
+    ble_server_thread = threading.Thread(target=ble_server_task, args=(q, ble_q), daemon=True, name="BLEServerThread")
     threads.append(ble_server_thread)
 
 
     for thread in threads:
         thread.start()
 
+    monitor_thread = threading.Thread(target=monitor_threads, daemon=True, name="MonitorThread")
+    threads.append(monitor_thread)
+    monitor_thread.start()
+
     # Optionally return or store monitor/scanner if needed elsewhere
     # return hr_monitor
+
+def monitor_threads():
+    """Periodically check thread health and log if any thread is not alive."""
+    import time
+    while True:
+        for thread in threads:
+            if not thread.is_alive():
+                logger.warning(f"Thread {thread.name} is not alive!")
+                print(f"[⚠️] Thread {thread.name} has stopped.")
+        time.sleep(10)  # Check every 10 seconds
 
 def stop_threads(signal_received, frame):
     """Handle graceful shutdown on Ctrl+C."""
