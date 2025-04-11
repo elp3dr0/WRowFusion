@@ -52,6 +52,9 @@ echo " "
 python3 -m venv venv
 source venv/bin/activate
 
+export repo_dir=$(cd $(dirname $0) > /dev/null 2>&1; pwd -P)
+export python3_path=$(which python3)
+
 echo " "
 echo "----------------------------------------------"
 echo "install needed python3 modules for the project        "
@@ -118,8 +121,7 @@ echo "PRETTY_HOSTNAME=WRowFusion" | sudo tee -a /etc/machine-info > /dev/null
 ##
 ## generate supervisord.conf from supervisord.conf.orig with updated paths
 ##
-#export repo_dir=$(cd $(dirname $0) > /dev/null 2>&1; pwd -P)
-#export python3_path=$(which python3)
+
 #export supervisord_path=$(which supervisord)
 #export supervisorctl_path=$(which supervisorctl)
 #
