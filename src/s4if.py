@@ -233,12 +233,17 @@ class Rower(object):
             self._find_serial()
 
     def open(self):
+        logger.debug("Rower.open: Testing for existing connection")
         if self._serial and self._serial.isOpen():
+            logger.debug("Rower.open: Calling ._serial._close")
             self._serial.close()
+        logger.debug("Rower.open: Calling _find_serial")
         self._find_serial()
+
+        logger.debug("Rower.open: Calling _is_set")
         if self._stop_event.is_set():
             #print("reset threads")
-            logger.info("reset threads")
+            logger.info("Rower.open: reset threads")
             self._stop_event.clear()
             self._request_thread = build_daemon(target=self.start_requesting)
             self._capture_thread = build_daemon(target=self.start_capturing)
@@ -247,6 +252,7 @@ class Rower(object):
             self._capture_thread.start()
             logger.info("Thread daemon _capture started")
 
+        logger.debug("Rower.open: Write USB_Request")
         self.write(USB_REQUEST)
 
     def close(self):
