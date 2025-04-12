@@ -300,9 +300,12 @@ class DataLogger(object):
             ant_out_q.append(values)
 
 def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
+    logger.debug("s4_data_task: Initialising Rower class")
     S4 = Rower()
+    logger.debug("s4_data_task: Opening Rower class")
     S4.open()
     #S4.reset_request()
+    logger.debug("s4_data_task: Initialising DataLogger")
     WRtoBLEANT = DataLogger(S4)
     logger.info("Waterrower Ready and sending data to BLE and ANT Thread")
     while True:
