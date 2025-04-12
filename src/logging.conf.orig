@@ -4,7 +4,7 @@
 # The root logger is currently configured to write info logs to stdout and debug logs
 # to a local file named "wrowfusion.log"
 [loggers]
-keys=root, src.wrowfusion, src.ble_client, src.ble_server, src.heart_rate, src.s4, bleak
+keys=root, src.wrowfusion, src.ble_client, src.ble_server, src.heart_rate, src.s4, src.s4if, bleak
 
 [handlers]
 keys=consoleHandler,fileHandler
@@ -44,6 +44,12 @@ propagate=0
 level=DEBUG
 handlers=consoleHandler, fileHandler
 qualname=src.s4
+propagate=0
+
+[logger_src.s4if]
+level=DEBUG
+handlers=consoleHandler, fileHandler
+qualname=src.s4if
 propagate=0
 
 [logger_bleak]
