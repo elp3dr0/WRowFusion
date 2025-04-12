@@ -200,6 +200,7 @@ def event_from(line):
 
 class Rower(object):
     def __init__(self, options=None):
+        logger.debug("Rower._init_")
         self._callbacks = set()
         self._stop_event = threading.Event()
         self._demo = False
