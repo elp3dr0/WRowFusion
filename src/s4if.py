@@ -223,8 +223,11 @@ class Rower(object):
 
     def _find_serial(self):
         if not self._demo:
+            logger.debug("Rower._find_serial: Calling ._find_port")
             self._serial.port = find_port()
+
         try:
+            logger.debug("Rower._find_serial: Calling ._serial.open")
             self._serial.open()
             logger.info("serial open")
         except serial.SerialException as e:

@@ -1,6 +1,17 @@
 import logging
 import logging.config
 import pathlib
+
+loggerconfigpath = str(pathlib.Path(__file__).parent.absolute()) +'/logging.conf'
+logging.config.fileConfig(loggerconfigpath)
+logger = logging.getLogger(__name__)
+
+# Do not put any non-logging related imports above this line,
+# especially imports from other parts of this project becuase 
+# that will prevent any modules that aren't explicitly
+# named in logger.conf from falling back to the default root
+# logger.
+
 import threading
 import signal
 import sys
@@ -12,9 +23,6 @@ from src.ble_server import ble_server_task
 from src.heart_rate import HeartRateMonitor
 from src.ble_client import HeartRateBLEScanner
 
-loggerconfigpath = str(pathlib.Path(__file__).parent.absolute()) +'/logging.conf'
-logging.config.fileConfig(loggerconfigpath)
-logger = logging.getLogger(__name__)
 
 # List to keep track of running threads
 threads = []
