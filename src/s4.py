@@ -77,7 +77,7 @@ class DataLogger(object):
         self._rower_interface.register_callback(self.on_rower_event)
         self._stop_event = threading.Event()
 
-        self._wr_lock = threading.Lock()
+        self._wr_lock = threading.RLock()
 
         self._InstaPowerStroke = None
         self.maxpowerStroke = None
