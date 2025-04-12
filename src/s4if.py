@@ -130,7 +130,12 @@ def find_port():
             if "WR-S4" in name:
                 logger.info("port found: %s" % path)
                 return path
-
+        # If a port isn't found, the code will remain in this loop.
+        # This will have the effect that any code asking for Rower.open() will
+        # not recieve control back until:
+        # - the port is found, otherwise the code loops here
+        # - and the serial is open without error, otherwise the code loops in _find_serial()
+        #  
         #print("port not found retrying in 5s")
         if ((attempts - 1) % 360) == 0: # message every ~30 minutes
           logger.warning("port not found in %d attempts; retrying every 5s",

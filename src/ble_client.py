@@ -47,7 +47,8 @@ class HeartRateBLEScanner(threading.Thread):
     async def scan_for_hrm(self):
         devices = await BleakScanner.discover(timeout=5.0)
         for d in devices:
-            if HRM_SERVICE_UUID.lower() in [uuid.lower() for uuid in d.advertisement_data.service_uuids]:
+            adv_data = d.advertisement_data
+            if HRM_SERVICE_UUID.lower() in [uuid.lower() for uuid in adv_data.service_uuids]:
                 logger.info(f"Found HRM: {d.name} [{d.address}]")
                 return d
         return None

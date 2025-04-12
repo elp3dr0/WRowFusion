@@ -304,6 +304,11 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
     S4 = Rower()
     logger.debug("s4_data_task: Opening Rower class")
     S4.open()
+    # Control will not return until a connection has been succesfully opened
+    # This means the thread will stay alive, but the code below and the loop
+    # which polls the S4 will not be executed unecessarily while an S4 is not
+    # connected
+    
     #S4.reset_request()
     logger.debug("s4_data_task: Initialising DataLogger")
     WRtoBLEANT = DataLogger(S4)
