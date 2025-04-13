@@ -329,6 +329,7 @@ class Rower(object):
         self.write(cmd + address)
 
     def register_callback(self, cb):
+        logger.debug(f"Rower.register_callback: Registering callback - {cb}")
         self._callbacks.add(cb)
 
     def remove_callback(self, cb):
