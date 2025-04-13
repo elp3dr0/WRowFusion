@@ -107,7 +107,9 @@ class DataLogger(object):
         #self._reset_state()
 
     def _reset_state(self):
+        logger.debug("DataLogger._reset_state: Attempting lock")
         with self._wr_lock:
+            logger.debug("DataLogger._reset_state: Lock attained, setting values")
             self._InstaPowerStroke = []
             self.maxpowerStroke = 0
             self._StrokeStart = False
@@ -142,6 +144,10 @@ class DataLogger(object):
             self.hoursWR = 0
             self.elapsetime = 0
             self.elapsetimeprevious = 0
+            logger.debug("DataLogger._reset_state: Values set")
+            logger.debug(f"DataLogger._reset_state: WRValues = {self.WRValues}")
+            logger.debug("DataLogger._reset_state: Releasing lock")
+        logger.debug("DataLogger._reset_state: Lock released.")
 
     def on_rower_event(self, event):
 
