@@ -227,8 +227,11 @@ class DataLogger(object):
                 self.WRValuesStandstill()
 
     def reset_requested(self,event):
+        logger.debug("DataLogger.reset_requested: Requesting Lock")
         with self._wr_lock:
+            logger.debug("DataLogger.reset_requested: Lock attained")
             if event['type'] == 'reset':
+                logger.debug("DataLogger.reset_requested: Calling _reset_state")
                 self._reset_state()
                 logger.info("value reseted")
 
@@ -265,20 +268,20 @@ class DataLogger(object):
 
 
     def get_WRValues(self):
-        logger.debug("getWRValues starting lock")
+        #logger.debug("getWRValues starting lock")
         with self._wr_lock:
-            logger.debug("getWRValues lock started")                
+            #logger.debug("getWRValues lock started")                
             if self.rowerreset:
-                logger.debug("getWRValues handling rowerreset")
+                #logger.debug("getWRValues handling rowerreset")
                 values = deepcopy(self.WRValues_rst)
             elif self.PaddleTurning:
-                logger.debug("getWRValues handling PaddleTurning")
+                #logger.debug("getWRValues handling PaddleTurning")
                 values = deepcopy(self.WRValues)
             else:
-                logger.debug("getWRValues handling standstill")
+                #logger.debug("getWRValues handling standstill")
                 values = deepcopy(self.WRValues_standstill)
-            logger.debug("getWRValues ending lock")
-        logger.debug("getWRValues lock ended")
+            #logger.debug("getWRValues ending lock")
+        #logger.debug("getWRValues lock ended")
         return values
 
     def inject_HR(self, values, hrm: HeartRateMonitor):
@@ -291,9 +294,9 @@ class DataLogger(object):
         return values
 
     def CueBLEANT(self, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
-        logger.debug("CueBLEANT calling get_WRValues")
+        #logger.debug("CueBLEANT calling get_WRValues")
         values = self.get_WRValues()
-        logger.debug("CueBLEANT returning from get_WRValues")
+        #logger.debug("CueBLEANT returning from get_WRValues")
         if values:
             logger.debug("CueBLEANT calling inject_HR")
             values = self.inject_HR(values, hrm)
@@ -337,7 +340,7 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
 
             logger.debug("Calling CueBLEANT")
             WRtoBLEANT.CueBLEANT(ble_out_q, ant_out_q, hrm)
-            logger.debug("Returned from CueBLEANT")
+            #logger.debug("Returned from CueBLEANT")
         except Exception as e:
             logger.exception(f"Exception in s4_data_task loop: {e}")
         

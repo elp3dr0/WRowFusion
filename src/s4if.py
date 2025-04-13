@@ -317,7 +317,7 @@ class Rower(object):
     def reset_request(self):
         self.write(RESET_REQUEST)
         self.notify_callbacks(build_event('reset'))
-        logger.info("Reset requested")
+        logger.info("Rower.reset_request: Reset requested")
 
     def request_info(self):
         self.write(MODEL_INFORMATION_REQUEST)
