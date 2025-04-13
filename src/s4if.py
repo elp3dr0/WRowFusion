@@ -335,5 +335,7 @@ class Rower(object):
         self._callbacks.remove(cb)
 
     def notify_callbacks(self, event):
+        logger.debug(f"Rower.notify_callbacks: Notifing callbacks of event {event}")
         for cb in self._callbacks:
+            logger.debug(f"Rower.notify_callbacks: Notifying callback {cb} of event {event}")
             cb(event)
