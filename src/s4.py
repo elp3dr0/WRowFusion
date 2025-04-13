@@ -309,7 +309,7 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
     # which polls the S4 will not be executed unecessarily while an S4 is not
     # connected
     
-    #S4.reset_request()
+    S4.reset_request()
     logger.debug("s4_data_task: Initialising DataLogger")
     WRtoBLEANT = DataLogger(S4)
     logger.info("Waterrower Ready and sending data to BLE and ANT Thread")
