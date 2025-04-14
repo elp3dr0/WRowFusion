@@ -104,7 +104,10 @@ class DataLogger(object):
         self.elapsetime = None
         self.elapsetimeprevious = None
 
-        #self._reset_state()
+        # Initialise the attributes, particularly the WRValues dictionaries because subsequent
+        # code tries to update the values of the dictionaries and so expect the dictionary keys
+        # to exist already.
+        self._reset_state()
 
     def _reset_state(self):
         logger.debug("DataLogger._reset_state: Attempting lock")
