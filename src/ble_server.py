@@ -88,7 +88,7 @@ def request_reset_ble():
     out_q_reset.put("reset_ble")
 
 def Convert_Waterrower_raw_to_byte():
-    print("Running Convert_Waterrower_raw_to_byte")
+    logger.debug(f"Running Convert_Waterrower_raw_to_byte on WaterrowerValuesRaw: {WaterrowerValuesRaw}")
     WRBytearray = []
     #print("Ble Values: {0}".format(WaterrowerValuesRaw))
     #todo refactor this part with the correct struct.pack e.g. 2 bytes use "H" instand of bitshifiting ?
@@ -294,8 +294,9 @@ class RowerData(Characteristic):
         self.iter = 0
 
     def Waterrower_cb(self):
-        print("Running RowerData Waterrower_cb")
+        logger.debug("RowerData.Waterrower_cb: About to call Convert_Waterrower_raw_to_byte")
         Waterrower_byte_values = Convert_Waterrower_raw_to_byte()
+        logger.debug(f"Rower.Waterrower_cb: Got Waterrower_byte_values: {Waterrower_byte_values}")
         if self.last_values != Waterrower_byte_values:
             self.last_values = Waterrower_byte_values 
             value = [dbus.Byte(0x2C), dbus.Byte(0x0B),
@@ -468,8 +469,9 @@ def Waterrower_poll():
     global WaterrowerValuesRaw_polled
     #print("Running Waterrower_poll...")
     if ble_in_q_value:
-        print("...ble_q is not none")
+        logger.debug("Waterrower_poll: ble_q is not none, getting values...")
         WaterrowerValuesRaw = ble_in_q_value.pop()
+        logger.debug(f"Waterrower_poll: WaterrowerValuesRaw = {WaterrowerValuesRaw}")
         for keys in WaterrowerValuesRaw:
             WaterrowerValuesRaw[keys] = int(WaterrowerValuesRaw[keys])
 

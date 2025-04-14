@@ -230,10 +230,10 @@ class DataLogger(object):
                 self.WRValuesStandstill()
 
     def reset_requested(self,event):
-        logger.debug("DataLogger.reset_requested: Requesting Lock")
-        with self._wr_lock:
-            logger.debug("DataLogger.reset_requested: Lock attained")
-            if event['type'] == 'reset':
+        if event['type'] == 'reset':
+            logger.debug("DataLogger.reset_requested: Requesting Lock")
+            with self._wr_lock:
+                logger.debug("DataLogger.reset_requested: Lock attained")
                 logger.debug("DataLogger.reset_requested: Calling _reset_state")
                 self._reset_state()
                 logger.info("value reseted")
@@ -301,13 +301,13 @@ class DataLogger(object):
         values = self.get_WRValues()
         #logger.debug("CueBLEANT returning from get_WRValues")
         if values:
-            logger.debug("CueBLEANT calling inject_HR")
+            #logger.debug("CueBLEANT calling inject_HR")
             values = self.inject_HR(values, hrm)
-            logger.debug("CueBLEANT returning from inject_HR")
+            #logger.debug("CueBLEANT returning from inject_HR")
             with self._wr_lock:
                 self.BLEvalues = values
                 self.ANTvalues = values
-            logger.debug(f"CueBLEANT got values from S4: {values}")
+            logger.debug(f"CueBLEANT got values to append to dqueues from S4: {values}")
             ble_out_q.append(values)
             ant_out_q.append(values)
 
