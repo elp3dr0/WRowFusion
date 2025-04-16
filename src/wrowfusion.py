@@ -19,7 +19,7 @@ from queue import Queue
 from collections import deque
 from src.s4 import s4_heart_beat_task
 from src.s4 import s4_data_task
-from src.ble_server import ble_server_task
+from src import ble_server
 from src.heart_rate import HeartRateMonitor
 from src.ble_client import HeartRateBLEScanner
 
@@ -54,7 +54,7 @@ def start_threads():
 
     # Thread for advertising and connecting the RPi to external clients and sending the data
     # to connected clients 
-    ble_server_thread = threading.Thread(target=ble_server_task, args=(q, ble_q), daemon=True, name="BLEServerThread")
+    ble_server_thread = threading.Thread(target=ble_server.ble_server_task, args=(q, ble_q), daemon=True, name="BLEServerThread")
     threads.append(ble_server_thread)
 
 
