@@ -35,6 +35,7 @@ sudo apt-get install -y \
     python3-pip \
     libatlas-base-dev \
     libglib2.0-dev \
+    libdbus-1-dev \
     libgirepository1.0-dev \
     libcairo2-dev \
     zlib1g-dev \
