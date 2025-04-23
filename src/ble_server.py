@@ -517,7 +517,7 @@ AGENT_PATH = "/com/inonoob/agent"
 WaterrowerValuesRaw_polled = None
 
 def Waterrower_poll():
-    logger.debug("Entering Waterrower_poll")
+    #logger.debug("Entering Waterrower_poll")
     global WaterrowerValuesRaw
     global WaterrowerValuesRaw_polled
 
@@ -589,8 +589,8 @@ def ble_server_task(out_q,ble_in_q): #out_q
     app.add_service(DeviceInformation(bus, 1))
     logger.debug("main: Calling add_service - FTMservice")
     app.add_service(FTMservice(bus, 2))
-    logger.debug("main: Calling add_service - HeartRate")
-    app.add_service(HeartRate(bus,3))
+    #logger.debug("main: Calling add_service - HeartRate")
+    #app.add_service(HeartRate(bus,3))
 
     # Set a callback function to poll the WaterRower data every 100ms 
     logger.debug("main: Set up Waterrower_poll recurring task")
