@@ -77,8 +77,8 @@ def monitor_threads():
             if not thread.is_alive():
                 logger.warning(f"Thread {thread.name} is not alive!")
                 print(f"[⚠️] Thread {thread.name} has stopped.")
-            else:
-                print(f"[⚠️] Thread {thread.name} is alive.")
+            #else:
+            #    print(f"[⚠️] Thread {thread.name} is alive.")
         time.sleep(10)  # Check every 10 seconds
 
 def stop_threads(signal_received, frame):
