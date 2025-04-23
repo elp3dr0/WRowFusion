@@ -31,6 +31,11 @@ def start_threads():
     """Start all necessary background tasks."""
     hr_monitor = HeartRateMonitor()
 
+    def BleService(out_q, ble_in_q):
+        logger.info("Start BLE Advertise and BLE GATT Server")
+        bleService = ble_server.main(out_q, ble_in_q)
+        bleService()
+
     # Queues for passing data between S4 and ANT/BLE 
     q = Queue()
     ble_q = deque(maxlen=1)
@@ -49,13 +54,17 @@ def start_threads():
     #threads.append(s4_heartbeat_thread)
 
     # Thread for S4 polling and collating data for transmission via BLE/ANT 
-    s4_data_thread = threading.Thread(target=s4_data_task, args=(q, ble_q, ant_q, hr_monitor), daemon=True, name="S4DataThread")
-    threads.append(s4_data_thread)
+#    s4_data_thread = threading.Thread(target=s4_data_task, args=(q, ble_q, ant_q, hr_monitor), daemon=True, name="S4DataThread")
+#    threads.append(s4_data_thread)
 
     # Thread for advertising and connecting the RPi to external clients and sending the data
     # to connected clients 
-    ble_server_thread = threading.Thread(target=ble_server.ble_server_task, args=(q, ble_q), daemon=True, name="BLEServerThread")
-    threads.append(ble_server_thread)
+    #ble_server_thread = threading.Thread(target=ble_server.ble_server_task, args=(q, ble_q), daemon=True, name="BLEServerThread")
+    #threads.append(ble_server_thread)
+
+    t = threading.Thread(target=BleService, args=(q, ble_q))
+    t.daemon = True
+    threads.append(t)
 
     logger.debug("wrfusion.start_threads: about to start threads")
     for thread in threads:

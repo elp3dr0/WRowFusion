@@ -96,7 +96,7 @@ def request_reset_ble():
     out_q_reset.put("reset_ble")
 
 def Convert_Waterrower_raw_to_byte():
-    logger.debug(f"Entering Conert_Waterrower_raw_to_byte on WaterrowerValuesRaw: {WaterrowerValuesRaw}")
+    logger.debug("Entering Conert_Waterrower_raw_to_byte")
     WRBytearray = []
     #print("Ble Values: {0}".format(WaterrowerValuesRaw))
     #todo refactor this part with the correct struct.pack e.g. 2 bytes use "H" instand of bitshifiting ?
@@ -330,7 +330,6 @@ class RowerData(Characteristic):
     def Waterrower_cb(self):
         logger.debug("Entering RowerData.Waterrower_cb")
         Waterrower_byte_values = Convert_Waterrower_raw_to_byte()
-        logger.debug(f"Rower.Waterrower_cb: Got Waterrower_byte_values: {Waterrower_byte_values}")
         if self.last_values != Waterrower_byte_values:
             self.last_values = Waterrower_byte_values 
             value = [dbus.Byte(0x2C), dbus.Byte(0x0B),
@@ -347,7 +346,7 @@ class RowerData(Characteristic):
 
     def _update_Waterrower_cb_value(self):
         logger.debug("Entering RowerData.update_Waterrower_cb_value")
-        #print('Update Waterrower Rower Data')
+        print('Update Waterrower Rower Data')
 
         if not self.notifying:
             return
@@ -491,7 +490,7 @@ class FTMPAdvertisement(Advertisement):
         self.add_service_uuid(HeartRate.HEART_RATE)
 
         #self.add_local_name("S4 Comms PI")
-        self.add_local_name("WRowFusion")
+        self.add_local_name("PiRowFlo")
         self.include_tx_power = True
 
 
@@ -522,9 +521,7 @@ def Waterrower_poll():
     global WaterrowerValuesRaw_polled
 
     if ble_in_q_value:
-        logger.debug("Waterrower_poll: ble_q is not none, getting values...")
         WaterrowerValuesRaw = ble_in_q_value.pop()
-        logger.debug(f"Waterrower_poll: WaterrowerValuesRaw = {WaterrowerValuesRaw}")
         for keys in WaterrowerValuesRaw:
             WaterrowerValuesRaw[keys] = int(WaterrowerValuesRaw[keys])
 
@@ -535,7 +532,7 @@ def Waterrower_poll():
     return True
 
 
-def ble_server_task(out_q,ble_in_q): #out_q
+def main(out_q,ble_in_q): #out_q
     logger.debug("main: Entering main")
     global mainloop
     global out_q_reset
@@ -592,7 +589,6 @@ def ble_server_task(out_q,ble_in_q): #out_q
     logger.debug("main: Calling add_service - HeartRate")
     app.add_service(HeartRate(bus,3))
 
-    # Set a callback function to poll the WaterRower data every 100ms 
     logger.debug("main: Set up Waterrower_poll recurring task")
     GLib.timeout_add(100, Waterrower_poll)
 
