@@ -49,8 +49,8 @@ def start_threads():
     #threads.append(s4_heartbeat_thread)
 
     # Thread for S4 polling and collating data for transmission via BLE/ANT 
-    s4_data_thread = threading.Thread(target=s4_data_task, args=(q, ble_q, ant_q, hr_monitor), daemon=True, name="S4DataThread")
-    threads.append(s4_data_thread)
+    #s4_data_thread = threading.Thread(target=s4_data_task, args=(q, ble_q, ant_q, hr_monitor), daemon=True, name="S4DataThread")
+    #threads.append(s4_data_thread)
 
     # Thread for advertising and connecting the RPi to external clients and sending the data
     # to connected clients 
