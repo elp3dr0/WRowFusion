@@ -335,11 +335,11 @@ class Advertisement(dbus.service.Object):
 AGENT_INTERFACE = "org.bluez.Agent1"
 
 
-def ask(prompt):
-    try:
-        return raw_input(prompt)
-    except:
-        return input(prompt)
+#def ask(prompt):
+#    try:
+#        return raw_input(prompt)
+#    except:
+#        return input(prompt)
 
 
 def set_trusted(path):
@@ -373,6 +373,7 @@ class Agent(dbus.service.Object):
     @dbus.service.method(AGENT_INTERFACE, in_signature="os", out_signature="")
     def AuthorizeService(self, device, uuid):
         logger.info("AuthorizeService (%s, %s)" % (device, uuid))
+        set_trusted(device)
         authorize = "yes" # ask("Authorize connection (yes/no): ")
         if authorize == "yes":
             return
@@ -380,16 +381,20 @@ class Agent(dbus.service.Object):
 
     @dbus.service.method(AGENT_INTERFACE, in_signature="o", out_signature="s")
     def RequestPinCode(self, device):
-        logger.info("RequestPinCode (%s)" % (device))
-        set_trusted(device)
-        return ask("Enter PIN Code: ")
+        logger.info("RequestPinCode (%s) - Just Works, rejecting PIN" % device)
+        raise Rejected("No PIN code available for Just Works")
+        #logger.info("RequestPinCode (%s)" % (device))
+        #set_trusted(device)
+        #return ask("Enter PIN Code: ")
 
     @dbus.service.method(AGENT_INTERFACE, in_signature="o", out_signature="u")
     def RequestPasskey(self, device):
-        logger.info("RequestPasskey (%s)" % (device))
-        set_trusted(device)
-        passkey = ask("Enter passkey: ")
-        return dbus.UInt32(passkey)
+        logger.info("RequestPasskey (%s) - Just Works, rejecting passkey" % device)
+        raise Rejected("No passkey available for Just Works")
+        #logger.info("RequestPasskey (%s)" % (device))
+        #set_trusted(device)
+        #passkey = ask("Enter passkey: ")
+        #return dbus.UInt32(passkey)
 
     @dbus.service.method(AGENT_INTERFACE, in_signature="ouq", out_signature="")
     def DisplayPasskey(self, device, passkey, entered):
@@ -401,16 +406,20 @@ class Agent(dbus.service.Object):
 
     @dbus.service.method(AGENT_INTERFACE, in_signature="ou", out_signature="")
     def RequestConfirmation(self, device, passkey):
-        logger.info("RequestConfirmation (%s, %06d)" % (device, passkey))
-        confirm = "yes" #ask("Confirm passkey (yes/no): ")
-        if confirm == "yes":
-            set_trusted(device)
-            return
-        raise Rejected("Passkey doesn't match")
+        logger.info("Auto-confirming Just Works pairing with passkey %06d for device %s" % (passkey, device))
+        set_trusted(device)
+        return
+        #logger.info("RequestConfirmation (%s, %06d)" % (device, passkey))
+        #confirm = "yes" #ask("Confirm passkey (yes/no): ")
+        #if confirm == "yes":
+        #    set_trusted(device)
+        #    return
+        #raise Rejected("Passkey doesn't match")
 
     @dbus.service.method(AGENT_INTERFACE, in_signature="o", out_signature="")
     def RequestAuthorization(self, device):
         logger.info("RequestAuthorization (%s)" % (device))
+        set_trusted(device)
         auth = "yes" #ask("Authorize? (yes/no): ")
         if auth == "yes":
             return
@@ -418,4 +427,4 @@ class Agent(dbus.service.Object):
 
     @dbus.service.method(AGENT_INTERFACE, in_signature="", out_signature="")
     def Cancel(self):
-        logger.info("Cancel")
+        logger.info("Agent request cancelled")

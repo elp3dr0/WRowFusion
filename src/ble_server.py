@@ -580,6 +580,9 @@ def ble_server_task(out_q,ble_in_q): #out_q
     logger.debug("main: Get bus object for bluez service")
     obj = bus.get_object(BLUEZ_SERVICE_NAME, "/org/bluez")
 
+    # Instantiates the Agent class. It creates the actual agent service object 
+    # on the D-Bus, implementing org.bluez.Agent1. This is essential, even though
+    # the agent variable is not referred to later on.
     logger.debug("main: Get Agent")
     agent = Agent(bus, AGENT_PATH)
 
