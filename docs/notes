@@ -55,14 +55,6 @@ For your WaterRower S4 emulation project, if your Raspberry Pi is going to use r
 
 
 
-
-
-
-You said:
-I'm less concerned about the Raspberry Pi protecting its privacy, but it needs to be able to handle connections to devices such as Phones that might implement random addresses on their side.
-
-
-ChatGPT said:
 If your primary concern is handling connections from devices like phones, which might use random addresses (such as for privacy reasons), then implementing Central Address Resolution (CAR) on the Raspberry Pi is indeed relevant.
 
 Here’s what you should consider for your WaterRower S4 emulation project:
@@ -135,3 +127,118 @@ Your Raspberry Pi doesn’t need to protect its own privacy, but it must be able
 You can achieve this by ensuring your Raspberry Pi, when emulating the WaterRower S4, is configured to handle random addresses using Central Address Resolution and advertising with the correct flags for privacy in GAP.
 
 BlueZ on the Raspberry Pi should automatically handle most of this for you, but make sure the correct configuration options for privacy and address resolution are enabled.
+
+## 2. How connected BLE devices subscribe to notifications
+
+🔄 High-Level Flow:
+The Central (e.g. phone or app) subscribes to notifications on the RowerData characteristic. This is a standard GATT procedure.
+
+BlueZ invokes the StartNotify() method of your RowerData class.
+
+Your implementation sets self.notifying = True and calls _update_Waterrower_cb_value().
+
+That method schedules a repeating callback using GLib.timeout_add(200, self.Waterrower_cb), i.e. every 200ms.
+
+Waterrower_cb() is now called on a 200ms interval, as long as self.notifying is True.
+
+🧵 Detailed Chain:
+📍Step 1: Notification subscription
+The Bluetooth central sends a Write to the Client Characteristic Configuration Descriptor (CCCD).
+
+That causes BlueZ to call your StartNotify() implementation.
+
+📍Step 2: StartNotify() runs
+python
+Copy
+Edit
+def StartNotify(self):
+    logger.debug("Entering RowerData.StartNotify")
+    if self.notifying:
+        print('Already notifying, nothing to do')
+        return
+
+    self.notifying = True
+    self._update_Waterrower_cb_value()
+→ This sets the flag and triggers the first timer-based update.
+
+📍Step 3: _update_Waterrower_cb_value() runs
+python
+Copy
+Edit
+def _update_Waterrower_cb_value(self):
+    logger.debug("Entering RowerData.update_Waterrower_cb_value")
+    if not self.notifying:
+        return
+
+    GLib.timeout_add(200, self.Waterrower_cb)
+→ This sets up a 200ms timer that keeps calling Waterrower_cb() until self.notifying is set to False.
+
+📍Step 4: Waterrower_cb() is invoked
+python
+Copy
+Edit
+def Waterrower_cb(self):
+    logger.debug("Entering RowerData.Waterrower_cb")
+    Waterrower_byte_values = Convert_Waterrower_raw_to_byte()
+    ...
+    self.PropertiesChanged(GATT_CHRC_IFACE, { 'Value': value }, [])
+→ It reads new data from the rower, compares it with the last sent values, and pushes out a notification only if the data has changed.
+
+→ Then it returns self.notifying, which is important:
+
+💡 Why return self.notifying?
+Because GLib.timeout_add will keep calling the callback again as long as the return value is True.
+
+So your logic creates a self-sustaining polling loop that only stops if the client unsubscribes (via StopNotify()).
+
+🔄 What about stopping?
+StopNotify() sets self.notifying = False.
+Then _update_Waterrower_cb_value() is called again, but since self.notifying is now false, the callback isn't re-added to the GLib event loop.
+
+✅ Summary
+So yes:
+✅ Waterrower_cb() is eventually called on a 200ms repeating timer
+✅ That loop begins when the client subscribes via StartNotify()
+✅ It ends when StopNotify() is called
+
+Note that the phone does not automatically subscribe to notifications on the RowerData characteristic when it connects or pairs.
+
+✅ What does happen when a central (like a phone) connects:
+The central discovers services — it sends a request to discover what services and characteristics the peripheral (your Raspberry Pi) offers. This is usually automatic.
+
+It sees the RowerData characteristic with the notify property.
+
+But in order to receive notifications, the central must:
+
+Write a specific value (typically 0x01 0x00) to the Client Characteristic Configuration Descriptor (CCCD) of RowerData.
+
+This is a standard part of GATT behaviour.
+
+🔁 Typical Central Behaviour (e.g. an iOS or Android fitness app):
+Upon connecting, it:
+
+Discovers the Fitness Machine Service (0x1826)
+
+Finds the RowerData characteristic (0x2AD1)
+
+Writes to the CCCD to enable notifications on that characteristic
+
+Once that happens, BlueZ will call your StartNotify() method, and your GLib.timeout_add(...) cycle begins.
+
+🔐 What about pairing?
+Pairing and bonding are optional and independent from notification subscription.
+
+Pairing just means that the devices exchange keys and potentially enable encryption.
+
+Bonding means they store those keys for later re-use.
+
+Notifications still require the CCCD to be explicitly written to, regardless of whether the devices are paired.
+
+✅ Summary
+
+Action	Automatically Happens?
+Service discovery	✅ Yes
+Characteristic discovery	✅ Yes
+Notification subscription	❌ No — requires CCCD write
+StartNotify() triggered	❌ Only after subscription
+Pairing	❌ Optional
