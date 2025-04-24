@@ -3,7 +3,7 @@
 - [ ] 
 
 ## 📌 Current Focus
-- [ ] Bluetooth server
+- [ ] Debug bluetooth server
 - [ ] 
 
 ## 🧱 Infrastructure
@@ -17,6 +17,7 @@
 - [ ] Evaluate thread safety of DataLogger callbacks
 
 ## 📡 Bluetooth & ANT+
+- [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)
 - [ ] Add support for ANT+ HR broadcast
 - [ ] Implement reconnection logic for BLE HRM
 - [ ] Explore need for pyusb (for ANT+ reciever) and gatt (smartrow?) in requirements.txt
