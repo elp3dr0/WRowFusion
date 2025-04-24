@@ -96,7 +96,7 @@ def request_reset_ble():
     out_q_reset.put("reset_ble")
 
 def Convert_Waterrower_raw_to_byte():
-    logger.debug(f"Entering Conert_Waterrower_raw_to_byte on WaterrowerValuesRaw: {WaterrowerValuesRaw}")
+    logger.debug(f"Entering Conert_Waterrower_raw_to_byte on WaterrowerValuesRaw:") # {WaterrowerValuesRaw}")
     WRBytearray = []
     #print("Ble Values: {0}".format(WaterrowerValuesRaw))
     #todo refactor this part with the correct struct.pack e.g. 2 bytes use "H" instand of bitshifiting ?
@@ -119,6 +119,7 @@ def Convert_Waterrower_raw_to_byte():
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['heart_rate'] & 0xff)))
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['elapsedtime'] & 0xff)))
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['elapsedtime'] & 0xff00) >> 8))
+    logger.debug(f"{WRBytearray}")
     return WRBytearray
 
 
@@ -490,7 +491,6 @@ class FTMPAdvertisement(Advertisement):
         self.add_service_uuid(FTMservice.FITNESS_MACHINE_UUID)
         self.add_service_uuid(HeartRate.HEART_RATE)
 
-        #self.add_local_name("S4 Comms PI")
         self.add_local_name("WRowFusion")
         self.include_tx_power = True
 
