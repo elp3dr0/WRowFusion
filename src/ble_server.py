@@ -330,6 +330,10 @@ class RowerData(Characteristic):
 
     def Waterrower_cb(self):
         logger.debug("Entering RowerData.Waterrower_cb")
+        if not WaterrowerValuesRaw:
+            logger.warning("RowerData.Waterrower_cb: WaterrowerValuesRaw is empty or not yet initialised.")
+            return self.notifying
+        
         Waterrower_byte_values = Convert_Waterrower_raw_to_byte()
         logger.debug(f"Rower.Waterrower_cb: Got Waterrower_byte_values: {Waterrower_byte_values}")
         if self.last_values != Waterrower_byte_values:
@@ -442,6 +446,10 @@ class HeartRateMeasurement(Characteristic):
 
     def Waterrower_cb(self):
         logger.debug("Entering HeartRateMeasurement.Waterrower_cb")
+        if not WaterrowerValuesRaw:
+            logger.warning("HeartRateMeasurement.Waterrower_cb: WaterrowerValuesRaw is empty or not yet initialised.")
+            return self.notifying
+
         hr = WaterrowerValuesRaw['heart_rate'];
         if self.last_hr != hr:
             self.last_hr = hr
@@ -512,7 +520,7 @@ def sigint_handler(sig, frame):
     else:
         raise ValueError("Undefined handler for '{}' ".format(sig))
 
-AGENT_PATH = "/com/inonoob/agent"
+AGENT_PATH = "/com/wrowfusion/agent"
 
 WaterrowerValuesRaw_polled = None
 
