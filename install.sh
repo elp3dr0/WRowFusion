@@ -194,8 +194,8 @@ echo " Add absolut path to the logging.conf file    "
 echo "----------------------------------------------"
 echo " "
 
-cp src/logging.conf.orig src/logging.conf
-sed -i 's@#REPO_DIR#@'"$repo_dir"'@g' src/logging.conf
+cp config/logging.conf.orig config/logging.conf
+sed -i 's@#REPO_DIR#@'"$repo_dir"'@g' config/logging.conf
 
 #echo " "
 #echo "----------------------------------------------"
