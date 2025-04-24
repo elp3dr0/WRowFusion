@@ -1,8 +1,13 @@
 import logging
 import logging.config
 import pathlib
+import os
 
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent.absolute()
+
+log_dir = PROJECT_ROOT / 'logs'
+os.makedirs(log_dir, exist_ok=True)
+
 loggerconfigpath = str(PROJECT_ROOT / 'config' / 'logging.conf')
 logging.config.fileConfig(loggerconfigpath)
 logger = logging.getLogger(__name__)
