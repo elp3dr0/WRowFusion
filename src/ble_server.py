@@ -502,7 +502,7 @@ class FTMPAdvertisement(Advertisement):
         self.add_local_name("WRowFusion")
         self.include_tx_power = True
         # Advertise as LE only, no BD/EDR to try and sidestep MITM input/output requirements.
-        self.add_data(dbus.UInt8(0x01), [dbus.Byte(0x06)])
+        self.add_data(0x01, [dbus.Byte(0x06)])
 
 def register_ad_cb():
     logger.debug("Entering FTMPAdvertisement.register_ad_cb")
