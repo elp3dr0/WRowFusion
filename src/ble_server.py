@@ -328,14 +328,14 @@ class RowerData(Characteristic):
         self.notifying = False
         self.iter = 0
 
-    def Waterrower_cb(self):
-        logger.debug("Entering RowerData.Waterrower_cb")
+    def rowerdata_cb(self):
+        logger.debug("Entering RowerData.rowerdata_cb")
         if not WaterrowerValuesRaw:
-            logger.warning("RowerData.Waterrower_cb: WaterrowerValuesRaw is empty or not yet initialised.")
+            logger.warning("RowerData.rowerdata_cb: WaterrowerValuesRaw is empty or not yet initialised.")
             return self.notifying
         
         Waterrower_byte_values = Convert_Waterrower_raw_to_byte()
-        logger.debug(f"Rower.Waterrower_cb: Got Waterrower_byte_values: {Waterrower_byte_values}")
+        logger.debug(f"Rower.rowerdata: Got Waterrower_byte_values: {Waterrower_byte_values}")
         if self.last_values != Waterrower_byte_values:
             self.last_values = Waterrower_byte_values 
             value = [dbus.Byte(0x2C), dbus.Byte(0x0B),
@@ -350,14 +350,14 @@ class RowerData(Characteristic):
             self.PropertiesChanged(GATT_CHRC_IFACE, { 'Value': value }, [])
         return self.notifying
 
-    def _update_Waterrower_cb_value(self):
-        logger.debug("Entering RowerData.update_Waterrower_cb_value")
+    def _update_rowerdata_cb_value(self):
+        logger.debug("Entering RowerData.update_rowerdata_cb_value")
         #print('Update Waterrower Rower Data')
 
         if not self.notifying:
             return
 
-        GLib.timeout_add(200, self.Waterrower_cb)
+        GLib.timeout_add(200, self.rowerdata_cb)
 
     def StartNotify(self):
         logger.debug("Entering RowerData.StartNotify")
@@ -366,7 +366,7 @@ class RowerData(Characteristic):
             return
 
         self.notifying = True
-        self._update_Waterrower_cb_value()
+        self._update_rowerdata_cb_value()
 
     def StopNotify(self):
         logger.debug("Entering RowerData.StopNotify")
@@ -375,7 +375,7 @@ class RowerData(Characteristic):
             return
 
         self.notifying = False
-        self._update_Waterrower_cb_value()
+        self._update_rowerdata_cb_value()
 
 
 ###### todo: function needed to get all the date from waterrower
@@ -444,10 +444,10 @@ class HeartRateMeasurement(Characteristic):
             service)
         self.notifying = False
 
-    def Waterrower_cb(self):
-        logger.debug("Entering HeartRateMeasurement.Waterrower_cb")
+    def hrm_cb(self):
+        logger.debug("Entering HeartRateMeasurement.hrm_cb")
         if not WaterrowerValuesRaw:
-            logger.warning("HeartRateMeasurement.Waterrower_cb: WaterrowerValuesRaw is empty or not yet initialised.")
+            logger.warning("HeartRateMeasurement.hrm_cb: WaterrowerValuesRaw is empty or not yet initialised.")
             return self.notifying
 
         hr = WaterrowerValuesRaw['heart_rate'];
@@ -459,14 +459,14 @@ class HeartRateMeasurement(Characteristic):
             self.PropertiesChanged(GATT_CHRC_IFACE, { 'Value': value }, [])
         return self.notifying
 
-    def _update_Waterrower_cb_value(self):
-        logger.debug("Entering HeartRateMeasurement.update_waterrower_cb_values")
+    def _update_hrm_cb_value(self):
+        logger.debug("Entering HeartRateMeasurement.update_hrm_cb_values")
         print('Update Waterrower HR Data')
 
         if not self.notifying:
             return
 
-        GLib.timeout_add(1000, self.Waterrower_cb)
+        GLib.timeout_add(1000, self.hrm_cb)
 
     def StartNotify(self):
         logger.debug("Entering HeartRateMeasurement.StartNotify")
@@ -476,7 +476,7 @@ class HeartRateMeasurement(Characteristic):
 
         print('Start HR Notify')
         self.notifying = True
-        self._update_Waterrower_cb_value()
+        self._update_hrm_cb_value()
         
     def StopNotify(self):
         logger.debug("Entering HeartRateMeasurement.StopNotify")
