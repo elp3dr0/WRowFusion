@@ -7,10 +7,10 @@
 - [ ] 
 
 ## 🧱 Infrastructure
-- [ ] Build systemd service for auto-start
-- [ ] Create install script to handle venv setup
+- [x] Build systemd service for auto-start
+- [x] Create install script to handle venv setup
 - [ ] Setup logging config file with rotation
-- [ ] Add user to the GPIO group so that the program can be run without root
+- [x] Add user to the GPIO group so that the program can be run without root
 
 ## 🔄 Data Handling
 - [ ] Replace deque with shared DataLogger instance
@@ -50,6 +50,7 @@
 - [ ] Refactor `wrowfusion.py` for clarity
 - [ ] Add high-level project diagram
 - [ ] Make necessary adjustments to /etc/bluetooth/main.conf during install script (see ble_notes.md)
+- [ ] Populate README and add references to PiRowFlo.
 
 ---
 

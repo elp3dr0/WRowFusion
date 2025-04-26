@@ -305,3 +305,5 @@ https://security.stackexchange.com/questions/206333/just-works-bluetooth-low-ene
 There are some more further reading links for JustWorks bluetooth here:
 https://devzone.nordicsemi.com/f/nordic-q-a/17165/ble-just-works-pairing
 
+6. Apple bluetooth
+Consider copying over services/update-bt-cfg files from pirowflo to support Apple bluetooth. This would also require re-enabling the relevant code within install.sh.
