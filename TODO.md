@@ -21,6 +21,8 @@
 - [ ] Add support for ANT+ HR broadcast
 - [ ] Implement reconnection logic for BLE HRM
 - [ ] Explore need for pyusb (for ANT+ reciever) and gatt (smartrow?) in requirements.txt
+- [ ] Address the ERROR DIFF TRANSACTION COLLISION seen in nRF debug logs during a succesful connection (see note 4)
+- [ ] Revisit MITM connection requests from Android. If they continue to be a significant hurdle, then explore a static passkey (see note 5). 
 
 ## 🖧 Comms with S4
 - [ ] Consider handling situation when S4 gets disconnected from serial port. Currently
@@ -46,6 +48,7 @@
 - [ ] Clean up unused imports across modules
 - [ ] Refactor `wrowfusion.py` for clarity
 - [ ] Add high-level project diagram
+- [ ] Make necessary adjustments to /etc/bluetooth/main.conf during install script (see ble_notes.md)
 
 ---
 

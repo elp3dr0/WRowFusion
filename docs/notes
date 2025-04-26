@@ -242,3 +242,66 @@ Characteristic discovery	✅ Yes
 Notification subscription	❌ No — requires CCCD write
 StartNotify() triggered	❌ Only after subscription
 Pairing	❌ Optional
+
+## 3. Bluetooth transaction collision during pairing
+From the debug logs of nRF, it reports an HCI ERROR DIFF TRANSACTION COLLISION even during successful connections. Here's some background:
+The error HCI ERROR DIFF TRANSACTION COLLISION (error code 0x2a) that appears in both logs is related to HCI (Host Controller Interface) transaction collision. This error generally occurs when two or more transactions conflict with each other, which can happen during Bluetooth communication, particularly during pairing and bonding.
+
+Here’s what might be going on and how to address it:
+
+What causes this error?
+This error typically occurs when there are conflicting operations happening simultaneously in the HCI layer. These operations can be:
+
+Pairing and Bonding: If two pairing or bonding procedures are initiated at the same time or within a short timeframe, the HCI layer might struggle to handle both operations and will throw a "transaction collision" error.
+
+Connection Parameter Updates: A connection parameter update request could conflict with an ongoing operation like pairing or service discovery.
+
+Multiple HCI Commands: If multiple HCI commands (like pairing, bonding, connection parameter updates) are being issued without proper sequencing, they can conflict and cause this error.
+
+In your case, the error appears during the connection phase (as seen at 13:21:36.045), suggesting that the Bluetooth stack is trying to process multiple commands simultaneously or in a conflicting sequence.
+
+What can you do to fix it?
+Sequence and Timing of Operations:
+
+Ensure that pairing, bonding, and connection parameter updates are properly sequenced. For example, you should avoid initiating a connection parameter update while a pairing process is still ongoing.
+
+You can also introduce a small delay between these operations to avoid timing issues. For example, after a pairing operation, wait for it to complete before initiating a connection parameter update.
+
+Revisiting Pairing Procedures:
+
+If your device advertises with the Just Works model and allows for fast pairing, ensure that you're not accidentally initiating bonding or pairing multiple times in parallel.
+
+Make sure the central device (nRF Connect in this case) doesn't try to initiate a new bonding process while one is already in progress.
+
+Avoiding Redundant HCI Commands:
+
+Make sure you're not sending redundant HCI commands (such as multiple connection parameter updates or pairing requests) within a very short timeframe. If the connection parameters are being updated right after the connection, this might be triggering the collision.
+
+Review Bluetooth Stack and Driver Logs:
+
+Depending on your device and Bluetooth stack (whether it’s BlueZ, Android Bluetooth stack, or something else), there might be configuration settings that control how the HCI layer handles multiple concurrent transactions. If you’re able to access the Bluetooth stack logs on your host, you may get more insight into which commands are conflicting.
+
+Testing with Single Operations:
+
+For troubleshooting, you can test each operation (pairing, bonding, connection parameters) in isolation to see if any particular operation triggers the issue. Start by establishing the connection first, then apply each additional step (e.g., update connection parameters) one by one to see if the error persists.
+
+In the context of your setup:
+Given that you’re working with a custom Bluetooth advertisement and are trying to manage the pairing process without MITM, it’s possible that you're inadvertently triggering overlapping operations that are causing the error. For instance:
+
+If the pairing is happening too quickly after the connection is established, this might be causing the collision.
+
+Similarly, if a connection parameter update is sent before the pairing procedure is fully complete, that could trigger this error.
+
+Conclusion:
+The HCI ERROR DIFF TRANSACTION COLLISION occurs when Bluetooth operations clash with each other, typically when pairing, bonding, and connection parameter updates are initiated in parallel. The solution is to carefully manage the sequence and timing of these operations, ensuring they don’t overlap in a way that causes conflicts. You may want to experiment with delaying certain actions or explicitly sequencing them to avoid triggering the error.
+
+4. Consider static passkey if Bluetooth MITM requirement is too frequent
+This post suggests a static passkey
+https://devzone.nordicsemi.com/f/nordic-q-a/47273/mitm-set-when-using-justwork-option-how-is-this-possible 
+Here's some security considerations though
+https://security.stackexchange.com/questions/206333/just-works-bluetooth-low-energy-security
+
+5. JustWorks bluetooth
+There are some more further reading links for JustWorks bluetooth here:
+https://devzone.nordicsemi.com/f/nordic-q-a/17165/ble-just-works-pairing
+

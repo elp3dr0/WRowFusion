@@ -29,9 +29,12 @@ It's important therefore to remove any services that might require a code on con
 - be set to ble only (i.e. not traditional bluetooth): This will surpress a number of unrequired services that would be enabled by default (e.g. A/V Remote Control, Handsfree Audio Gateway, Audio Sink, Audio Source, etc).
 - Disable D-Bus experimental interfaces: This will prevent the unwanted addition of the Volume Control service.
 
-To achieve this, edit the bluetooth conf file (sudo nano /etc/bluetooth/main.conf) and in the General section, set:
+To make this more likely, edit the bluetooth conf file (sudo nano /etc/bluetooth/main.conf) and in the General section, set:
 - ControllerMode = le
 - Experimental = false
+- JustWorksRepairing = always
+
+The effect of these combined with the NoInputNoOutput advertisement should be that a connecting device will try to connect on a JustWorks basis, rather than requesting a MITM confirmation. However, in practice Android is found to be highly temperamental - it frequently requests MITM during a connection attempt, which means that the connection fails.
 
 **Bluez PnP Device Information prevents Coxswain from connecting**
 Bluez versions greater than 5.50 introduced a PnP Device which is advertised by default by the Raspberry Pi. This is problematic because it will advertise a Device Information service (0x180A) that describes the Raspberry Pi as a PnP device. However, the Coxswain app interrogates the Device Information data to determine whether the device is a Rowing machine or not. Our project creates a Device Information service that presents the Raspberry Pi as if it were an S4 Waterrower. However, if on connection, Coxswain reads the PnP Device Information first, it will deduce that our Raspberry Pi is not a Waterrower. At the very least, it will prevent Coxswain from being able to issue a reset command to the S4 (according to the author of PiRowFlo), though it might also prevent Coxswain from connecting to the Raspberry Pi at all.
