@@ -144,6 +144,34 @@ echo "PRETTY_HOSTNAME=WRowFusion" | sudo tee -a /etc/machine-info > /dev/null
 
 echo " "
 echo "----------------------------------------------"
+echo " Configure bluetooth settings in "
+echo " /etc/bluetooth/main.conf"
+echo "----------------------------------------------"
+echo " "
+
+# Set ControllerMode to le
+if ! grep -q '^ControllerMode' /etc/bluetooth/main.conf; then
+    echo "ControllerMode = le" | sudo tee -a /etc/bluetooth/main.conf > /dev/null
+else
+    sudo sed -i 's/^ControllerMode=.*/ControllerMode = le/' /etc/bluetooth/main.conf
+fi
+
+# Set Experimental to false
+if ! grep -q '^Experimental' /etc/bluetooth/main.conf; then
+    echo "Experimental = false" | sudo tee -a /etc/bluetooth/main.conf > /dev/null
+else
+    sudo sed -i 's/^Experimental=.*/Experimental = false/' /etc/bluetooth/main.conf
+fi
+
+# Set JustWorksRepairing to always
+if ! grep -q '^JustWorksRepairing' /etc/bluetooth/main.conf; then
+    echo "JustWorksRepairing = always" | sudo tee -a /etc/bluetooth/main.conf > /dev/null
+else
+    sudo sed -i 's/^JustWorksRepairing=.*/JustWorksRepairing = always/' /etc/bluetooth/main.conf
+fi
+
+echo " "
+echo "----------------------------------------------"
 echo " Update bluart file as it prevents the start of"
 echo " internal bluetooth if usb bluetooth dongle is "
 echo " present                                       "
@@ -154,7 +182,7 @@ sudo sed -i 's/hci0/hci2/g' /usr/bin/btuart
 
 echo " "
 echo "----------------------------------------------"
-echo "Configure logging for the local environment"
+echo " Configure logging for the local environment"
 echo "----------------------------------------------"
 echo " "
 
