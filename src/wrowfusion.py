@@ -45,14 +45,14 @@ def start_threads():
     # Thread to connect as a client to BLE heart rate monitor
     # This is an object that manages its own lifecycle with asyncio so can be started using a different
     # syntax to the other threads    
-    #ble_hrm_scanner = HeartRateBLEScanner(hr_monitor)
-    #ble_hrm_scanner.name = "BLEHRMScannerThread"
-    #threads.append(ble_hrm_scanner)
+    ble_hrm_scanner = HeartRateBLEScanner(hr_monitor)
+    ble_hrm_scanner.name = "BLEHRMScannerThread"
+    threads.append(ble_hrm_scanner)
     
     # Thread for simulating heart beat to send to S4 
     # This construct is an explicit request to run a function in a separate thread (unlike ble_hrm_scanner).
-    #s4_heartbeat_thread = threading.Thread(target=s4_heart_beat_task, args=(hr_monitor,), daemon=True, name="S4HeatbeatThread")
-    #threads.append(s4_heartbeat_thread)
+    s4_heartbeat_thread = threading.Thread(target=s4_heart_beat_task, args=(hr_monitor,), daemon=True, name="S4HeatbeatThread")
+    threads.append(s4_heartbeat_thread)
 
     # Thread for S4 polling and collating data for transmission via BLE/ANT 
     s4_data_thread = threading.Thread(target=s4_data_task, args=(q, ble_q, ant_q, hr_monitor), daemon=True, name="S4DataThread")
