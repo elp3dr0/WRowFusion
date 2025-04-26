@@ -10,6 +10,7 @@
 - [ ] Build systemd service for auto-start
 - [ ] Create install script to handle venv setup
 - [ ] Setup logging config file with rotation
+- [ ] Add user to the GPIO group so that the program can be run without root
 
 ## 🔄 Data Handling
 - [ ] Replace deque with shared DataLogger instance
