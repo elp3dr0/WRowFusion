@@ -1,5 +1,17 @@
 #!/bin/bash
-# https://stackoverflow.com/questions/9449417/how-do-i-assign-the-output-of-a-command-into-an-array
+
+#########################################################################
+# wrowfusion will be installed in the following directory. This script
+# will create the directory if it doesn't already exist. (Do not include
+# a trailing slash / )
+app_dir="/opt/wrowfusion"
+
+# The application will be run on startup by the following system user.
+# This script will create this system user.
+app_user="wrowfusion"
+#########################################################################
+
+set -e  # Exit the script if any command fails
 
 echo " "
 echo " "
@@ -12,21 +24,13 @@ echo " This script will install all the needed packages and modules "
 echo " to make the Waterrower Ant and BLE Raspbery Pi Module working"
 echo " "
 
-set -e  # Exit the script if any command fails
+echo " "
+echo "----------------------------------------------"
+echo " Install required system software packages "
+echo "----------------------------------------------"
+echo " "
 
-echo " "
-echo "-------------------------------------------------------------"
-echo "updates the list of latest updates available for the packages"
-echo "-------------------------------------------------------------"
-echo " "
 sudo apt-get update
-
-echo " "
-echo "----------------------------------------------"
-echo "install needed packages for python          "
-echo "----------------------------------------------"
-echo " "
-
 sudo apt-get install -y \
     python3 \
     python3-gi \
@@ -46,31 +50,54 @@ sudo apt-get install -y \
 
 echo " "
 echo "----------------------------------------------"
-echo "set up virtual environment        "
+echo " Configure system user ${app_user}"
 echo "----------------------------------------------"
 echo " "
 
-python3 -m venv venv
-source venv/bin/activate
+if ! id "$app_user" &>/dev/null; then
+  if ! sudo useradd --system --no-create-home --shell /usr/sbin/nologin "$app_user"; then
+      echo "Failed to create user $app_user. Exiting."
+      exit 1
+  fi
+fi
 
-export repo_dir=$(cd $(dirname $0) > /dev/null 2>&1; pwd -P)
-export python3_path=$(which python3)
+sudo usermod -aG bluetooth,dialout,gpio "$app_user"
 
 echo " "
 echo "----------------------------------------------"
-echo "install needed python3 modules for the project        "
+echo " Install the application in the directory:"
+echo " ${app_dir}"
 echo "----------------------------------------------"
 echo " "
 
-pip install --upgrade pip
-pip install -r requirements.txt
+sudo mkdir -p "$app_dir"
+script_dir=$(cd "$(dirname "$0")" && pwd)
+sudo cp -r "$script_dir"/* "$app_dir/"
+sudo chown -R "$app_user:$app_user" "$app_dir"
 
 echo " "
-echo "-------------------------------------------------------"
-echo "check for Ant+ dongle in order to set udev rules       "
-echo "Load the Ant+ dongle with FTDI driver                  "
-echo "and ensure that the user pi has access to              "
-echo "-------------------------------------------------------"
+echo "----------------------------------------------"
+echo " Set up virtual environment        "
+echo "----------------------------------------------"
+echo " "
+
+sudo -u "$app_user" python3 -m venv "$app_dir"/venv
+
+echo " "
+echo "----------------------------------------------"
+echo " Install python modules needed by WRowFusion"
+echo "----------------------------------------------"
+echo " "
+
+sudo -u "$app_user" "$app_dir"/venv/bin/pip install --upgrade pip
+sudo -u "$app_user" "$app_dir"/venv/bin/pip install -r "$app_dir"/requirements.txt
+
+echo " "
+echo "----------------------------------------------"
+echo " Check for Ant+ dongle in order to set udev"
+echo " rules. Load the Ant+ dongle with FTDI driver"
+echo " and ensure that the user has access to it"
+echo "----------------------------------------------"
 echo " "
 
 # https://unix.stackexchange.com/questions/67936/attaching-usb-serial-device-with-custom-pid-to-ttyusb0-on-embedded
@@ -93,62 +120,19 @@ do
 done
 unset IFS
 
-echo "----------------------------------------------"
-echo " Add current user to bluetooth and dialout groups"
-echo " (wrowfusion should be run by this user) "
-echo "----------------------------------------------"
-
-CURRENT_USER=$(whoami)
-sudo usermod -a -G bluetooth "$CURRENT_USER"
-sudo usermod -a -G dialout "$CURRENT_USER"
-
 echo " "
-echo "-----------------------------------------------"
-echo " Change bluetooth name of the pi to WRowFusion"
-echo "-----------------------------------------------"
+echo "----------------------------------------------"
+echo " Change the Pi's bluetooth name to WRowFusion"
+echo "----------------------------------------------"
 echo " "
 
 echo "PRETTY_HOSTNAME=WRowFusion" | sudo tee -a /etc/machine-info > /dev/null
-#echo "PRETTY_HOSTNAME=S4 Comms PI" | sudo tee -a /etc/machine-info > /dev/null
-
-
-
 
 #echo " "
-#echo "------------------------------------------------------"
-#echo " configuring web interface on http://${HOSTNAME}:9001 "
-#echo "------------------------------------------------------"
+#echo "------------------------------------------------------------"
+#echo " Update bluetooth settings according to Apple specifications"
+#echo "------------------------------------------------------------"
 #echo " "
-##
-## generate supervisord.conf from supervisord.conf.orig with updated paths
-##
-
-#export supervisord_path=$(which supervisord)
-#export supervisorctl_path=$(which supervisorctl)
-#
-#cp services/supervisord.conf.orig services/supervisord.conf
-#sed -i 's@#PYTHON3#@'"$python3_path"'@g' services/supervisord.conf
-#sed -i 's@#REPO_DIR#@'"$repo_dir"'@g' services/supervisord.conf
-#sed -i 's@#USER#@'"$CURRENT_USER"'@g' services/supervisord.conf
-#
-## configure a systemd service to start supervisord automatically at boot
-##
-#cp services/supervisord.service services/supervisord.service.tmp
-#sed -i 's@#REPO_DIR#@'"$repo_dir"'@g' services/supervisord.service.tmp
-#sed -i 's@#SUPERVISORD_PATH#@'"$supervisord_path"'@g' services/supervisord.service.tmp
-#sed -i 's@#SUPERVISORCTL_PATH#@'"$supervisorctl_path"'@g' services/supervisord.service.tmp
-#sudo mv services/supervisord.service.tmp /etc/systemd/system/supervisord.service
-#sudo chown root:root /etc/systemd/system/supervisord.service
-#sudo chmod 655 /etc/systemd/system/supervisord.service
-#sudo systemctl enable supervisord
-#sudo rm -f /tmp/pirowflo*
-#sudo rm -f /tmp/supervisord.log
-
-echo " "
-echo "------------------------------------------------------------"
-echo " Update bluetooth settings according to Apple specifications"
-echo "------------------------------------------------------------"
-echo " "
 # update bluetooth configuration and start supervisord from rc.local
 #
 #cp services/update-bt-cfg.service services/update-bt-cfg.service.tmp
@@ -158,44 +142,46 @@ echo " "
 #sudo chmod 655 /etc/systemd/system/update-bt-cfg.service
 #sudo systemctl enable update-bt-cfg
 
-
 echo " "
-echo "------------------------------------------------------------"
-echo " setup screen setting to start up at boot                   "
-echo "------------------------------------------------------------"
-echo " "
-
-#sudo sed -i 's/#dtparam=spi=on/dtparam=spi=on/g' /boot/firmware/config.txt
-#cp src/adapters/screen/settings.ini.orig src/adapters/screen/settings.ini
-#sudo sed -i 's@#REPO_DIR#@'"$repo_dir"'@g' src/adapters/screen/settings.ini
-
-#cp services/screen.service services/screen.service.tmp
-#sed -i 's@#PYTHON3#@'"$python3_path"'@g' services/screen.service.tmp
-#sed -i 's@#REPO_DIR#@'"$repo_dir"'@g' services/screen.service.tmp
-#sed -i 's@#USER#@'"$CURRENT_USER"'@g' services/screen.service.tmp
-#sudo mv services/screen.service.tmp /etc/systemd/system/screen.service
-#sudo chown root:root /etc/systemd/system/screen.service
-#sudo chmod 655 /etc/systemd/system/screen.service
-#sudo systemctl enable screen
-
-echo " "
-echo "-----------------------------------------------"
-echo " update bluart file as it prevents the start of"
+echo "----------------------------------------------"
+echo " Update bluart file as it prevents the start of"
 echo " internal bluetooth if usb bluetooth dongle is "
 echo " present                                       "
-echo "-----------------------------------------------"
+echo "----------------------------------------------"
 echo " "
 
 sudo sed -i 's/hci0/hci2/g' /usr/bin/btuart
 
 echo " "
 echo "----------------------------------------------"
-echo " Add absolut path to the logging.conf file    "
+echo "Configure logging for the local environment"
 echo "----------------------------------------------"
 echo " "
 
-cp config/logging.conf.orig config/logging.conf
-sed -i 's@#REPO_DIR#@'"$repo_dir"'@g' config/logging.conf
+sudo -u "$app_user" cp "$app_dir"/config/logging.conf.orig "$app_dir"/config/logging.conf
+sudo -u "$app_user" sed -i 's@#REPO_DIR#@'"$app_dir"'@g' "$app_dir"/config/logging.conf
+
+echo " "
+echo "----------------------------------------------"
+echo " Start WRowFusion when system boots"
+echo "----------------------------------------------"
+echo " "
+
+sudo cp "$app_dir"/config/wrowfusion.service /etc/systemd/system/wrowfusion.service
+sudo sed -i 's@#REPO_DIR#@'"$app_dir"'@g' /etc/systemd/system/wrowfusion.service
+sudo sed -i 's@#APP_USER#@'"$app_user"'@g' /etc/systemd/system/wrowfusion.service
+sudo chmod 644 /etc/systemd/system/wrowfusion.service
+sudo systemctl daemon-reload
+sudo systemctl enable wrowfusion
+
+echo " "
+echo "----------------------------------------------"
+echo " Restart services and run wrowfusion service"
+echo "----------------------------------------------"
+echo " "
+
+sudo systemctl restart bluetooth
+sudo systemctl start wrowfusion
 
 #echo " "
 #echo "----------------------------------------------"
@@ -203,9 +189,11 @@ sed -i 's@#REPO_DIR#@'"$repo_dir"'@g' config/logging.conf
 #echo "----------------------------------------------"
 #sleep 3
 #sudo reboot
-echo "----------------------------------------------"
-echo " Installation done: Please reboot your system!"
-echo "----------------------------------------------"
 
-#echo " "
-#exit 0
+echo " "
+echo "----------------------------------------------"
+echo " Installation done!"
+echo "----------------------------------------------"
+echo " "
+
+exit 0

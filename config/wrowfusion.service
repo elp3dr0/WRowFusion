@@ -1,0 +1,16 @@
+[Unit]
+Description=WRowFusion Service
+After=network.target  bluetooth.service
+Requires=bluetooth.service
+
+[Service]
+Type=simple
+User=#APP_USER#
+Group=#APP_USER#
+WorkingDirectory=#REPO_DIR#
+Environment="PATH=#REPO_DIR#/venv/bin"
+ExecStart=#REPO_DIR#/venv/bin/python wrowfusion.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
