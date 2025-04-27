@@ -2,6 +2,7 @@ import logging
 import logging.config
 import pathlib
 import os
+import sys
 
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent.absolute()
 
@@ -9,7 +10,7 @@ log_dir = PROJECT_ROOT / 'logs'
 os.makedirs(log_dir, exist_ok=True)
 
 loggerconfigpath = str(PROJECT_ROOT / 'config' / 'logging.conf')
-logging.config.fileConfig(loggerconfigpath)
+logging.config.fileConfig(loggerconfigpath, disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
 
 # Do not put any non-logging related imports above this line,
@@ -20,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 import threading
 import signal
-import sys
 from queue import Queue
 from collections import deque
 from src.s4 import s4_heart_beat_task

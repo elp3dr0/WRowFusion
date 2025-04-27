@@ -13,5 +13,8 @@ ExecStart=#REPO_DIR#/venv/bin/python -m src.wrowfusion
 Restart=on-failure
 RestartSec=3
 
+StandardOutput=journal
+StandardError=inherit
+
 [Install]
 WantedBy=multi-user.target

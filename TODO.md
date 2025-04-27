@@ -1,7 +1,5 @@
 # ✅ TODO List for WRowFusion
 
-- [ ] 
-
 ## 📌 Current Focus
 - [ ] Debug bluetooth server
 - [ ] 
@@ -9,8 +7,12 @@
 ## 🧱 Infrastructure
 - [x] Build systemd service for auto-start
 - [x] Create install script to handle venv setup
-- [ ] Setup logging config file with rotation
+- [x] Setup logging config file with rotation
 - [x] Add user to the GPIO group so that the program can be run without root
+
+## New functionality
+- [ ] Turn USB ports off after 10mins of no rowing. Add a button that turns the USB ports back on.
+
 
 ## 🔄 Data Handling
 - [ ] Replace deque with shared DataLogger instance

@@ -7,54 +7,54 @@
 keys=root, src.wrowfusion, src.ble_client, src.ble_server, src.heart_rate, src.s4, src.s4if, bleak
 
 [handlers]
-keys=consoleHandler,fileHandler
+keys=consoleHandler,rotatingFileHandler
 
 [formatters]
 keys=simpleFormatter
 
 [logger_root]
 level=DEBUG
-handlers=consoleHandler,fileHandler
+handlers=consoleHandler,rotatingFileHandler
 
 [logger_src.wrowfusion]
 level=DEBUG
-handlers=consoleHandler, fileHandler
+handlers=consoleHandler, rotatingFileHandler
 qualname=src.wrowfusion
 propagate=0
 
 [logger_src.ble_client]
 level=DEBUG
-handlers=consoleHandler, fileHandler
+handlers=consoleHandler, rotatingFileHandler
 qualname=src.ble_client
 propagate=0
 
 [logger_src.ble_server]
 level=DEBUG
-handlers=consoleHandler, fileHandler
+handlers=consoleHandler, rotatingFileHandler
 qualname=src.ble_server
 propagate=0
 
 [logger_src.heart_rate]
 level=INFO
-handlers=consoleHandler, fileHandler
+handlers=consoleHandler, rotatingFileHandler
 qualname=src.heart_rate
 propagate=0
 
 [logger_src.s4]
 level=DEBUG
-handlers=consoleHandler, fileHandler
+handlers=consoleHandler, rotatingFileHandler
 qualname=src.s4
 propagate=0
 
 [logger_src.s4if]
 level=DEBUG
-handlers=consoleHandler, fileHandler
+handlers=consoleHandler, rotatingFileHandler
 qualname=src.s4if
 propagate=0
 
 [logger_bleak]
 level=WARNING
-handlers=consoleHandler, fileHandler
+handlers=consoleHandler, rotatingFileHandler
 qualname=bleak
 propagate=0
 
@@ -64,11 +64,12 @@ level=DEBUG
 formatter=simpleFormatter
 args=(sys.stdout,)
 
-[handler_fileHandler]
-class=FileHandler
+[handler_rotatingFileHandler]
+class=handlers.RotatingFileHandler
 level=DEBUG
 formatter=simpleFormatter
-args=("#REPO_DIR#/logs/wrowfusion.log", 'a')
+# args = (filename, mode, maxBytes, backupCount)
+args=("#REPO_DIR#/logs/wrowfusion.log", 'a', 1*1024*1024, 9)
 
 [formatter_simpleFormatter]
 format=%(asctime)s [%(levelname)s] %(name)s: %(message)s
