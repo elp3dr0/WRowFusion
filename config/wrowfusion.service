@@ -9,8 +9,9 @@ User=#APP_USER#
 Group=#APP_USER#
 WorkingDirectory=#REPO_DIR#
 Environment="PATH=#REPO_DIR#/venv/bin"
-ExecStart=#REPO_DIR#/venv/bin/python src/wrowfusion.py
+ExecStart=#REPO_DIR#/venv/bin/python -m src.wrowfusion
 Restart=on-failure
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
