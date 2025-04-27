@@ -88,7 +88,7 @@ echo " Set up virtual environment        "
 echo "----------------------------------------------"
 echo " "
 
-sudo -u "$app_user" python3 -m venv "$app_dir"/venv
+sudo -u "$app_user" python3 -m venv --upgrade-deps "$app_dir"/venv
 
 echo " Done."
 echo " "
