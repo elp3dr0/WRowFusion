@@ -88,7 +88,7 @@ echo " Set up virtual environment        "
 echo "----------------------------------------------"
 echo " "
 
-sudo -u "$app_user" python3 -m venv --upgrade-deps "$app_dir"/venv
+sudo -u "$app_user" python3 -m venv "$app_dir"/venv
 
 echo " Done."
 echo " "
@@ -97,8 +97,7 @@ echo " Install python modules needed by WRowFusion"
 echo "----------------------------------------------"
 echo " "
 
-
-sudo -u "$app_user" "$app_dir"/venv/bin/python3 -m pip install --upgrade --no-cache-dir pip
+sudo -u "$app_user" "$app_dir"/venv/bin/python3 -m pip install --upgrade --no-cache-dir pip setuptools wheel
 sudo -u "$app_user" "$app_dir"/venv/bin/python3 -m pip install --no-cache-dir -r "$app_dir"/requirements.txt
 
 echo " Done."
