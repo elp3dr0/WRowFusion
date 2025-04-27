@@ -30,7 +30,11 @@ echo " Install required system software packages "
 echo "----------------------------------------------"
 echo " "
 
+echo " - Refreshing list of available softare packages"
 sudo apt-get update
+echo " "
+
+echo " - Installing softare packages"
 sudo apt-get install -y \
     python3 \
     python3-gi \
@@ -48,6 +52,7 @@ sudo apt-get install -y \
     libopenjp2-7 \
     libtiff6
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Configure system user ${app_user}"
@@ -63,6 +68,7 @@ fi
 
 sudo usermod -aG bluetooth,dialout,gpio "$app_user"
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Install the application in the directory:"
@@ -75,6 +81,7 @@ script_dir=$(cd "$(dirname "$0")" && pwd)
 sudo cp -r "$script_dir"/* "$app_dir/"
 sudo chown -R "$app_user:$app_user" "$app_dir"
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Set up virtual environment        "
@@ -83,15 +90,18 @@ echo " "
 
 sudo -u "$app_user" python3 -m venv "$app_dir"/venv
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Install python modules needed by WRowFusion"
 echo "----------------------------------------------"
 echo " "
 
-sudo -u "$app_user" "$app_dir"/venv/bin/pip install --upgrade pip
-sudo -u "$app_user" "$app_dir"/venv/bin/pip install -r "$app_dir"/requirements.txt
 
+sudo -u "$app_user" "$app_dir"/venv/bin/python3 -m pip install --upgrade --no-cache-dir pip
+sudo -u "$app_user" "$app_dir"/venv/bin/python3 -m pip install --no-cache-dir -r "$app_dir"/requirements.txt
+
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Check for Ant+ dongle in order to set udev"
@@ -120,6 +130,7 @@ do
 done
 unset IFS
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Change the Pi's bluetooth name to WRowFusion"
@@ -142,6 +153,7 @@ echo "PRETTY_HOSTNAME=WRowFusion" | sudo tee -a /etc/machine-info > /dev/null
 #sudo chmod 655 /etc/systemd/system/update-bt-cfg.service
 #sudo systemctl enable update-bt-cfg
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Configure bluetooth settings in "
@@ -170,6 +182,7 @@ else
     sudo sed -i 's/^JustWorksRepairing=.*/JustWorksRepairing = always/' /etc/bluetooth/main.conf
 fi
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Update bluart file as it prevents the start of"
@@ -180,6 +193,7 @@ echo " "
 
 sudo sed -i 's/hci0/hci2/g' /usr/bin/btuart
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Configure logging for the local environment"
@@ -189,6 +203,7 @@ echo " "
 sudo -u "$app_user" cp "$app_dir"/config/logging.conf.orig "$app_dir"/config/logging.conf
 sudo -u "$app_user" sed -i 's@#REPO_DIR#@'"$app_dir"'@g' "$app_dir"/config/logging.conf
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Start WRowFusion when system boots"
@@ -202,6 +217,7 @@ sudo chmod 644 /etc/systemd/system/wrowfusion.service
 sudo systemctl daemon-reload
 sudo systemctl enable wrowfusion
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
 echo " Restart services and run wrowfusion service"
@@ -218,9 +234,10 @@ sudo systemctl start wrowfusion
 #sleep 3
 #sudo reboot
 
+echo " Done."
 echo " "
 echo "----------------------------------------------"
-echo " Installation done!"
+echo " Installation complete!"
 echo "----------------------------------------------"
 echo " "
 
