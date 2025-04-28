@@ -14,28 +14,38 @@ import serial.tools.list_ports
 
 logger = logging.getLogger(__name__)
 
+'''
+The Water Rower S4 S5 USB Protocol Iss 1 04 specs incorrectly suggest that double digit data is 
+stored:
+- little endian (i.e. low byte first, high byte second) for primary data (i.e. data that is
+directly measured such as distance)
+- big endian (i.e. high byte first, low byte second) for computed data (i.e. 'maths' data that is
+computed from the directly measured data such as 500m pace)
+It appears, however, that it is exactly the opposite.
+'''
+
 MEMORY_MAP = {
-                '055': {'type': 'total_distance_m', 'size': 'double', 'base': 16},
-                '140': {'type': 'total_strokes', 'size': 'double', 'base': 16},
-                '088': {'type': 'watts', 'size': 'double', 'base': 16},
-                '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16},
-                '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16},
-                '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16},
-                '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10},
-                '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10},
-                '1E2': {'type': 'display_min', 'size': 'single', 'base': 10},
-                '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10},
+                '055': {'type': 'total_distance_m', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '140': {'type': 'total_strokes', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big'},
+                '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big'},
+                '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big'},
+                '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big'},
+                '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big'},
                 # from zone math
-                '1A0': {'type': 'heart_rate', 'size': 'double', 'base': 16},
-                '1A6': {'type': '500mps', 'size': 'double', 'base': 16},
-                '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16},
+                '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little'},
+                '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big'},
                 # explore
                 # Stroke_pull is first subtracted from stroke_average then a modifier of 
                 # 1.25 multiplied by the result to generate the ratio value for display.
-                '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16},
-                '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16},
+                '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big'},
                 #other
-                '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'not_in_loop': True},
+                '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'not_in_loop': True},
              }
 
 # Packet identifiers as speicified in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
@@ -165,12 +175,28 @@ def read_reply(cmd):
     memory = MEMORY_MAP.get(address)
     if memory:
         size = memory['size']
+        endian = memory.get('endian', 'big')  # Default to big if unspecified
         value_fn = SIZE_PARSE_MAP.get(size, lambda cmd: None)
-        value = value_fn(cmd)
-        if value is None:
+        value_str = value_fn(cmd)
+
+        if value_str is None:
             logger.error('unknown size: %s', size)
         else:
-            return build_event(memory['type'], int(value, base=memory['base']), cmd)
+            value = int(value_str, base=memory['base'])
+
+            if endian == 'little':
+                # Swap bytes if necessary (only for double and triple types)
+                if size == 'double' and len(value_str) == 4:
+                    high = int(value_str[0:2], 16)
+                    low = int(value_str[2:4], 16)
+                    value = (low << 8) | high
+                elif size == 'triple' and len(value_str) == 6:
+                    high = int(value_str[0:2], 16)
+                    mid  = int(value_str[2:4], 16)
+                    low  = int(value_str[4:6], 16)
+                    value = (low << 16) | (mid << 8) | high
+
+            return build_event(memory['type'], value, cmd)
     else:
         logger.error('cannot read reply for %s', cmd)
 
