@@ -24,6 +24,8 @@ from src.bleif import (
     Agent,
 )
 
+from src.ble_standard_services import DeviceInformation
+
 MainLoop = None
 
 try:
@@ -123,150 +125,6 @@ def Convert_Waterrower_raw_to_byte():
     return WRBytearray
 
 
-class DeviceInformation(Service):
-    logger.debug("Entering class DeviceInformation")
-    DEVICE_INFORMATION_UUID = '180A'
-
-    def __init__(self, bus, index):
-        Service.__init__(self, bus, index, self.DEVICE_INFORMATION_UUID, True)
-        self.add_characteristic(ManufacturerNameString(bus, 0, self))
-        self.add_characteristic(ModelNumberString(bus, 1, self))
-        self.add_characteristic(SerialNumberSring(bus,2,self))
-        self.add_characteristic(HardwareRevisionString(bus,3,self))
-        self.add_characteristic(FirmwareRevisionString(bus,4,self))
-        self.add_characteristic(SoftwareRevisionString(bus, 5, self))
-
-
-class ManufacturerNameString(Characteristic):
-    logger.debug("Entering class ManuracturerNameString")
-    MANUFACTURER_NAME_STRING_UUID = '2a29'
-
-    def __init__(self, bus, index, service):
-        logger.debug("Entering ManufacturerNameString.init")
-        Characteristic.__init__(
-            self, bus, index,
-            self.MANUFACTURER_NAME_STRING_UUID,
-            ['read'],
-            service)
-        self.notifying = False
-        self.ManuName = bytes('Waterrower', 'utf-8')
-        self.value = dbus.Array(self.ManuName)  # ble com module waterrower software revision
-
-
-    def ReadValue(self, options):
-        logger.debug("Entering ManufacturerNameString.ReadValue")
-        print('ManufacturerNameString: ' + repr(self.value))
-        return self.value
-
-class ModelNumberString(Characteristic):
-    logger.debug("Entering class ModelNumberString")
-    MODEL_NUMBER_STRING_UUID = '2a24'
-
-    def __init__(self, bus, index, service):
-        logger.debug("Entering ModelNumberString.init")
-        Characteristic.__init__(
-            self, bus, index,
-            self.MODEL_NUMBER_STRING_UUID,
-            ['read'],
-            service)
-        self.notifying = False
-        self.ManuName = bytes('4', 'utf-8')
-        self.value = dbus.Array(self.ManuName)  # ble com module waterrower software revision
-
-
-    def ReadValue(self, options):
-        logger.debug("Entering ModelNumberString.ReadValue")
-        print('ModelNumberString: ' + repr(self.value))
-        return self.value
-
-class SerialNumberSring(Characteristic):
-    logger.debug("Entering Class SerialNumberString")
-    MANUFACTURER_NAME_STRING_UUID = '2a25'
-
-    def __init__(self, bus, index, service):
-        logger.debug("Entering SerialNumberString.init")
-        Characteristic.__init__(
-            self, bus, index,
-            self.MANUFACTURER_NAME_STRING_UUID,
-            ['read'],
-            service)
-        self.notifying = False
-        self.ManuName = bytes('0000', 'utf-8')
-        self.value = dbus.Array(self.ManuName)  # ble com module waterrower software revision
-
-
-    def ReadValue(self, options):
-        logger.debug("Entering SerialNumberString.ReadValue")
-        print('SerialNumberSring: ' + repr(self.value))
-        return self.value
-
-class HardwareRevisionString(Characteristic):
-    logger.debug("Entering Class HardwareRevisioString")
-    MANUFACTURER_NAME_STRING_UUID = '2a27'
-
-    def __init__(self, bus, index, service):
-        logger.debug("Entering HardwareRevisionString.init")
-        Characteristic.__init__(
-            self, bus, index,
-            self.MANUFACTURER_NAME_STRING_UUID,
-            ['read'],
-            service)
-        self.notifying = False
-        self.ManuName = bytes('2.2BLE', 'utf-8')
-        self.value = dbus.Array(self.ManuName)  # ble com module waterrower software revision
-
-
-    def ReadValue(self, options):
-        logger.debug("Entering HardwareRevisionString.ReadValue")
-        print('HardwareRevisionString: ' + repr(self.value))
-        return self.value
-
-class FirmwareRevisionString(Characteristic):
-    logger.debug("Entering Class FirmwareRevisionString")
-    MANUFACTURER_NAME_STRING_UUID = '2a26'
-
-    def __init__(self, bus, index, service):
-        logger.debug("Entering FirmwareRevisionString.init")
-        Characteristic.__init__(
-            self, bus, index,
-            self.MANUFACTURER_NAME_STRING_UUID,
-            ['read'],
-            service)
-        self.notifying = False
-        self.ManuName = bytes('0.30', 'utf-8')
-        self.value = dbus.Array(self.ManuName)  # ble com module waterrower software revision
-
-
-    def ReadValue(self, options):
-        logger.debug("Entering FirmwareRevisionString.ReadValue")
-        print('FirmwareRevisionString: ' + repr(self.value))
-        return self.value
-
-class SoftwareRevisionString(Characteristic):
-    logger.debug("Entering Class SoftwareRevisionsString")
-    SOFTWARE_REVISION_STRING_UUID = '2a28'
-
-    def __init__(self, bus, index, service):
-        logger.debug("Entering SoftwareRevisionsString.init")
-        Characteristic.__init__(
-            self, bus, index,
-            self.SOFTWARE_REVISION_STRING_UUID,
-            ['read'],
-            service)
-        self.notifying = False
-        #self.value = [dbus.Byte(0), dbus.Byte(0), dbus.Byte(0), dbus.Byte(0)]  # ble com module waterrower software revision
-        self.value = [dbus.Byte(0), dbus.Byte(0), dbus.Byte(0)]  # ble com module waterrower software revision
-
-        self.value[0] = 0x34
-        self.value[1] = 0x2E
-        self.value[2] = 0x33
-        #self.value[3] = 0x30
-
-    def ReadValue(self, options):
-        logger.debug("Entering SoftwareRevisionsString.ReadValue")
-        print('SoftwareRevisionString: ' + repr(self.value))
-        return self.value
-
 class FTMservice(Service):
     logger.debug("Entering Class FTMservice")
     FITNESS_MACHINE_UUID = '1826'
@@ -280,19 +138,42 @@ class FTMservice(Service):
 
 
 class FitnessMachineFeature(Characteristic):
-    logger.debug("Entering Class FitnessMachineFeature")
+    '''
+    Define the 8-byte flag array for the FTMS Feature Characteristic.
+    The flags specify what fields the Fitness Machine will provide (and what ).
+    See Bluetooth_FTMS_v1.0.1.pdf 4.3.1.1 bit field definition.
+    The octets are little endian.
+    0x26 0x56 translates to a bit field of 0101 0110 0010 0110
+    which specifies:
+    Bit	Value	Feature
+    0	0  	    Average Speed Supported
+    1	1 	    Cadence Supported
+    2	1 	    Total Distance Supported
+    3	0	    Inclination Supported
+    4	0	    Elevation Gain Supported
+    5	1 	    Pace Supported
+    6	0	    Step Count Supported
+    7	0	    Resistance Level Supported
+    8	1 	    Stride Count Supported
+    9	1 	    Expended Energy Supported
+    10	0	    Heart Rate Measurement Supported
+    11	1 	    Metabolic Equivalent (MET) Supported
+    12	0	    Elapsed Time Supported
+    13	1 	    Remaining Time Supported
+    14	0	    Power Measurement Supported
+    15	1 	    Force Measurement Supported
+    '''
 
     FITNESS_MACHINE_FEATURE_UUID = '2acc'
 
     def __init__(self, bus, index, service):
-        logger.debug("Entering Class FitnessMachineFeature.init")
         Characteristic.__init__(
             self, bus, index,
             self.FITNESS_MACHINE_FEATURE_UUID,
             ['read'],
             service)
         self.notifying = False
-        self.value = [dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0)]  # ble com module waterrower software revision
+        self.value = [dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0)]
 
         self.value[0] = 0x26
         self.value[1] = 0x56
@@ -303,15 +184,12 @@ class FitnessMachineFeature(Characteristic):
         self.value[6] = 0x00
         self.value[7] = 0x00
 
-        #00100110           01010110
-
-#0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-
 
     def ReadValue(self, options):
         logger.debug("Entering FitnessMachineFeature.ReadValue")
         print('Fitness Machine Feature: ' + repr(self.value))
         return self.value
+
 
 class RowerData(Characteristic):
     logger.debug("Entering Class RowerData")
@@ -495,7 +373,7 @@ class FTMPAdvertisement(Advertisement):
         self.add_manufacturer_data(
             0xFFFF, [0x77, 0x72],
         )
-        self.add_service_uuid(DeviceInformation.DEVICE_INFORMATION_UUID)
+        self.add_service_uuid(DeviceInformation.UUID)
         self.add_service_uuid(FTMservice.FITNESS_MACHINE_UUID)
         self.add_service_uuid(HeartRate.HEART_RATE)
 
@@ -598,8 +476,17 @@ def ble_server_task(out_q,ble_in_q): #out_q
 
     logger.debug("main: Set app object")
     app = Application(bus)
+
+    device_info = DeviceInformation(bus, 1)
+    device_info.manufacturer.value = dbus.Array(b'Waterrower', signature='y')
+    device_info.model.value = dbus.Array(b'4', signature='y')
+    device_info.serial.value = dbus.Array(b'0000', signature='y')
+    device_info.hardware.value = dbus.Array(b'2.2BLE', signature='y')
+    device_info.firmware.value = dbus.Array(b'0.30', signature='y')
+    device_info.software.value = dbus.Array([dbus.Byte(0x34), dbus.Byte(0x2E), dbus.Byte(0x33)], signature='y')
+
     logger.debug("main: Calling add_service - DeviceInformation")
-    app.add_service(DeviceInformation(bus, 1))
+    app.add_service(device_info)
     logger.debug("main: Calling add_service - FTMservice")
     app.add_service(FTMservice(bus, 2))
     logger.debug("main: Calling add_service - HeartRate")
