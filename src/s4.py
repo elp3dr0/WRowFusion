@@ -3,7 +3,7 @@ import logging
 import time
 from gpiozero import DigitalOutputDevice
 from copy import deepcopy
-from datetime import timedelta
+#from datetime import timedelta
 
 from src.s4if import Rower
 from src.heart_rate import HeartRateMonitor
@@ -19,12 +19,14 @@ In the case of 2)
 3 callback functions are registered to the s4if.Rower class. Those functions get exectuted as soon as any of the 
 events for which we watch is recieved from the s4 via the Rower.start_capturing() method.
 Each of the three callback functions create a dict of WaterRower data, each with a different value set. 
-1) reset_requested: Intention is to reset the S4, so all values should be set to 0 even if old values persist in the WR memory 
-2) pulse: Caters for the periods of no rowing (e.g. during rest intervals). Set all instantaneous values to 0 e.g power, pace, 
-   stroke rate. Other values are not set to 0 in the WR memory.
-3) on_rower_event: Normal rowing, so capture data from WR memory without modification 
+1) reset_requested: Intention is to reset the S4, so all values should be set to 0 even if old values persist in the WR memory.
+   These 'reset' values are stored in the WRValues_rst dictionary.
+2) pulse_monitor: Caters for the periods of no rowing (e.g. during rest intervals). Set all instantaneous values to 0 e.g power, pace, 
+   stroke rate. Other values are not set to 0 in the WR memory. These 'standstill' values are stored in the WRValues_standstill dictionary.
+3) on_rower_event: Normal rowing, so capture data from WR memory without modification. These 'normal' rowing values are stored
+   in the WRValues dictionary.
 
-Depeding on thoses cases, send only the value dict with the correct numbers to the bluetooth module. 
+Depeding on thoses cases, load the appropriate values into the TXValues dictionary for transmission via BLE/ANT. 
 
 Note: As all three callback functions take event as an arguement, they could be written as one callback function. 
 Design choice for 3 callbacks brings these benefits:
@@ -52,36 +54,29 @@ class DataLogger(object):
     def __init__(self, rower_interface):
         self._rower_interface = rower_interface
         self._rower_interface.register_callback(self.reset_requested)
-        self._rower_interface.register_callback(self.pulse)
+        self._rower_interface.register_callback(self.pulse_monitor)
         self._rower_interface.register_callback(self.on_rower_event)
         self._stop_event = threading.Event()
 
         self._wr_lock = threading.RLock()
 
         self._RecentStrokesMaxPower = None
-        self.StrokeMaxPower = None
+        self._StrokeMaxPower = None
         self._DrivePhase = None        # Our _DrivePhase is set to True at when the S4 determines pulley accelleration
                                         # and set to False when S4 detects pulley decelleration. It is therefore True
                                         # throughout the whole Drive phase of the stroke and False during recovery phase. 
-        self._StrokeTotal = None
-        self.Watts = None
-        self.LiveAvgPower = None
-        self.Lastcheckforpulse = None
-        self.PulseEventTime = None
-        self.InstantaneousPace = None
-        self.DeltaPulse = None
-        self.PaddleTurning = None
-        self.rowerreset = None
+        self._WattsEventValue = None
+        self._LastCheckForPulse = None
+        self._PulseEventTime = None
+        self._PaddleTurning = None
+        self._RowerReset = None
         self.WRValues_rst = None
         self.WRValues = None
         self.WRValues_standstill = None
-        self.BLEvalues = None
-        self.ANTvalues = None
+        self.TXValues = None
         self.secondsWR = None
         self.minutesWR = None
         self.hoursWR = None
-        self.elapsetime = None
-        self.elapsetimeprevious = None
 
         # Initialise the attributes, particularly the WRValues dictionaries because subsequent
         # code tries to update the values of the dictionaries and so expect the dictionary keys
@@ -93,17 +88,13 @@ class DataLogger(object):
         with self._wr_lock:
             logger.debug("DataLogger._reset_state: Lock attained, setting values")
             self._RecentStrokesMaxPower = []
-            self.StrokeMaxPower = 0
+            self._StrokeMaxPower = 0
             self._DrivePhase = False
-            self._StrokeTotal = 0
-            self.Watts = 0
-            self.LiveAvgPower = 0
-            self.Lastcheckforpulse = 0
-            self.PulseEventTime = 0
-            self.InstantaneousPace = 0
-            self.DeltaPulse = 0
-            self.PaddleTurning = False
-            self.rowerreset = True
+            self._WattsEventValue = 0
+            self._LastCheckForPulse = 0
+            self._PulseEventTime = 0
+            self._PaddleTurning = False
+            self._RowerReset = True
             self.WRValues_rst = {
                     'stroke_rate': 0,
                     'total_strokes': 0,
@@ -119,13 +110,10 @@ class DataLogger(object):
                 }
             self.WRValues = deepcopy(self.WRValues_rst)
             self.WRValues_standstill = deepcopy(self.WRValues_rst)
-            self.BLEvalues = deepcopy(self.WRValues_rst)
-            self.ANTvalues = deepcopy(self.WRValues_rst)
+            self.TXValues = deepcopy(self.WRValues_rst)
             self.secondsWR = 0
             self.minutesWR = 0
             self.hoursWR = 0
-            self.elapsetime = 0
-            self.elapsetimeprevious = 0
             logger.debug("DataLogger._reset_state: Values set")
             logger.debug(f"DataLogger._reset_state: WRValues = {self.WRValues}")
             logger.debug("DataLogger._reset_state: Releasing lock")
@@ -144,7 +132,6 @@ class DataLogger(object):
             if event['type'] == 'stroke_rate':
                 self.WRValues.update({'stroke_rate': (event['value']*2)})
             if event['type'] == 'total_strokes':
-                self._StrokeTotal = event['value']
                 self.WRValues.update({'total_strokes': event['value']})
             if event['type'] == 'total_distance_m':
                 self.WRValues.update({'total_distance_m': (event['value'])})
@@ -153,13 +140,13 @@ class DataLogger(object):
                     self.WRValues.update({'instantaneous pace': 0})
                     self.WRValues.update({'speed':0})
                 else:
-                    self.InstantaneousPace = (500 * 100) / event['value']
-                    #print(self.InstantaneousPace)
-                    self.WRValues.update({'instantaneous pace': self.InstantaneousPace})
+                    PaceFromSpeed = (500 * 100) / event['value']
+                    #print(f{PaceFromSpeed})
+                    self.WRValues.update({'instantaneous pace': PaceFromSpeed})
                     self.WRValues.update({'speed':event['value']})
             if event['type'] == 'watts':
-                self.Watts = event['value']
-                self.update_live_avg_power(self.Watts)
+                self._WattsEventValue = event['value']
+                self.update_live_avg_power(self._WattsEventValue)
             if event['type'] == 'total_kcal':
                 self.WRValues.update({'total_kcal': ((event['value']+500)/1000)})  # convert calories into kCal (add 500 first to implement arithmetic rounding rather than rounding down)
             if event['type'] == 'total_kcal_h':  # must calclatre it first
@@ -177,7 +164,7 @@ class DataLogger(object):
         self.TimeElapsedcreator()
 
 
-    def pulse(self,event):
+    def pulse_monitor(self,event):
         # As a callback, this function is called by the notifier each time any event 
         # is captured from the S4. The function detects when the paddle is stationary
         # by checking when the S4 last reported a pulse event (pulses are triggered as
@@ -187,25 +174,23 @@ class DataLogger(object):
         # thereby allowing the time since the last pulse to be computed. If this is
         # longer than the NO_ROWING_PULSE_GAP in milliseconds (e.g. 300ms), then the 
         # paddle is assumed to be stationary and no rowing is taking place.
-        self.Lastcheckforpulse = int(round(time.time() * 1000))
+        self._LastCheckForPulse = int(round(time.time() * 1000))
         with self._wr_lock:
             if event['type'] == 'pulse':
-                self.PulseEventTime = event['at']
-                self.rowerreset = False
+                self._PulseEventTime = event['at']
+                self._RowerReset = False
 
-            if self.PulseEventTime is not None:
-                self.DeltaPulse = self.Lastcheckforpulse - self.PulseEventTime
+            if self._PulseEventTime:
+                pulse_gap = self._LastCheckForPulse - self._PulseEventTime
             else:
-                self.DeltaPulse = float('inf')  # Assume paddle is not turning yet
+                pulse_gap = float('inf')  # Assume paddle is not turning yet
 
-            if self.DeltaPulse <= NO_ROWING_PULSE_GAP:
-                self.PaddleTurning = True
+            if pulse_gap <= NO_ROWING_PULSE_GAP:
+                self._PaddleTurning = True
             else:
-                self.PaddleTurning = False
+                self._PaddleTurning = False
                 self._DrivePhase = False
-                self.PulseEventTime = 0
                 self._RecentStrokesMaxPower = []
-                self.LiveAvgPower = 0
                 self.WRValuesStandstill()
 
     def reset_requested(self,event):
@@ -219,44 +204,44 @@ class DataLogger(object):
 
     def TimeElapsedcreator(self):
         with self._wr_lock:
-            self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
-            self.elapsetime = int(self.elapsetime.total_seconds())
-            # print('sec:{0};min:{1};hr:{2}'.format(self.secondsWR,self.minutesWR,self.hoursWR))
-            self.WRValues.update({'elapsedtime': self.elapsetime})
-            self.elapsetimeprevious = self.elapsetime
+            #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
+            #self.elapsetime = int(self.elapsetime.total_seconds())
+            elapsed_time = int(self.hoursWR * 3600 + self.minutesWR * 60 + self.secondsWR)
+            self.WRValues.update({'elapsedtime': elapsed_time})
 
     def WRValuesStandstill(self):
         with self._wr_lock:
             self.WRValues_standstill = deepcopy(self.WRValues)
-            self.WRValues_standstill.update({'stroke_rate': 0})
-            self.WRValues_standstill.update({'instantaneous pace': 0})
-            self.WRValues_standstill.update({'heart_rate': 0})
-            self.WRValues_standstill.update({'speed': 0})
-            self.WRValues_standstill.update({'watts': 0})
+            self.WRValues_standstill.update({
+                'stroke_rate': 0,
+                'instantaneous pace': 0,
+                'speed': 0,
+                'watts': 0,
+            })
 
     def update_live_avg_power(self,watts):
         with self._wr_lock:
             if self._DrivePhase:
-                self.StrokeMaxPower = max(self.StrokeMaxPower, watts)
+                self._StrokeMaxPower = max(self._StrokeMaxPower, watts)
             else:
-                if self.StrokeMaxPower:
-                    self._RecentStrokesMaxPower.append(self.StrokeMaxPower)
-                    self.StrokeMaxPower = 0
+                if self._StrokeMaxPower:
+                    self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
+                    self._StrokeMaxPower = 0
                 while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_POWER_AVG:
                     self._RecentStrokesMaxPower.pop(0)
                 if len(self._RecentStrokesMaxPower) == NUM_STROKES_FOR_POWER_AVG:
-                    self.LiveAvgPower = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
-                    self.WRValues.update({'watts': self.LiveAvgPower})
+                    live_avg_power = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
+                    self.WRValues.update({'watts': live_avg_power})
 
 
     def get_WRValues(self):
         #logger.debug("getWRValues starting lock")
         with self._wr_lock:
             #logger.debug("getWRValues lock started")                
-            if self.rowerreset:
+            if self._RowerReset:
                 #logger.debug("getWRValues handling rowerreset")
                 values = deepcopy(self.WRValues_rst)
-            elif self.PaddleTurning:
+            elif self._PaddleTurning:
                 #logger.debug("getWRValues handling PaddleTurning")
                 values = deepcopy(self.WRValues)
             else:
@@ -284,8 +269,7 @@ class DataLogger(object):
             values = self.inject_HR(values, hrm)
             #logger.debug("CueBLEANT returning from inject_HR")
             with self._wr_lock:
-                self.BLEvalues = values
-                self.ANTvalues = values
+                self.TXValues = values
             logger.debug(f"CueBLEANT got values to append to dqueues from S4: {values}")
             ble_out_q.append(values)
             ant_out_q.append(values)
@@ -319,7 +303,7 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
     S4.open()
     # Control will not return until a connection has been succesfully opened
     # This means the thread will stay alive, but the code below and the loop
-    # which polls the S4 will not be executed unecessarily while an S4 is not
+    # which polls the S4 will not be executed unecessarily before an S4 is
     # connected
     
     S4.reset_request()
@@ -376,8 +360,8 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
 #             #print("Rowering_value_standstill  {0}".format(WRtoBLEANT.WRValues_standstill))
 #             print("Reset  {0}".format(WRtoBLEANT.rowerreset))
 #             #print("Paddleturning  {0}".format(WRtoBLEANT.PaddleTurning))
-#             #print("Lastcheck {0}".format(WRtoBLEANT.Lastcheckforpulse))
-#             #print("last pulse {0}".format(WRtoBLEANT.PulseEventTime))
+#             #print("Lastcheck {0}".format(WRtoBLEANT._LastCheckForPulse))
+#             #print("last pulse {0}".format(WRtoBLEANT._PulseEventTime))
 #             #print("is connected {}".format(S4.is_connected()))
 #             time.sleep(0.1)
 #
