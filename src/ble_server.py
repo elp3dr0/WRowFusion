@@ -24,7 +24,7 @@ from src.bleif import (
     Agent,
 )
 
-from src.ble_standard_services import DeviceInformation
+from src.ble_standard_services import DeviceInformation, FTMService
 
 MainLoop = None
 
@@ -123,18 +123,6 @@ def Convert_Waterrower_raw_to_byte():
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['elapsedtime'] & 0xff00) >> 8))
     logger.debug(f"{WRBytearray}")
     return WRBytearray
-
-
-class FTMservice(Service):
-    logger.debug("Entering Class FTMservice")
-    FITNESS_MACHINE_UUID = '1826'
-
-    def __init__(self, bus, index):
-        logger.debug("Entering FTMService.init")
-        Service.__init__(self, bus, index, self.FITNESS_MACHINE_UUID, True)
-        self.add_characteristic(FitnessMachineFeature(bus,0,self))
-        self.add_characteristic(RowerData(bus, 1, self))
-        self.add_characteristic(FitnessMachineControlPoint(bus, 2, self))
 
 
 class FitnessMachineFeature(Characteristic):
@@ -374,7 +362,7 @@ class FTMPAdvertisement(Advertisement):
             0xFFFF, [0x77, 0x72],
         )
         self.add_service_uuid(DeviceInformation.UUID)
-        self.add_service_uuid(FTMservice.FITNESS_MACHINE_UUID)
+        self.add_service_uuid(FTMService.UUID)
         self.add_service_uuid(HeartRate.HEART_RATE)
 
         self.add_local_name("WRowFusion")
@@ -421,7 +409,6 @@ def Waterrower_poll():
             print("rower", WaterrowerValuesRaw_polled)
 
     return True
-
 
 def ble_server_task(out_q,ble_in_q): #out_q
     logger.debug("main: Entering main")
@@ -487,8 +474,21 @@ def ble_server_task(out_q,ble_in_q): #out_q
 
     logger.debug("main: Calling add_service - DeviceInformation")
     app.add_service(device_info)
+
+    ftm_service = FTMService(bus, 2)
+    ftm_service.add_characteristic(FitnessMachineFeature(bus, 0, ftm_service))
+    ftm_service.add_characteristic(RowerData(bus, 1, ftm_service))
+    ftm_service.add_characteristic(FitnessMachineControlPoint(bus, 2, ftm_service))
+
+#    ftm_service.register_characteristics([
+#        FitnessMachineFeature(bus, 0, ftm_service),
+#        RowerData(bus, 1, ftm_service),
+#        FitnessMachineControlPoint(bus, 2, ftm_service),
+#    ])
+
     logger.debug("main: Calling add_service - FTMservice")
-    app.add_service(FTMservice(bus, 2))
+    app.add_service(ftm_service)
+    
     logger.debug("main: Calling add_service - HeartRate")
     app.add_service(HeartRate(bus,3))
 

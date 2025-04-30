@@ -82,3 +82,14 @@ class SoftwareRevisionString(Characteristic):
 
     def ReadValue(self, options):
         return self.value
+
+
+class FTMService(Service):
+    UUID = '1826'
+
+    def __init__(self, bus, index):
+        super().__init__(bus, index, self.UUID, True)
+
+#    def register_characteristics(self, characteristics):
+#        for char in characteristics:
+#            self.add_characteristic(char)
