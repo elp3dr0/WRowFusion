@@ -1,4 +1,4 @@
-from bleif import Service, Characteristic
+from src.bleif import Service, Characteristic
 import dbus
 import logging
 
