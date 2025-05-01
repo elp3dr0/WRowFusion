@@ -28,19 +28,11 @@ from src.ble_standard_services import (
     DeviceInformation, 
     FTMService, 
     FitnessMachineControlPoint,
+    FitnessMachineFeature,   
 )
 
-MainLoop = None
+logger = logging.getLogger(__name__)
 
-try:
-    from gi.repository import GLib
-
-    MainLoop = GLib.MainLoop
-
-except ImportError:
-    import gobject as GObject
-
-    MainLoop = GObject.MainLoop
 
 DBUS_OM_IFACE = "org.freedesktop.DBus.ObjectManager"
 DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
@@ -54,8 +46,21 @@ LE_ADVERTISEMENT_IFACE = "org.bluez.LEAdvertisement1"
 
 BLUEZ_SERVICE_NAME = "org.bluez"
 GATT_MANAGER_IFACE = "org.bluez.GattManager1"
+ADAPTER_IFACE = "org.bluez.Adapter1"
+AGENT_MANAGER_IFACE = "org.bluez.AgentManager1"
+AGENT_PATH = "/com/wrowfusion/agent"
 
-logger = logging.getLogger(__name__)
+MainLoop = None
+
+try:
+    from gi.repository import GLib
+
+    MainLoop = GLib.MainLoop
+
+except ImportError:
+    import gobject as GObject
+
+    MainLoop = GObject.MainLoop
 
 mainloop = None
 
@@ -83,21 +88,67 @@ class FailedException(dbus.exceptions.DBusException):
     _dbus_error_name = "org.bluez.Error.Failed"
     logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
 
+###########################
+## GATT helper functions ##
+###########################
 
 def register_app_cb():
-    logger.info("GATT application registered")
+    logger.info("GATT application registered.")
 
 
 def register_app_error_cb(error):
     logger.critical("Failed to register GATT application: " + str(error))
     mainloop.quit()
 
-# Function is needed to trigger the reset of the waterrower. It puts the "reset_ble" into the queue (FIFO) in order
-# for the WaterrowerInterface thread to get the signal to reset the waterrower.
+
+def register_ad_cb():
+    logger.info("GATT advertisement registered.")
+
+
+def register_ad_error_cb(error):
+    logger.critical("Failed to register GATT advertisement: " + str(error))
+    mainloop.quit()
+
+
+###########################################
+## FTM Service helper functions & config ##
+###########################################
 
 def request_reset_ble():
+    # Cues up a reset of the waterrower following an instruction recieved via the FTM Control Point. 
+    # Puts "reset_ble" into the queue (FIFO), to be handled by S4 thread.
     logger.debug("Entering request_reset_ble")
     out_q_reset.put("reset_ble")
+
+def fmcp_request_control_handler(payload):
+    return 0x01  # Success
+
+def fmcp_reset_handler(payload):
+    request_reset_ble()
+    return 0x01  # Success
+
+def fmcp_command_handler(opcode, payload):
+    handler = FTM_SUPPORTED_OPCODES.get(opcode)
+    if handler:
+        return handler(payload)
+    logger.warning(f"Recieved valid but unsupported OpCode: {opcode}")
+    return 0x02  # Op code not supported
+
+
+# Specify which Fitness Machine Control Point OpCodes our application supports, 
+# and specify which function should be called in each case.
+FTM_SUPPORTED_OPCODES = {
+    FitnessMachineControlPoint.FTMControlOpCode.FTMC_REQUEST_CONTROL: fmcp_request_control_handler,
+    FitnessMachineControlPoint.FTMControlOpCode.FTMC_RESET: fmcp_reset_handler,
+}
+
+# Specify which Fitness Machine Features our application supports
+FTM_SUPPORTED_FEATURES = (
+    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_CADENCE_SUPPORTED |
+    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_PACE_SUPPORTED |
+    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_EXPENDED_ENERGY_SUPPORTED
+)
+
 
 def Convert_Waterrower_raw_to_byte():
     logger.debug(f"Entering Conert_Waterrower_raw_to_byte on WaterrowerValuesRaw:") # {WaterrowerValuesRaw}")
@@ -125,60 +176,6 @@ def Convert_Waterrower_raw_to_byte():
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['elapsedtime'] & 0xff00) >> 8))
     logger.debug(f"{WRBytearray}")
     return WRBytearray
-
-
-class FitnessMachineFeature(Characteristic):
-    '''
-    Define the 8-byte flag array for the FTMS Feature Characteristic.
-    The flags specify what fields the Fitness Machine will provide (and what ).
-    See Bluetooth_FTMS_v1.0.1.pdf 4.3.1.1 bit field definition.
-    The octets are little endian.
-    0x26 0x56 translates to a bit field of 0101 0110 0010 0110
-    which specifies:
-    Bit	Value	Feature
-    0	0  	    Average Speed Supported
-    1	1 	    Cadence Supported
-    2	1 	    Total Distance Supported
-    3	0	    Inclination Supported
-    4	0	    Elevation Gain Supported
-    5	1 	    Pace Supported
-    6	0	    Step Count Supported
-    7	0	    Resistance Level Supported
-    8	1 	    Stride Count Supported
-    9	1 	    Expended Energy Supported
-    10	0	    Heart Rate Measurement Supported
-    11	1 	    Metabolic Equivalent (MET) Supported
-    12	0	    Elapsed Time Supported
-    13	1 	    Remaining Time Supported
-    14	0	    Power Measurement Supported
-    15	1 	    Force Measurement Supported
-    '''
-
-    FITNESS_MACHINE_FEATURE_UUID = '2acc'
-
-    def __init__(self, bus, index, service):
-        Characteristic.__init__(
-            self, bus, index,
-            self.FITNESS_MACHINE_FEATURE_UUID,
-            ['read'],
-            service)
-        self.notifying = False
-        self.value = [dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0),dbus.Byte(0)]
-
-        self.value[0] = 0x26
-        self.value[1] = 0x56
-        self.value[2] = 0x00
-        self.value[3] = 0x00
-        self.value[4] = 0x00
-        self.value[5] = 0x00
-        self.value[6] = 0x00
-        self.value[7] = 0x00
-
-
-    def ReadValue(self, options):
-        logger.debug("Entering FitnessMachineFeature.ReadValue")
-        print('Fitness Machine Feature: ' + repr(self.value))
-        return self.value
 
 
 class RowerData(Characteristic):
@@ -250,27 +247,6 @@ class RowerData(Characteristic):
 # 20 byte is max data send
 # example : 0x 2C-0B-00-00-00-00-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00
 # first 2 bytes: are for rowing machine details: 0B
-
-def fmcp_request_control_handler(payload):
-    return 0x01  # Success
-
-def fmcp_reset_handler(payload):
-    request_reset_ble()
-    return 0x01  # Success
-
-# Specify which Fitness Machine Control Point OpCodes our application supports, 
-# and specify which function should be called in each case.
-opcode_handlers = {
-    FitnessMachineControlPoint.FTMControlOpCode.FTMC_REQUEST_CONTROL: fmcp_request_control_handler,
-    FitnessMachineControlPoint.FTMControlOpCode.FTMC_RESET: fmcp_reset_handler,
-}
-
-def fmcp_command_handler(opcode, payload):
-    handler = opcode_handlers.get(opcode)
-    if handler:
-        return handler(payload)
-    logger.warning(f"Recieved valid but unsupported OpCode: {opcode}")
-    return 0x02  # Op code not supported
 
 
 class HeartRate(Service):
@@ -357,24 +333,12 @@ class FTMPAdvertisement(Advertisement):
         # Sadly this doesn't work. Possibly because Bluez wants full control over setting this flag.
         #self.add_data(0x01, [dbus.Byte(0x06)])
 
-def register_ad_cb():
-    logger.debug("Entering FTMPAdvertisement.register_ad_cb")
-    logger.info("Advertisement registered")
-
-
-def register_ad_error_cb(error):
-    logger.debug("Entering FTMPAdvertisement.register_ad_error_cb")
-    logger.critical("Failed to register advertisement: " + str(error))
-    mainloop.quit()
-
 def sigint_handler(sig, frame):
-    logger.debug("Entering FTMPAdvertisement.sigint_handler")
     if sig == signal.SIGINT:
+        logger.info("SIGINT received. Quitting ble_server dbus mainloop.")
         mainloop.quit()
     else:
         raise ValueError("Undefined handler for '{}' ".format(sig))
-
-AGENT_PATH = "/com/wrowfusion/agent"
 
 WaterrowerValuesRaw_polled = None
 
@@ -423,11 +387,11 @@ def ble_server_task(out_q,ble_in_q): #out_q
     adapter_obj = bus.get_object(BLUEZ_SERVICE_NAME, adapter)
 
     logger.debug("main: Getting Bluez properties")
-    adapter_props = dbus.Interface(adapter_obj, "org.freedesktop.DBus.Properties")
+    adapter_props = dbus.Interface(adapter_obj, DBUS_PROP_IFACE)
 
     # powered property on the controller to on
     logger.debug("main: Set bluez powered property to on")
-    adapter_props.Set("org.bluez.Adapter1", "Powered", dbus.Boolean(1))
+    adapter_props.Set(ADAPTER_IFACE, "Powered", dbus.Boolean(1))
 
     # Get manager objs
     logger.debug("main: Getting Bluez GATT MANAGER IFACE")
@@ -462,7 +426,10 @@ def ble_server_task(out_q,ble_in_q): #out_q
     app.add_service(device_info)
 
     ftm_service = FTMService(bus, 2)
-    ftm_service.add_characteristic(FitnessMachineFeature(bus, 0, ftm_service))
+
+    ftm_features = FitnessMachineFeature(bus, 0, ftm_service, supported_features=FTM_SUPPORTED_FEATURES)
+
+    ftm_service.add_characteristic(ftm_features)
     ftm_service.add_characteristic(RowerData(bus, 1, ftm_service))
 
     ftm_cp = FitnessMachineControlPoint(bus, 2, ftm_service)
@@ -484,7 +451,7 @@ def ble_server_task(out_q,ble_in_q): #out_q
     mainloop = MainLoop()
 
     logger.debug("main: Set agent manager")
-    agent_manager = dbus.Interface(obj, "org.bluez.AgentManager1")
+    agent_manager = dbus.Interface(obj, AGENT_MANAGER_IFACE)
     logger.debug("main: Register bluetooth agent with noinputnooutput")
     agent_manager.RegisterAgent(AGENT_PATH, "NoInputNoOutput") # register the bluetooth agent with no input and output which should avoid asking for pairing 
 

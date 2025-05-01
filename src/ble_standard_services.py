@@ -1,7 +1,7 @@
 from src.bleif import Service, Characteristic
 import dbus
 import logging
-from enum import Enum
+from enum import Enum, IntFlag
 
 logger = logging.getLogger(__name__)
 
@@ -166,3 +166,55 @@ class FitnessMachineControlPoint(Characteristic):
         if param:
             response += [dbus.Byte(b) for b in param]
         return response
+
+
+class FitnessMachineFeature(Characteristic):
+    #Currently this supports only the Fitness Machine Field, not the Target Setting Features Field
+    UUID = '2acc'
+    '''
+    Define the 8-byte flag array for the FTMS Feature Characteristic.
+    The flags specify what fields the Fitness Machine will provide.
+    See Bluetooth_FTMS_v1.0.1.pdf 4.3.1.1 for bit field definition.
+    The octets are little endian.
+    '''
+    class FitnessMachineFeatureFlags(IntFlag):
+        # Octet 0
+        FTMF_AVERAGE_SPEED_SUPPORTED           = 1 << 0
+        FTMF_CADENCE_SUPPORTED                 = 1 << 1
+        FTMF_TOTAL_DISTANCE_SUPPORTED          = 1 << 2
+        FTMF_INCLINATION_SUPPORTED             = 1 << 3
+        FTMF_ELEVATION_GAIN_SUPPORTED          = 1 << 4
+        FTMF_PACE_SUPPORTED                    = 1 << 5
+        FTMF_STEP_COUNT_SUPPORTED              = 1 << 6
+        FTMF_RESISTANCE_LEVEL_SUPPORTED        = 1 << 7
+
+        # Octet 1
+        FTMF_STRIDE_COUNT_SUPPORTED            = 1 << 8
+        FTMF_EXPENDED_ENERGY_SUPPORTED         = 1 << 9
+        FTMF_HEART_RATE_MEASUREMENT_SUPPORTED  = 1 << 10
+        FTMF_METABOLIC_EQUIV_SUPPORTED         = 1 << 11
+        FTMF_ELAPSED_TIME_SUPPORTED            = 1 << 12
+        FTMF_REMAINING_TIME_SUPPORTED          = 1 << 13
+        FTMF_POWER_MEASUREMENT_SUPPORTED       = 1 << 14
+        FTMF_FORCE_MEASUREMENT_SUPPORTED       = 1 << 15
+
+        # Octet 2
+        FTMF_USER_DATA_RETENTION_SUPPORTED     = 1 << 16
+
+    def __init__(self, bus, index, service, supported_features=FitnessMachineFeatureFlags(0)):
+        super().__init__(
+            bus, index,
+            self.UUID,
+            ['read'],
+            service
+        )
+        self._features = supported_features
+
+    def set_features(self, features: FitnessMachineFeatureFlags):
+        self._features = features
+
+    def ReadValue(self, options):
+        bitfield = self._features.value.to_bytes(8, byteorder='little')  # 8 bytes required by spec
+        value = [dbus.Byte(b) for b in bitfield]
+        logger.debug(f'FTMS Feature Flags: {self._features} ({value})')
+        return value
