@@ -12,7 +12,9 @@
 
 ## New functionality
 - [ ] Turn USB ports off after 10mins of no rowing. Add a button that turns the USB ports back on.
-
+- [ ] Review FTM_SUPPORTED_FEATURES in ble_server, make the list reflect what we actually support (refer to BLE specs
+      determine what each thing means). Add functionality to support other features. Check whether supporting other
+      features means having to transmit the features in two packets.
 
 ## 🔄 Data Handling
 - [ ] Replace deque with shared DataLogger instance
