@@ -331,6 +331,11 @@ class FTMPAdvertisement(Advertisement):
         self.add_service_uuid(FTMService.UUID)
         self.add_service_uuid(HeartRate.HEART_RATE)
 
+        self.add_service_data(
+            "1826",  # 16-bit UUID for FTMS, passed as a string
+            [0x01, 0b00010000, 0b00000000]  # 0x01 = Supported Modes, 0x10 = Rowing supported
+        )
+        
         self.add_local_name("WRowFusion")
         self.include_tx_power = True
         # Advertise as LE only, no BD/EDR to try and sidestep MITM input/output requirements.

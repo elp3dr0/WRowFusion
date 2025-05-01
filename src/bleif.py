@@ -109,6 +109,7 @@ class Advertisement(dbus.service.Object):
         self.local_name = None
         self.include_tx_power = None
         self.data = None
+        self.discoverable = None
         dbus.service.Object.__init__(self, bus, self.path)
 
     def get_properties(self):
@@ -128,6 +129,8 @@ class Advertisement(dbus.service.Object):
             )
         if self.local_name is not None:
             properties["LocalName"] = dbus.String(self.local_name)
+        if self.discoverable is not None and self.discoverable == True:
+            properties['Discoverable'] = dbus.Boolean(self.discoverable)
         if self.include_tx_power is not None:
             properties["IncludeTxPower"] = dbus.Boolean(self.include_tx_power)
 
@@ -170,15 +173,14 @@ class Advertisement(dbus.service.Object):
 
     @dbus.service.method(DBUS_PROP_IFACE, in_signature="s", out_signature="a{sv}")
     def GetAll(self, interface):
-        logger.info("GetAll")
+        logger.debug("GetAll Advertisement properties")
         if interface != LE_ADVERTISEMENT_IFACE:
             raise InvalidArgsException()
-        logger.info("returning props")
         return self.get_properties()[LE_ADVERTISEMENT_IFACE]
 
     @dbus.service.method(LE_ADVERTISEMENT_IFACE, in_signature="", out_signature="")
     def Release(self):
-        logger.info("%s: Released!" % self.path)
+        logger.info("%s: Advertisement Released!" % self.path)
 
 ##################
 ##  GATT AGENT  ##
