@@ -71,12 +71,31 @@ sudo usermod -aG bluetooth,dialout,gpio "$app_user"
 echo " Done."
 echo " "
 echo "----------------------------------------------"
+echo " Check for any existing wrowfusion service."
+echo "----------------------------------------------"
+echo " "
+
+if systemctl is-active --quiet "wrowfusion"; then
+    echo " Stopping existing wrowfusion service..."
+    sudo systemctl stop "wrowfusion"
+else
+    echo " wrowfusion is not running."
+fi
+
+echo " Done."
+echo " "
+echo "----------------------------------------------"
 echo " Install the application in the directory:"
 echo " ${app_dir}"
 echo "----------------------------------------------"
 echo " "
 
 sudo mkdir -p "$app_dir"
+echo " Cleaning any existing $app_dir while preserving logs..."
+find "$app_dir" -mindepth 1 -not -path "$app_dir/logs" -not -path "$app_dir/logs/*" -exec sudo rm -rf {} +
+echo " Done."
+
+echo " Copying application files to $app_dir..."
 script_dir=$(cd "$(dirname "$0")" && pwd)
 sudo cp -r "$script_dir"/* "$app_dir/"
 sudo chown -R "$app_user:$app_user" "$app_dir"
