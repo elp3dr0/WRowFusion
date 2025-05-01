@@ -24,7 +24,11 @@ from src.bleif import (
     Agent,
 )
 
-from src.ble_standard_services import DeviceInformation, FTMService
+from src.ble_standard_services import (
+    DeviceInformation, 
+    FTMService, 
+    FitnessMachineControlPoint,
+)
 
 MainLoop = None
 
@@ -56,38 +60,36 @@ logger = logging.getLogger(__name__)
 mainloop = None
 
 class InvalidArgsException(dbus.exceptions.DBusException):
-    logger.debug("Entering class InvalidArgsException")
     _dbus_error_name = "org.freedesktop.DBus.Error.InvalidArgs"
+    logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
 
 
 class NotSupportedException(dbus.exceptions.DBusException):
-    logger.debug("Entering class NotSupportedException")
     _dbus_error_name = "org.bluez.Error.NotSupported"
+    logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
 
 
 class NotPermittedException(dbus.exceptions.DBusException):
-    logger.debug("Entering class NotPermittedException")
     _dbus_error_name = "org.bluez.Error.NotPermitted"
+    logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
 
 
 class InvalidValueLengthException(dbus.exceptions.DBusException):
-    logger.debug("Entering class InvalidValueLengthException")
     _dbus_error_name = "org.bluez.Error.InvalidValueLength"
+    logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
 
 
 class FailedException(dbus.exceptions.DBusException):
-    logger.debug("Entering class FailedException")
     _dbus_error_name = "org.bluez.Error.Failed"
+    logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
 
 
 def register_app_cb():
-    logger.debug("Entering register_app_cb")
-    #logger.info("GATT application registered")
+    logger.info("GATT application registered")
 
 
 def register_app_error_cb(error):
-    logger.debug("Entering register_app_error_cb")
-    #logger.critical("Failed to register application: " + str(error))
+    logger.critical("Failed to register GATT application: " + str(error))
     mainloop.quit()
 
 # Function is needed to trigger the reset of the waterrower. It puts the "reset_ble" into the queue (FIFO) in order
@@ -249,43 +251,27 @@ class RowerData(Characteristic):
 # example : 0x 2C-0B-00-00-00-00-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00
 # first 2 bytes: are for rowing machine details: 0B
 
-class FitnessMachineControlPoint(Characteristic):
-    logger.debug("Entering Class FitnessMachineControlPoint")
-    FITNESS_MACHINE_CONTROL_POINT_UUID = '2ad9'
+def fmcp_request_control_handler(payload):
+    return 0x01  # Success
 
-    def __init__(self, bus, index, service):
-        logger.debug("Entering FitnessMachineControlPoint.init")
-        Characteristic.__init__(
-            self, bus, index,
-            self.FITNESS_MACHINE_CONTROL_POINT_UUID,
-            ['indicate', 'write'],
-            service)
-        self.out_q = None
+def fmcp_reset_handler(payload):
+    request_reset_ble()
+    return 0x01  # Success
 
-    def fmcp_cb(self, byte):
-        logger.debug("Entering FitnessMachineControlPoint.fmcp_cb")
-        print('fmcp_cb activate')
-        print(byte)
-        if byte == 0:
-            value = [dbus.Byte(128), dbus.Byte(0), dbus.Byte(1)]
-        elif byte == 1:
-            value = [dbus.Byte(128), dbus.Byte(1), dbus.Byte(1)]
-            request_reset_ble()
-        #print(value)
-        self.PropertiesChanged(GATT_CHRC_IFACE, {'Value': value}, [])
+# Specify which Fitness Machine Control Point OpCodes our application supports, 
+# and specify which function should be called in each case.
+opcode_handlers = {
+    FitnessMachineControlPoint.FTMControlOpCode.REQUEST_CONTROL: fmcp_request_control_handler,
+    FitnessMachineControlPoint.FTMControlOpCode.RESET: fmcp_reset_handler,
+}
 
-    def WriteValue(self, value, options):
-        logger.debug("Entering FitnessMachineControlPoint.WriteValue")
-        self.value = value
-        print(value)
-        byte = self.value[0]
-        print('Fitness machine control point: ' + repr(self.value))
-        if byte == 0:
-            print('Request control')
-            self.fmcp_cb(byte)
-        elif byte == 1:
-            print('Reset')
-            self.fmcp_cb(byte)
+def fmcp_command_handler(opcode, payload):
+    handler = opcode_handlers.get(opcode)
+    if handler:
+        return handler(payload)
+    logger.warning(f"Recieved valid but unsupported OpCode: {opcode}")
+    return 0x02  # Op code not supported
+
 
 class HeartRate(Service):
     logger.debug("Entering Class HeartRate")
@@ -478,13 +464,11 @@ def ble_server_task(out_q,ble_in_q): #out_q
     ftm_service = FTMService(bus, 2)
     ftm_service.add_characteristic(FitnessMachineFeature(bus, 0, ftm_service))
     ftm_service.add_characteristic(RowerData(bus, 1, ftm_service))
-    ftm_service.add_characteristic(FitnessMachineControlPoint(bus, 2, ftm_service))
 
-#    ftm_service.register_characteristics([
-#        FitnessMachineFeature(bus, 0, ftm_service),
-#        RowerData(bus, 1, ftm_service),
-#        FitnessMachineControlPoint(bus, 2, ftm_service),
-#    ])
+    ftm_cp = FitnessMachineControlPoint(bus, 2, ftm_service)
+
+    ftm_cp.command_handler = fmcp_command_handler
+    ftm_service.add_characteristic(ftm_cp)
 
     logger.debug("main: Calling add_service - FTMservice")
     app.add_service(ftm_service)
