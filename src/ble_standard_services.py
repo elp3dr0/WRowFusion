@@ -12,12 +12,13 @@ class DeviceInformation(Service):
 
     def __init__(self, bus, index):
         super().__init__(bus, index, self.UUID, True)
-        self.manufacturer = ManufacturerNameString(bus, 0, self)
-        self.model = ModelNumberString(bus, 1, self)
-        self.serial = SerialNumberString(bus, 2, self)
-        self.hardware = HardwareRevisionString(bus, 3, self)
-        self.firmware = FirmwareRevisionString(bus, 4, self)
-        self.software = SoftwareRevisionString(bus, 5, self)
+        self.manufacturer = self.ManufacturerNameString(bus, 0, self)
+        self.model = self.ModelNumberString(bus, 1, self)
+        self.serial = self.SerialNumberString(bus, 2, self)
+        self.hardware = self.HardwareRevisionString(bus, 3, self)
+        self.firmware = self.FirmwareRevisionString(bus, 4, self)
+        self.software = self.SoftwareRevisionString(bus, 5, self)
+        self.system_id = self.SystemID(bus, 6, self)
 
         self.add_characteristic(self.manufacturer)
         self.add_characteristic(self.model)
@@ -25,68 +26,78 @@ class DeviceInformation(Service):
         self.add_characteristic(self.hardware)
         self.add_characteristic(self.firmware)
         self.add_characteristic(self.software)
+        self.add_characteristic(self.system_id)
 
-class ManufacturerNameString(Characteristic):
-    UUID = '2A29'
+    class ManufacturerNameString(Characteristic):
+        UUID = '2A29'
 
-    def __init__(self, bus, index, service):
-        super().__init__(bus, index, self.UUID, ['read'], service)
-        self.value = dbus.Array([], signature='y')
+        def __init__(self, bus, index, service):
+            super().__init__(bus, index, self.UUID, ['read'], service)
+            self.value = dbus.Array([], signature='y')
 
-    def ReadValue(self, options):
-        return self.value
+        def ReadValue(self, options):
+            return self.value
 
-class ModelNumberString(Characteristic):
-    UUID = '2A24'
+    class ModelNumberString(Characteristic):
+        UUID = '2A24'
 
-    def __init__(self, bus, index, service):
-        super().__init__(bus, index, self.UUID, ['read'], service)
-        self.value = dbus.Array([], signature='y')
+        def __init__(self, bus, index, service):
+            super().__init__(bus, index, self.UUID, ['read'], service)
+            self.value = dbus.Array([], signature='y')
 
-    def ReadValue(self, options):
-        return self.value
+        def ReadValue(self, options):
+            return self.value
 
-class SerialNumberString(Characteristic):
-    UUID = '2A25'
+    class SerialNumberString(Characteristic):
+        UUID = '2A25'
 
-    def __init__(self, bus, index, service):
-        super().__init__(bus, index, self.UUID, ['read'], service)
-        self.value = dbus.Array([], signature='y')
+        def __init__(self, bus, index, service):
+            super().__init__(bus, index, self.UUID, ['read'], service)
+            self.value = dbus.Array([], signature='y')
 
-    def ReadValue(self, options):
-        return self.value
+        def ReadValue(self, options):
+            return self.value
 
-class HardwareRevisionString(Characteristic):
-    UUID = '2A27'
+    class HardwareRevisionString(Characteristic):
+        UUID = '2A27'
 
-    def __init__(self, bus, index, service):
-        super().__init__(bus, index, self.UUID, ['read'], service)
-        self.value = dbus.Array([], signature='y')
+        def __init__(self, bus, index, service):
+            super().__init__(bus, index, self.UUID, ['read'], service)
+            self.value = dbus.Array([], signature='y')
 
-    def ReadValue(self, options):
-        return self.value
+        def ReadValue(self, options):
+            return self.value
 
-class FirmwareRevisionString(Characteristic):
-    UUID = '2A26'
+    class FirmwareRevisionString(Characteristic):
+        UUID = '2A26'
 
-    def __init__(self, bus, index, service):
-        super().__init__(bus, index, self.UUID, ['read'], service)
-        self.value = dbus.Array([], signature='y')
+        def __init__(self, bus, index, service):
+            super().__init__(bus, index, self.UUID, ['read'], service)
+            self.value = dbus.Array([], signature='y')
 
-    def ReadValue(self, options):
-        return self.value
+        def ReadValue(self, options):
+            return self.value
 
-class SoftwareRevisionString(Characteristic):
-    UUID = '2A28'
+    class SoftwareRevisionString(Characteristic):
+        UUID = '2A28'
 
-    def __init__(self, bus, index, service):
-        super().__init__(bus, index, self.UUID, ['read'], service)
-        self.value = dbus.Array([], signature='y')
+        def __init__(self, bus, index, service):
+            super().__init__(bus, index, self.UUID, ['read'], service)
+            self.value = dbus.Array([], signature='y')
 
-    def ReadValue(self, options):
-        return self.value
+        def ReadValue(self, options):
+            return self.value
 
+    class SystemID(Characteristic):
+        UUID = '2A23'
 
+        def __init__(self, bus, index, service):
+            super().__init__(bus, index, self.UUID, ['read'], service)
+            self.value = dbus.Array([], signature='y')
+
+        def ReadValue(self, options):
+            return self.value
+        
 class FTMService(Service):
     UUID = '1826'
 
