@@ -261,8 +261,8 @@ def fmcp_reset_handler(payload):
 # Specify which Fitness Machine Control Point OpCodes our application supports, 
 # and specify which function should be called in each case.
 opcode_handlers = {
-    FitnessMachineControlPoint.FTMControlOpCode.REQUEST_CONTROL: fmcp_request_control_handler,
-    FitnessMachineControlPoint.FTMControlOpCode.RESET: fmcp_reset_handler,
+    FitnessMachineControlPoint.FTMControlOpCode.FTMC_REQUEST_CONTROL: fmcp_request_control_handler,
+    FitnessMachineControlPoint.FTMControlOpCode.FTMC_RESET: fmcp_reset_handler,
 }
 
 def fmcp_command_handler(opcode, payload):
