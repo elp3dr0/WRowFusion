@@ -145,8 +145,12 @@ FTM_SUPPORTED_OPCODES = {
 # Specify which Fitness Machine Features our application supports
 FTM_SUPPORTED_FEATURES = (
     FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_CADENCE_SUPPORTED |
+    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_TOTAL_DISTANCE_SUPPORTED |
     FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_PACE_SUPPORTED |
-    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_EXPENDED_ENERGY_SUPPORTED
+    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_EXPENDED_ENERGY_SUPPORTED |
+    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_HEART_RATE_MEASUREMENT_SUPPORTED |
+    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_ELAPSED_TIME_SUPPORTED |
+    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_POWER_MEASUREMENT_SUPPORTED
 )
 
 
