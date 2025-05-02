@@ -4,6 +4,10 @@ import logging
 import time
 import contextlib
 
+from dbus_next.aio import MessageBus
+from dbus_next import Message
+from dbus_next.constants import MessageType
+
 from bleak import BleakClient, BleakScanner, BleakError
 from bleak.backends.device import BLEDevice
 from src.heart_rate import HeartRateMonitor
@@ -39,6 +43,7 @@ class HeartRateBLEScanner(threading.Thread):
         self._stop_event = threading.Event()
         self.target_device = None
         self.connected = False
+        self.scanning = None
 
     def run(self):
         asyncio.run(self.monitor_loop())
@@ -46,6 +51,9 @@ class HeartRateBLEScanner(threading.Thread):
     async def monitor_loop(self):
         logger.debug("Entering monitor_loop")
         scan_window = INITIAL_SCAN_TIMEOUT
+        # Stop any existing discovery process on the hci0 adapter to avoid
+        # encountering an error when we start the new discovery process
+        self.stop_ble_discovery
         while not self._stop_event.is_set():
             try:
                 logger.info("Scanning for BLE heart rate monitors (HRMs)...")
@@ -70,6 +78,7 @@ class HeartRateBLEScanner(threading.Thread):
 
     async def scan_for_hrm(self, timeout) -> BLEDevice | None:
         logger.debug("Starting scan_for_hrm()")
+        self.scanning = True
         devices: dict[str, BLEDevice] = {}
         rssi_map: dict[str, int] = {}
 
@@ -78,34 +87,50 @@ class HeartRateBLEScanner(threading.Thread):
             found_good_device = False
             bonus_window_start = None
 
-            async for d, adv in scanner.advertisement_data():
-                if self._stop_event.is_set():
+            adv_iterator = scanner.advertisement_data()
+
+            while self.scanning:
+                
+                now = time.time()
+                if now - start_time > timeout:
+                    logger.debug("HRM scan timeout reached.")
+                    self.scanning = False
+                    break
+                if bonus_window_start and (now -bonus_window_start > BONUS_SCAN_WINDOW)
+                    logger.debug("HRM scan bonus window expired.")
+                    self.scanning = False
                     break
 
+                if self._stop_event.is_set():
+                    self.scanning = False
+                    break
+
+                # Ask for the next item from the iterator, but give it a timelimit
+                # to return the item, afterwhich move on even if a new device hasn't been found.
+                # This it to prevent the code from hanging here if no additional 
+                # devices ever appear. 
+                try:
+                    d, adv = await asyncio.wait_for(adv_iterator.__anext__(), timeout=1.0)
+                except (TimeoutError, StopAsyncIteration):
+                    continue  # No new device seen in this window so go back to the top of the while loop
+
+
                 if not self._is_heart_rate_monitor(adv):
-                    # Ignore this device and restart the loop with the next device
+                    # Ignore this device and go back to the top of the while loop
                     continue
 
                 if d.rssi < RSSI_THRESHOLD:
-                    # Ignore this device and restart the loop with the next device
+                    # Ignore this device and go back to the top of the while loop
                     continue
 
                 devices[d.address] = d
                 rssi_map[d.address] = d.rssi
-                logger.info(f"[BLE] Found HRM candidate: {d.address} ({d.rssi} dBm)")
+                logger.info(f"BLE Scanner found HRM candidate: {d.address} ({d.rssi} dBm)")
 
                 if not found_good_device:
-                    logger.info("[BLE] First HRM above RSSI threshold found. Starting bonus scan window.")
+                    logger.info("Searching a bit longer in case there are stronger HRM signals.")
                     bonus_window_start = time.time()
                     found_good_device = True
-
-                if found_good_device and (time.time() - bonus_window_start > BONUS_SCAN_WINDOW):
-                    logger.info("[BLE] Bonus scan window over. Selecting best HRM.")
-                    break
-
-                if time.time() - start_time > timeout:
-                    logger.info("[BLE] Initial scan timeout reached.")
-                    break
         
         logger.debug("Exiting scan_for_hrm()")
         if not devices:
@@ -295,3 +320,18 @@ class HeartRateBLEScanner(threading.Thread):
 
     def stop(self):
         self._stop_event.set()
+
+    async def stop_ble_discovery():
+        bus = await MessageBus(system=True).connect()
+
+        introspect = await bus.introspect('org.bluez', '/org/bluez/hci0')
+        obj = bus.get_proxy_object('org.bluez', '/org/bluez/hci0', introspect)
+        adapter = obj.get_interface('org.bluez.Adapter1')
+
+        try:
+            await adapter.call_stop_discovery()
+        except Exception as e:
+            if "org.bluez.Error.NotReady" in str(e) or "org.bluez.Error.Failed" in str(e):
+                pass  # Likely already stopped or inactive adapter
+            else:
+                raise
