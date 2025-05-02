@@ -44,11 +44,13 @@ class HeartRateBLEScanner(threading.Thread):
         asyncio.run(self.monitor_loop())
 
     async def monitor_loop(self):
+        logger.debug("Entering monitor_loop")
         scan_window = INITIAL_SCAN_TIMEOUT
         while not self._stop_event.is_set():
             try:
                 logger.info("Scanning for BLE heart rate monitors (HRMs)...")
                 await self.scan_for_hrm(scan_window)
+                logger.debug("Returning from scan for hrm")
                 if self.target_device:
                     try:
                         # Try to connect, and then block until disconnected
