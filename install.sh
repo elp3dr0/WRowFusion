@@ -90,11 +90,14 @@ echo " ${app_dir}"
 echo "----------------------------------------------"
 echo " "
 
-sudo mkdir -p "$app_dir"
-echo " Cleaning any existing $app_dir while preserving logs..."
+
+echo " Cleaning any existing $app_dir..."
 sudo rm -rf "$app_dir"/*
 
+sudo mkdir -p "$app_dir"
+
 # Untested code to delete everything within the app directory except the log directory and its contents
+#echo " Cleaning any existing $app_dir while preserving logs..."
 #shopt -s extglob
 #cd "$app_dir" || exit 1
 #sudo rm -rf !(logs)
