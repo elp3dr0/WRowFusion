@@ -29,19 +29,19 @@ qualname=src.ble_client
 propagate=0
 
 [logger_src.ble_server]
-level=DEBUG
+level=INFO
 handlers=consoleHandler, rotatingFileHandler
 qualname=src.ble_server
 propagate=0
 
 [logger_src.ble_standard_services]
-level=DEBUG
+level=INFO
 handlers=consoleHandler, rotatingFileHandler
 qualname=src.ble_standard_services
 propagate=0
 
 [logger_src.bleif]
-level=DEBUG
+level=INFO
 handlers=consoleHandler, rotatingFileHandler
 qualname=src.bleif
 propagate=0

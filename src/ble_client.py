@@ -54,7 +54,7 @@ class HeartRateBLEScanner(threading.Thread):
         return None
 
     async def connect_and_monitor(self, device):
-        logger.info(f"Connecting as client to {device.name} [{device.address}]...")
+        logger.info(f"Connecting as client to ble device: {device.name} [{device.address}]...")
         try:
             async with BleakClient(device.address) as client:
                 if not await client.is_connected():
