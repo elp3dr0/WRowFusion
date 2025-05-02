@@ -320,23 +320,30 @@ class HeartRateMeasurement(Characteristic):
 
 
 class FTMPAdvertisement(Advertisement):
-    logger.debug("Entering Class FTMPAdvertisement")
+    '''
+    Wrapper around the generic Advertisement class which will be used to configure
+    the Fitness Machine Profile Advertisement as appropriate for this application.
+    '''
     def __init__(self, bus, index):
-        logger.debug("Entering FTMPAdvertisement.init")
         Advertisement.__init__(self, bus, index, "peripheral")
+        # Set Company Identifier code as FFFF, which is defined by Bluetooth SIG as a reserved/testID 
+        # often used for development or internal testing. The [0x77, 0x72] bytes are 'wr' in ASCII
+        # for waterrower
         self.add_manufacturer_data(
             0xFFFF, [0x77, 0x72],
         )
-        self.add_service_uuid(DeviceInformation.UUID)
-        self.add_service_uuid(FTMService.UUID)
-        self.add_service_uuid(HeartRate.HEART_RATE)
-
+        # Set the name that our bluetooth server will appear as
+        self.add_local_name("WRowFusion")
+        # Advertise the application as a Rower-type Fitness Machine.
         self.add_service_data(
             "1826",  # 16-bit UUID for FTMS, passed as a string
             [0x01, 0b00010000, 0b00000000]  # 0x01 = Supported Modes, 0x10 = Rowing supported
         )
-        
-        self.add_local_name("WRowFusion")
+
+        self.add_service_uuid(DeviceInformation.UUID)
+        self.add_service_uuid(FTMService.UUID)
+        self.add_service_uuid(HeartRate.HEART_RATE)
+
         self.include_tx_power = True
         # Advertise as LE only, no BD/EDR to try and sidestep MITM input/output requirements.
         # Sadly this doesn't work. Possibly because Bluez wants full control over setting this flag.
