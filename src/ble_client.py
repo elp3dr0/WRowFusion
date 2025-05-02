@@ -67,6 +67,7 @@ class HeartRateBLEScanner(threading.Thread):
             await asyncio.sleep(RECHECK_INTERVAL)
 
     async def scan_for_hrm(self, timeout) -> BLEDevice | None:
+        logger.debug("Starting scan_for_hrm()")
         devices: dict[str, BLEDevice] = {}
         rssi_map: dict[str, int] = {}
 
@@ -76,7 +77,7 @@ class HeartRateBLEScanner(threading.Thread):
             bonus_window_start = None
 
             async for d, adv in scanner.advertisement_data():
-                if self._should_stop.is_set():
+                if self._stop_event.is_set():
                     break
 
                 if not self._is_heart_rate_monitor(adv):
@@ -103,7 +104,8 @@ class HeartRateBLEScanner(threading.Thread):
                 if time.time() - start_time > timeout:
                     logger.info("[BLE] Initial scan timeout reached.")
                     break
-
+        
+        logger.debug("Exiting scan_for_hrm()")
         if not devices:
             return None
 
@@ -114,9 +116,7 @@ class HeartRateBLEScanner(threading.Thread):
     def _is_heart_rate_monitor(self, adv) -> bool:
         # Heart Rate Service UUID is 0x180D (16-bit), represented as 0000180d-0000-1000-8000-00805f9b34fb
         return HRM_SERVICE_UUID.lower() in [uuid.lower() for uuid in adv.service_uuids]
-
-    def stop(self):
-        self._should_stop.set()
+    
 
     async def connect_and_monitor(self, device):
         logger.info(f"Connecting as client to ble device: {device.name} [{device.address}]...")
