@@ -138,7 +138,9 @@ class HeartRateBLEScanner(threading.Thread):
 
         # Pick device with strongest RSSI
         best_address = max(rssi_map, key=rssi_map.get)
-        return devices[best_address]
+        best_rssi = rssi_map[best_address]
+        logger.debug(f"Choosing HRM with the strongest signal ({best_rssi}db): {best_address}")
+        self.target_device = devices[best_address]
 
     def _is_heart_rate_monitor(self, adv) -> bool:
         # Heart Rate Service UUID is 0x180D (16-bit), represented as 0000180d-0000-1000-8000-00805f9b34fb
