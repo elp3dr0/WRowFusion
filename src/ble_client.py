@@ -96,7 +96,7 @@ class HeartRateBLEScanner(threading.Thread):
                     logger.debug("HRM scan timeout reached.")
                     self.scanning = False
                     break
-                if bonus_window_start and (now -bonus_window_start > BONUS_SCAN_WINDOW)
+                if bonus_window_start and (now -bonus_window_start > BONUS_SCAN_WINDOW):
                     logger.debug("HRM scan bonus window expired.")
                     self.scanning = False
                     break
