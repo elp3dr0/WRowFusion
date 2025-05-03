@@ -11,73 +11,109 @@ HRM_TIMEOUT = 10
 class HeartRateMonitor:
     def __init__(self):
         self._lock = threading.Lock()
-        self._bluetooth_hr = 0
-        self._bluetooth_ts = 0
-        self._ant_hr = 0
-        self._ant_ts = 0
+        self.manufacturer = None
+        self.model = None
+        self.serial_nr = None
+        self.protocol = None
+        self.address = None
+        self.body_sensor_location = None
+        self.skin_contact_detected = None
+        self.battery_level = None
+        self.heart_rate = None
+        self.heart_rate_ts = None
+        self.rr_intervals = None
+        self.rr_intervals_ts = None
+        self.energy_expended = None
+        self.energy_expended_ts = None
 
-    def update_bluetooth_hr(self, hr: int) -> None:
+    def update_manufacturer(self, data) -> None:
         with self._lock:
-            self._bluetooth_hr = hr
-            self._bluetooth_ts = time.time()
-        logger.debug(f"Bluetooth HR updated: {hr} at {self._bluetooth_ts}")
+            self.manufacturer = data
+        logger.debug(f"HRM manufacturer updated: {data}")
 
-    def update_ant_hr(self, hr: int) -> None:
+    def update_model(self, data) -> None:
         with self._lock:
-            self._ant_hr = hr
-            self._ant_ts = time.time()
-        logger.debug(f"ANT+ HR updated: {hr} at {self._ant_ts}")
+            self.model = data
+        logger.debug(f"HRM model updated: {data}")
+
+    def update_serial_nr(self, data) -> None:
+        with self._lock:
+            self.serial_nr = data
+        logger.debug(f"HRM serial_nr updated: {data}")
+
+    def update_protocol(self, data) -> None:
+        with self._lock:
+            self.protocol = data
+        logger.debug(f"HRM protocol updated: {data}")
+
+    def update_address(self, data) -> None:
+        with self._lock:
+            self.address = data
+        logger.debug(f"HRM address updated: {data}")
+
+    def update_body_sensor_location(self, data) -> None:
+        with self._lock:
+            self.body_sensor_location = data
+        logger.debug(f"HRM body_sensor_location updated: {data}")
+
+    def update_skin_contact_detected(self, data) -> None:
+        with self._lock:
+            self.skin_contact_detected = data
+        logger.debug(f"HRM skin_contact_detected updated: {data}")
+
+    def update_battery_level(self, data) -> None:
+        with self._lock:
+            self.battery_level = data
+        logger.debug(f"HRM battery level updated: {data}")
+
+    def update_heart_rate(self, hr: int) -> None:
+        with self._lock:
+            self.heart_rate = hr
+            self.heart_rate_ts = time.time()
+        logger.debug(f"HRM heart rate updated: {hr} at {self.heart_rate_ts}")
+
+    def update_rr_intervals(self, data) -> None:
+        with self._lock:
+            self.rr_intervals = data
+            self.rr_intervals_ts = time.time()
+        logger.debug(f"HRM rr_intervals updated: {data} at {self.rr_intervals_ts}")
+
+    def update_energy_expended(self, data) -> None:
+        with self._lock:
+            self.energy_expended = data
+            self.energy_expended_ts = time.time()
+        logger.debug(f"HRM energy_expended updated: {data} at {self.energy_expended_ts}")
 
     def get_heart_rate(self) -> int:
-        """Return the most recently updated and still-valid heart rate."""
-        now = time.time()
-        
+        """
+        Return the heart rate if a valid rate has been captured within the acceptable timeframe.
+        Otherwise return 0
+        """
+        hr = 0
         with self._lock:
-            bt_hr = self._bluetooth_hr
-            if self._bluetooth_ts is not None:
-                bt_age = f"{now - self._bluetooth_ts:.2f}"
-                bt_valid = (now - self._bluetooth_ts < HRM_TIMEOUT) and bt_hr > 0
+            if self.heart_rate and self.heart_rate > 0:
+                if self.heart_rate_ts is not None:
+                    age_seconds = time.time() - self.heart_rate_ts
+                    age = f"{age_seconds:.2f}"
+
+                    if age_seconds < HRM_TIMEOUT:
+                        hr = self.heart_rate
+                        logger.debug(f"Got valid heart rate: {hr} (age: {age}s)")
+                    else:
+                        logger.debug(f"Heart rate data is stale: age: {age}s")
+                else:
+                    logger.debug("Heart rate data has invalid timestamp.")
             else:
-                bt_age = "N/A"
-                bt_valid = False
-
-            ant_hr = self._ant_hr
-            if self._ant_ts is not None:
-                ant_age = f"{now - self._ant_ts:.2f}"
-                ant_valid = (now - self._ant_ts < HRM_TIMEOUT) and ant_hr > 0
-            else:
-                ant_age = "N/A"
-                ant_valid = False
-
-
-            if bt_valid and (not ant_valid or self._bluetooth_ts >= self._ant_ts):
-                hr = bt_hr
-            elif ant_valid:
-                hr = ant_hr
-            else:
-                hr = 0  # No valid source
-
-        if bt_valid:
-            logger.debug(f"Bluetooth HR is valid: {bt_hr} (age: {bt_age}s)")
-        else:
-            logger.debug(f"Bluetooth HR is invalid or stale (age: {bt_age}s)")
-
-        if ant_valid:
-            logger.debug(f"ANT+ HR is valid: {ant_hr} (age: {ant_age}s)")
-        else:
-            logger.debug(f"ANT+ HR is invalid or stale (age: {ant_age}s)")
-
-        if hr == 0:
-            logger.debug("No valid heart rate data available.")
-
+                logger.debug("No heart rate data available.")
+        
         return hr
 
     def __repr__(self):
         """Return a string representation of the current state of heart rate data."""
-        bt_time = datetime.fromtimestamp(self._bluetooth_ts).strftime('%Y-%m-%d %H:%M:%S') if self._bluetooth_ts else "N/A"
-        ant_time = datetime.fromtimestamp(self._ant_ts).strftime('%Y-%m-%d %H:%M:%S') if self._ant_ts else "N/A"
+        ts_str = datetime.fromtimestamp(self.heart_rate_ts).strftime('%Y-%m-%d %H:%M:%S') if self.heart_rate_ts else "N/A"
 
+        hr = self.heart_rate if self.heart_rate is not None else "N/A"
+        
         return (
-            f"<HeartRateMonitor bt_hr={self._bluetooth_hr}, bt_ts={bt_time}, "
-            f"ant_hr={self._ant_hr}, ant_ts={ant_time}>"
+            f"<HeartRateMonitor hr={hr}, ts={ts_str}>"
         )

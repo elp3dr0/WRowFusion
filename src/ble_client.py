@@ -159,6 +159,9 @@ class HeartRateBLEScanner(threading.Thread):
                     return
                 
                 self.connected = True
+                self.hr_monitor.update_address(device.address)
+                self.hr_monitor.update_protocol("bluetooth")
+
                 logger.info("Connected to BLE HRM. Logging GATT services and characteristics...")
                 await self.log_services_and_characteristics(client)
 
@@ -216,19 +219,25 @@ class HeartRateBLEScanner(threading.Thread):
     async def fetch_static_info(self, client: BleakClient):
         try:
             manufacturer = await client.read_gatt_char(HRM_MANUFACTURER_CHAR_UUID)
-            logger.info(f"Manufacturer: {manufacturer.decode('utf-8').strip()}")
+            manufacturer_str = manufacturer.decode('utf-8').strip()
+            self.hr_monitor.update_manufacturer(manufacturer_str)
+            logger.info(f"Manufacturer: {manufacturer_str}")
         except Exception as e:
             logger.warning(f"BLE HRM: Failed to read manufacturer: {e}")
 
         try:
-            model_number = await client.read_gatt_char(HRM_MODEL_CHAR_UUID)
-            logger.info(f"Model Number: {model_number.decode('utf-8').strip()}")
+            model = await client.read_gatt_char(HRM_MODEL_CHAR_UUID)
+            model_str = model.decode('utf-8').strip()
+            self.hr_monitor.update_model(model_str)
+            logger.info(f"Model Number: {model_str}")
         except Exception as e:
             logger.warning(f"BLE HRM: Failed to read model number: {e}")
 
         try:
             serial_number = await client.read_gatt_char(HRM_SERIAL_CHAR_UUID)
-            logger.info(f"Serial Number: {serial_number.decode('utf-8').strip()}")
+            serial_str = serial_number.decode('utf-8').strip()
+            self.hr_monitor.update_serial_nr(serial_str)
+            logger.info(f"Serial Number: {serial_str}")
         except Exception as e:
             logger.warning(f"BLE HRM: Failed to read serial number: {e}")
 
@@ -291,13 +300,12 @@ class HeartRateBLEScanner(threading.Thread):
                 index += 1
         
             # Record the heart rate in the HeartRateMonitor class
-            self.hr_monitor.update_bluetooth_hr(hr_value)
+            self.hr_monitor.update_heart_rate(hr_value)
             logger.debug(f"Heart rate received: {hr_value} bpm")
-
-            # TODO: Consider adding the following data fields to the HeartRateMonitor class or recording it as data somewhere rather
-            # than just logging them.
             
-            logger.debug(f"HRM sensor skin contact: {CONTACT_STATUS_MEANING.get(contact_status)}")
+            contact_status_str = CONTACT_STATUS_MEANING.get(contact_status)
+            self.hr_monitor.update_skin_contact_detected(contact_status_str)
+            logger.debug(f"HRM sensor skin contact: {contact_status_str}")
             
             # Energy expenditure (2 bytes)
             # If supported, typically sent once every 10 measurements at regular intervals 
@@ -306,6 +314,7 @@ class HeartRateBLEScanner(threading.Thread):
                 if index + 2 <= len(data):
                     energy_exp = int.from_bytes(data[index:index + 2], byteorder="little")
                     index += 2
+                    self.hr_monitor.update_energy_expended(energy_exp)
                     logger.debug(f"Energy expenditure: {energy_exp} kcal")
                 else:
                     logger.warning("Energy expenditure flag set but data is too short.")
@@ -319,6 +328,7 @@ class HeartRateBLEScanner(threading.Thread):
                     rr = int.from_bytes(data[index:index + 2], byteorder="little")
                     rr_intervals.append(rr)
                     index += 2
+                self.hr_monitor.update_rr_intervals(rr_intervals)
                 logger.debug(f"RR Intervals: {rr_intervals}")
 
         except Exception as e:

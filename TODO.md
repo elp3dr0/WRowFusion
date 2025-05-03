@@ -16,6 +16,7 @@
       determine what each thing means). Add functionality to support other features. Check whether supporting other
       features means having to transmit the features in two packets.
 
+
 ## 🔄 Data Handling
 - [ ] Replace deque with shared DataLogger instance
 - [ ] Make DataLogger accessible across threads
@@ -24,10 +25,13 @@
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)
 - [ ] Add support for ANT+ HR broadcast
-- [ ] Implement reconnection logic for BLE HRM
+- [ ] Change the logic for recording Heart Rate:
+        * On scanning for Heart Rate Monitor, find the best signal amongst both Bluetooth and Ant
+        * Once an HRM is selected, record only those values in the hr_monitor class.
 - [ ] Explore need for pyusb (for ANT+ reciever) and gatt (smartrow?) in requirements.txt
 - [ ] Address the ERROR DIFF TRANSACTION COLLISION seen in nRF debug logs during a succesful connection (see note 4)
-- [ ] Revisit MITM connection requests from Android. If they continue to be a significant hurdle, then explore a static passkey (see note 5). 
+- [ ] Revisit MITM Bluetooth connection requests from Android. If they continue to be a significant hurdle, then explore a static passkey (see note 5).
+- [ ] Consider adding BLE Heart Rate Control Point functionality to ble_client.py to allow a reset of Expended Energy for devices that support it.
 
 ## 🖧 Comms with S4
 - [ ] Consider handling situation when S4 gets disconnected from serial port. Currently
@@ -61,3 +65,4 @@
 ### ✅ Done
 - [x] Fork project structure from PiRowFlo
 - [x] Initial Bluetooth HRM scan integration
+- [x] Implement reconnection logic for BLE HRM
