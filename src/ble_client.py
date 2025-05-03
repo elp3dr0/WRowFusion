@@ -14,7 +14,7 @@ from src.heart_rate import HeartRateMonitor
 
 logger = logging.getLogger(__name__)
 
-# Settings for Heart Rate Monitor discovery
+# Settings for Heart Rate Monitor (HRM) discovery
 RSSI_THRESHOLD = -80        # Minimum signal strength of device to be considered elibible for connection
 INITIAL_SCAN_TIMEOUT = 300  # Number of seconds for which initial scan will stay alive constantly unless an eligible device is found
 BONUS_SCAN_WINDOW = 15      # Additional window to discover other HRMs after the first HRM has been discovered and before a device is selected
@@ -22,6 +22,7 @@ BONUS_SCAN_WINDOW = 15      # Additional window to discover other HRMs after the
 RECHECK_INTERVAL = 60       # Time between periodic scans after initial scan
 RECHECK_DURATION = 30       # Duration of each periodic scan
 
+LOW_FREQ_POLL_DELAY = 30    # Delay between polls of low frequency HRM data such as battery level 
 
 # BLE Heart Rate Service and Characteristic UUIDs
 HRM_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb"
@@ -31,9 +32,13 @@ HRM_SENSOR_LOCATION_CHAR_UUID = "00002a38-0000-1000-8000-00805f9b34fb"
 HRM_MANUFACTURER_CHAR_UUID = "00002a29-0000-1000-8000-00805f9b34fb"
 HRM_MODEL_CHAR_UUID = "00002a24-0000-1000-8000-00805f9b34fb"
 HRM_SERIAL_CHAR_UUID = "00002a25-0000-1000-8000-00805f9b34fb"
-LOW_FREQ_POLL_DELAY = 30
-RECONNECT_DELAY = 10
-RESCAN_DELAY = 30
+
+CONTACT_STATUS_MEANING = {
+    0b00: "Not supported",
+    0b01: "Not supported",
+    0b10: "No skin contact detected",
+    0b11: "Skin contact detected",
+}
 
 class HeartRateBLEScanner(threading.Thread):
     def __init__(self, hr_monitor: HeartRateMonitor):
@@ -49,35 +54,30 @@ class HeartRateBLEScanner(threading.Thread):
         asyncio.run(self.monitor_loop())
 
     async def monitor_loop(self):
-        logger.debug("Entering monitor_loop")
         scan_window = INITIAL_SCAN_TIMEOUT
         # Stop any existing discovery process on the hci0 adapter to avoid
         # encountering an error when we start the new discovery process
         self.stop_ble_discovery
         while not self._stop_event.is_set():
             try:
-                logger.info("Scanning for BLE heart rate monitors (HRMs)...")
                 await self.scan_for_hrm(scan_window)
-                logger.debug("Returning from scan for hrm")
                 if self.target_device:
                     try:
                         # Try to connect, and then block until disconnected
                         await self.connect_and_monitor(self.target_device)
                     except Exception as e:
-                        logger.error(f"BLE Scanner connection error: {e}")
+                        logger.error(f"BLE scanner connection error: {e}")
                     self.connected = False
                     self.target_device = None
-                else:
-                    logger.info(f"No BLE HRM found. Retrying in {RECHECK_INTERVAL} seconds.")
 
             except Exception as e:
-                logger.warning(f"HeartRateBLEScanner Monitor loop error: {e}")
+                logger.error(f"HeartRateBLEScanner Monitor loop error: {e}. Retrying in {RECHECK_INTERVAL} seconds.")
 
             scan_window = RECHECK_DURATION
             await asyncio.sleep(RECHECK_INTERVAL)
 
     async def scan_for_hrm(self, timeout) -> BLEDevice | None:
-        logger.debug("Starting scan_for_hrm()")
+        logger.info("Starting device discovery scan for BLE Heart Rate Monitor...")
         self.scanning = True
         devices: dict[str, BLEDevice] = {}
         rssi_map: dict[str, int] = {}
@@ -93,11 +93,11 @@ class HeartRateBLEScanner(threading.Thread):
                 
                 now = time.time()
                 if now - start_time > timeout:
-                    logger.debug("HRM scan timeout reached.")
+                    logger.debug("BLE HRM discovery scan timeout reached.")
                     self.scanning = False
                     break
                 if bonus_window_start and (now -bonus_window_start > BONUS_SCAN_WINDOW):
-                    logger.debug("HRM scan bonus window expired.")
+                    logger.debug("BLE HRM disovery scan bonus window expired.")
                     self.scanning = False
                     break
 
@@ -116,31 +116,34 @@ class HeartRateBLEScanner(threading.Thread):
 
 
                 if not self._is_heart_rate_monitor(adv):
+                    logger.debug(f"BLE scan found device {d.address} is not a HRM.")
                     # Ignore this device and go back to the top of the while loop
                     continue
 
                 if d.rssi < RSSI_THRESHOLD:
+                    logger.debug(f"BLE scan ignoring HRM {d.address} because signal strength {d.rssi} dB < {RSSI_THRESHOLD} dB threshold.")
                     # Ignore this device and go back to the top of the while loop
                     continue
 
                 devices[d.address] = d
                 rssi_map[d.address] = d.rssi
-                logger.info(f"BLE Scanner found HRM candidate: {d.address} ({d.rssi} dBm)")
+                logger.debug(f"BLE Scanner found HRM device: {d.address} ({d.rssi} dB)")
 
                 if not found_good_device:
-                    logger.info("Searching a bit longer in case there are stronger HRM signals.")
+                    logger.info(f"Found a BLE HRM, extending search for {BONUS_SCAN_WINDOW} seconds in case there are other HRM devices.")
                     bonus_window_start = time.time()
                     found_good_device = True
         
-        logger.debug("Exiting scan_for_hrm()")
         if not devices:
+            logger.info(f"No BLE Heart Rate Monitor found during scan window.")
             return None
 
         # Pick device with strongest RSSI
         best_address = max(rssi_map, key=rssi_map.get)
         best_rssi = rssi_map[best_address]
-        logger.debug(f"Choosing HRM with the strongest signal ({best_rssi}db): {best_address}")
+        logger.info(f"HRM with the strongest signal selected: ({best_rssi}db): {best_address}")
         self.target_device = devices[best_address]
+
 
     def _is_heart_rate_monitor(self, adv) -> bool:
         # Heart Rate Service UUID is 0x180D (16-bit), represented as 0000180d-0000-1000-8000-00805f9b34fb
@@ -162,7 +165,7 @@ class HeartRateBLEScanner(threading.Thread):
                 logger.info("Connected to BLE HRM. Fetching static BLE data...")
                 await self.fetch_static_info(client)
 
-                logger.info("Subscribing to heart rate notifications...")
+                logger.info("Subscribing to heart rate notifications from BLE HRM...")
                 await client.start_notify(HRM_MEASUREMENT_CHAR_UUID, self.handle_heart_rate)
 
                 # Start low-frequency polling as a background task
@@ -184,9 +187,31 @@ class HeartRateBLEScanner(threading.Thread):
 
         except BleakError as e:
             logger.warning(f"BLE client connection failed: {e}")
+        except asyncio.TimeoutError:
+            logger.warning("BLE connection attempt timed out.")
+        except asyncio.CancelledError:
+            logger.warning("BLE connection task was cancelled.")
+            raise
         except Exception as e:
-            logger.exception(f"Unexpected error during BLE HRM connection: {e}")
+            logger.error(f"Unexpected error during BLE HRM connection: {e}")
             
+
+    async def log_services_and_characteristics(self, client):
+        if not client or not client.is_connected:
+            logger.warning("Cannot log services — HRM not connected.")
+            return
+
+        try:
+            services = await client.get_services()
+            if services:
+                logger.debug(f"Connected BLE HRM supports:")
+            for service in services:
+                logger.debug(f" Service: {service.uuid} — {service.description}")
+                for char in service.characteristics:
+                    logger.debug(f"  Characteristic: {char.uuid} — {char.description}")
+        except Exception as e:
+            logger.warning(f"Failed to log GATT services: {e}")
+
 
     async def fetch_static_info(self, client: BleakClient):
         try:
@@ -196,13 +221,13 @@ class HeartRateBLEScanner(threading.Thread):
             logger.warning(f"BLE HRM: Failed to read manufacturer: {e}")
 
         try:
-            model_number = await client.read_gatt_char()
-            logger.info(f"Model Number: {model_number.decode('utf-8').strip(HRM_MODEL_CHAR_UUID)}")
+            model_number = await client.read_gatt_char(HRM_MODEL_CHAR_UUID)
+            logger.info(f"Model Number: {model_number.decode('utf-8').strip()}")
         except Exception as e:
             logger.warning(f"BLE HRM: Failed to read model number: {e}")
 
         try:
-            serial_number = await client.read_gatt_char()
+            serial_number = await client.read_gatt_char(HRM_SERIAL_CHAR_UUID)
             logger.info(f"Serial Number: {serial_number.decode('utf-8').strip()}")
         except Exception as e:
             logger.warning(f"BLE HRM: Failed to read serial number: {e}")
@@ -225,48 +250,19 @@ class HeartRateBLEScanner(threading.Thread):
         except Exception as e:
             logger.warning(f"BLE HRM: Failed to read sensor location data: {e}")
 
+
     async def poll_low_frequency_data(self, client: BleakClient):
         while await client.is_connected():
             try:
                 # Battery level
                 battery = await client.read_gatt_char(HRM_BATTERY_LEVEL_CHAR_UUID)
                 battery_pct = int(battery[0])
-                logger.info(f"[Low-Freq] Battery level: {battery_pct}%")
+                logger.debug(f"[Low-Freq Poll] HRM battery level: {battery_pct}%")
             except Exception as e:
-                logger.warning(f"[Low-Freq] Battery poll failed: {e}")
-
-            try:
-                # Sensor contact status (parse flags from HR measurement characteristic)
-                raw = await client.read_gatt_char(HRM_MEASUREMENT_CHAR_UUID)
-                flags = raw[0]
-                contact_status = (flags >> 1) & 0b11
-
-                contact_status_meaning = {
-                    0b00: "Not supported",
-                    0b01: "Not supported",
-                    0b10: "No skin contact detected",
-                    0b11: "Skin contact detected",
-                }
-                logger.info(f"[Low-Freq] HRM sensor skin contact: {contact_status_meaning.get(contact_status)}")
-
-            except Exception as e:
-                logger.warning(f"[Low-Freq] Sensor contact poll failed: {e}")
+                logger.warning(f"[Low-Freq Poll] HRM battery poll failed: {e}")
 
             await asyncio.sleep(LOW_FREQ_POLL_DELAY)
 
-    async def log_services_and_characteristics(self, client):
-        if not client or not client.is_connected:
-            logger.warning("Cannot log services — HRM not connected.")
-            return
-
-        try:
-            services = await client.get_services()
-            for service in services:
-                logger.debug(f"Service: {service.uuid} — {service.description}")
-                for char in service.characteristics:
-                    logger.debug(f"  Characteristic: {char.uuid} — {char.description}")
-        except Exception as e:
-            logger.warning(f"Failed to log GATT services: {e}")
 
     def handle_heart_rate(self, sender, data: bytearray):
         """
@@ -275,10 +271,14 @@ class HeartRateBLEScanner(threading.Thread):
         """
         try:
         
+            # Note that the value of the flags can change from one notification to the next:
+            # i.e., whether the contact is detected, whether RR intervals are included, etc.
+            # — can change from one notification to the next, depending on what the device is reporting.
             flags = data[0]
             hr_format_16bit = flags & 0x01
             energy_exp_present = flags & 0x08
             rr_present = flags & 0x10
+            contact_status = (flags >> 1) & 0b11
 
             index = 1
 
@@ -294,10 +294,13 @@ class HeartRateBLEScanner(threading.Thread):
             self.hr_monitor.update_bluetooth_hr(hr_value)
             logger.debug(f"Heart rate received: {hr_value} bpm")
 
-            # TODO: Consider adding the following data to the HeartRateMonitor class or recording it as data somewhere rather
-            # than just logging it.
+            # TODO: Consider adding the following data fields to the HeartRateMonitor class or recording it as data somewhere rather
+            # than just logging them.
+            
+            logger.debug(f"HRM sensor skin contact: {CONTACT_STATUS_MEANING.get(contact_status)}")
             
             # Energy expenditure (2 bytes)
+            # If supported, typically sent once every 10 measurements at regular intervals 
             energy_exp = None
             if energy_exp_present:
                 if index + 2 <= len(data):
@@ -308,6 +311,8 @@ class HeartRateBLEScanner(threading.Thread):
                     logger.warning("Energy expenditure flag set but data is too short.")
 
             # RR-Intervals (each is 2 bytes)
+            # RR Intervals are recorded at a higher frequncy than heart beat, so mulitple
+            # readings (up to a max of 9) are passed in each payload.  
             rr_intervals = []
             if rr_present:
                 while index + 1 < len(data):
@@ -321,7 +326,11 @@ class HeartRateBLEScanner(threading.Thread):
 
 
     def stop(self):
+        logger.debug("Stopping BLE Heart Rate Monitor Scanner")
         self._stop_event.set()
+        self.scanning = False
+        self.stop_ble_discovery
+
 
     async def stop_ble_discovery():
         bus = await MessageBus(system=True).connect()
