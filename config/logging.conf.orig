@@ -23,7 +23,7 @@ qualname=src.wrowfusion
 propagate=0
 
 [logger_src.ble_client]
-level=DEBUG
+level=INFO
 handlers=consoleHandler, rotatingFileHandler
 qualname=src.ble_client
 propagate=0
