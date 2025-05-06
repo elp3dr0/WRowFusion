@@ -14,8 +14,8 @@ class HeartRateMonitor:
         self.manufacturer = None
         self.model = None
         self.serial_nr = None
-        self.protocol = None
-        self.address = None
+        self.source = None      # Specifies the source of the the heart rate signal. Either: bluetooth, ant+, s4 
+        self.address = None     # MAC address of the heart rate monitor 
         self.body_sensor_location = None
         self.skin_contact_detected = None
         self.battery_level = None
@@ -41,10 +41,10 @@ class HeartRateMonitor:
             self.serial_nr = data
         logger.debug(f"HRM serial_nr updated: {data}")
 
-    def update_protocol(self, data) -> None:
+    def update_source(self, data) -> None:
         with self._lock:
-            self.protocol = data
-        logger.debug(f"HRM protocol updated: {data}")
+            self.source = data
+        logger.debug(f"HRM source updated: {data}")
 
     def update_address(self, data) -> None:
         with self._lock:
@@ -110,9 +110,10 @@ class HeartRateMonitor:
 
     def __repr__(self):
         """Return a string representation of the current state of heart rate data."""
-        ts_str = datetime.fromtimestamp(self.heart_rate_ts).strftime('%Y-%m-%d %H:%M:%S') if self.heart_rate_ts else "N/A"
+        with self._lock:
+            ts_str = datetime.fromtimestamp(self.heart_rate_ts).strftime('%Y-%m-%d %H:%M:%S') if self.heart_rate_ts else "N/A"
 
-        hr = self.heart_rate if self.heart_rate is not None else "N/A"
+            hr = self.heart_rate if self.heart_rate is not None else "N/A"
         
         return (
             f"<HeartRateMonitor hr={hr}, ts={ts_str}>"

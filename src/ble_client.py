@@ -160,7 +160,7 @@ class HeartRateBLEScanner(threading.Thread):
                 
                 self.connected = True
                 self.hr_monitor.update_address(device.address)
-                self.hr_monitor.update_protocol("bluetooth")
+                self.hr_monitor.update_source("bluetooth")
 
                 logger.info("Connected to BLE HRM. Logging GATT services and characteristics...")
                 await self.log_services_and_characteristics(client)
