@@ -28,7 +28,9 @@ from src.ble_standard_services import (
     DeviceInformation, 
     FTMService, 
     FitnessMachineControlPoint,
-    FitnessMachineFeature,   
+    FitnessMachineFeature,
+    HeartRateService,
+    HeartRateMeasurementCharacteristic,  
 )
 
 logger = logging.getLogger(__name__)
@@ -253,72 +255,6 @@ class RowerData(Characteristic):
 # first 2 bytes: are for rowing machine details: 0B
 
 
-class HeartRate(Service):
-    logger.debug("Entering Class HeartRate")
-    HEART_RATE = '180D'
-
-    def __init__(self, bus, index):
-        logger.debug("Entering HeartRate.init")
-        Service.__init__(self, bus, index, self.HEART_RATE, True)
-        self.add_characteristic(HeartRateMeasurement(bus, 0, self))
-
-class HeartRateMeasurement(Characteristic):
-    logger.debug("Entering Class HeartRateMeasurement")
-    HEART_RATE_MEASUREMENT = '2a37'
-    last_hr = 0
-
-    def __init__(self, bus, index, service):
-        logger.debug("Entering HeartRateMeasurement.init")
-        Characteristic.__init__(
-            self, bus, index,
-            self.HEART_RATE_MEASUREMENT,
-            ['notify'],
-            service)
-        self.notifying = False
-
-    def hrm_cb(self):
-        logger.debug("Entering HeartRateMeasurement.hrm_cb")
-        if not WaterrowerValuesRaw:
-            logger.warning("HeartRateMeasurement.hrm_cb: WaterrowerValuesRaw is empty or not yet initialised.")
-            return self.notifying
-
-        hr = WaterrowerValuesRaw['heart_rate'];
-        if self.last_hr != hr:
-            self.last_hr = hr
-            print("new ble hr: %d" % self.last_hr)
-            value = [dbus.Byte(0),dbus.Byte(self.last_hr & 0xff)]
-
-            self.PropertiesChanged(GATT_CHRC_IFACE, { 'Value': value }, [])
-        return self.notifying
-
-    def _update_hrm_cb_value(self):
-        logger.debug("Entering HeartRateMeasurement.update_hrm_cb_values")
-        print('Update Waterrower HR Data')
-
-        if not self.notifying:
-            return
-
-        GLib.timeout_add(1000, self.hrm_cb)
-
-    def StartNotify(self):
-        logger.debug("Entering HeartRateMeasurement.StartNotify")
-        if self.notifying:
-            print('Already notifying, nothing to do')
-            return
-
-        print('Start HR Notify')
-        self.notifying = True
-        self._update_hrm_cb_value()
-        
-    def StopNotify(self):
-        logger.debug("Entering HeartRateMeasurement.StopNotify")
-        if not self.notifying:
-            print('Not notifying, nothing to do')
-            return
-
-        self.notifying = False
-
-
 class FTMPAdvertisement(Advertisement):
     '''
     Wrapper around the generic Advertisement class which will be used to configure
@@ -342,12 +278,39 @@ class FTMPAdvertisement(Advertisement):
 
         self.add_service_uuid(DeviceInformation.UUID)
         self.add_service_uuid(FTMService.UUID)
-        self.add_service_uuid(HeartRate.HEART_RATE)
+        self.add_service_uuid(AppHeartRate.UUID)
 
         self.include_tx_power = True
         # Advertise as LE only, no BD/EDR to try and sidestep MITM input/output requirements.
         # Sadly this doesn't work. Possibly because Bluez wants full control over setting this flag.
         #self.add_data(0x01, [dbus.Byte(0x06)])
+
+
+class AppHeartRateMeasurement(HeartRateMeasurementCharacteristic):
+    '''Wrapper around the generic heart rate measurement characteristic to allow app-specific configuration'''
+    def __init__(self, bus, index, service, hr_monitor):
+        super().__init__(bus, index, service)
+        self.hr_monitor = hr_monitor
+        self.last_hr = 0
+
+    def _update(self):
+        GLib.timeout_add(1000, self._hrm_cb)
+
+    def _hrm_cb(self):
+        hr = self.hr_monitor.get_heart_rate()
+        if hr and hr > 0 and self.last_hr != hr:
+            self.last_hr = hr
+            value = [dbus.Byte(0), dbus.Byte(hr & 0xff)]
+            self.PropertiesChanged(GATT_CHRC_IFACE, { 'Value': value }, [])
+        return self.notifying
+
+
+class AppHeartRate(HeartRateService):
+    '''Wrapper around the generic heart rate service to allow app-specific configuration'''
+    def __init__(self, bus, index, hr_monitor):
+        super().__init__(bus, index)
+        self.add_characteristic(AppHeartRateMeasurement(bus, 0, self, hr_monitor))
+
 
 def sigint_handler(sig, frame):
     if sig == signal.SIGINT:
@@ -376,7 +339,7 @@ def Waterrower_poll():
 
     return True
 
-def ble_server_task(out_q,ble_in_q): #out_q
+def ble_server_task(out_q,ble_in_q, hr_monitor): #out_q
     logger.debug("main: Entering main")
     global mainloop
     global out_q_reset
@@ -457,7 +420,7 @@ def ble_server_task(out_q,ble_in_q): #out_q
     app.add_service(ftm_service)
     
     logger.debug("main: Calling add_service - HeartRate")
-    app.add_service(HeartRate(bus,3))
+    app.add_service(AppHeartRate(bus,3,hr_monitor))
 
     # Set a callback function to poll the WaterRower data every 100ms 
     logger.debug("main: Set up Waterrower_poll recurring task")

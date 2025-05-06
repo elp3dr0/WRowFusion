@@ -229,3 +229,33 @@ class FitnessMachineFeature(Characteristic):
         value = [dbus.Byte(b) for b in bitfield]
         logger.debug(f'FTMS Feature Flags: {self._features} ({value})')
         return value
+    
+
+class HeartRateService(Service):
+    UUID = '180D'
+
+    def __init__(self, bus, index):
+        super().__init__(bus, index, self.UUID, True)
+
+class HeartRateMeasurementCharacteristic(Characteristic):
+    UUID = '2a37'
+
+    def __init__(self, bus, index, service):
+        super().__init__(
+            bus, index,
+            self.UUID,
+            ['notify'],
+            service)
+        self.notifying = False
+
+    def StartNotify(self):
+        if self.notifying:
+            return
+        self.notifying = True
+        self._update()
+
+    def StopNotify(self):
+        self.notifying = False
+
+    def _update(self):
+        raise NotImplementedError("Must be implemented in subclass or injected")

@@ -60,7 +60,7 @@ def start_threads():
 
     # Thread for advertising and connecting the RPi to external clients and sending the data
     # to connected clients 
-    ble_server_thread = threading.Thread(target=ble_server.ble_server_task, args=(q, ble_q), daemon=True, name="BLEServerThread")
+    ble_server_thread = threading.Thread(target=ble_server.ble_server_task, args=(q, ble_q, hr_monitor), daemon=True, name="BLEServerThread")
     threads.append(ble_server_thread)
 
     logger.debug("wrfusion.start_threads: about to start threads")
