@@ -32,6 +32,7 @@
 - [ ] Address the ERROR DIFF TRANSACTION COLLISION seen in nRF debug logs during a succesful connection (see note 4)
 - [ ] Revisit MITM Bluetooth connection requests from Android. If they continue to be a significant hurdle, then explore a static passkey (see note 5).
 - [ ] Consider adding BLE Heart Rate Control Point functionality to ble_client.py to allow a reset of Expended Energy for devices that support it.
+- [ ] Investigate error: "src.ble_client: HeartRateBLEScanner Monitor loop error: [org.bluez.Error.InProgress] Operation already in progress. Retrying in 60 seconds." Likely to do with existing discovery process? Encountered after installation over previous installation. Or possibly whenever the service is restarted without a reboot. Currently a reboot clears it.
 
 ## 🖧 Comms with S4
 - [ ] Consider handling situation when S4 gets disconnected from serial port. Currently
