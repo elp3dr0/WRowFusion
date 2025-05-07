@@ -140,6 +140,7 @@ class DataLogger(object):
         logger.debug(f"Received event: {event}")
         with self._wr_lock:
             if event['type'] in IGNORE_LIST:
+                logger.debug(f"Ignoring event in ignore list: {event['type']}")
                 return
             if event['type'] == 'stroke_start':
                 self._DrivePhase = True

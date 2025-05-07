@@ -53,7 +53,7 @@ qualname=src.heart_rate
 propagate=0
 
 [logger_src.s4]
-level=INFO
+level=DEBUG
 handlers=consoleHandler, rotatingFileHandler
 qualname=src.s4
 propagate=0
