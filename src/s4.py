@@ -45,7 +45,7 @@ heartbeat_signal = DigitalOutputDevice(HEARTBEAT_PIN, active_high=True, initial_
 # Specified in milliseconds
 NO_ROWING_PULSE_GAP = 300
 
-IGNORE_LIST = ['graph', 'tank_volume', 'display_sec_dec']
+IGNORE_LIST = ['graph', 'tank_volume']
 
 # Smooth the displayed power by finding the average max power output over a number of strokes 
 NUM_STROKES_FOR_POWER_AVG = 4
@@ -77,6 +77,7 @@ class DataLogger(object):
         self.secondsWR = None
         self.minutesWR = None
         self.hoursWR = None
+        self.secdecWR = None
 
         # Initialise the attributes, particularly the WRValues dictionaries because subsequent
         # code tries to update the values of the dictionaries and so expect the dictionary keys
@@ -114,6 +115,7 @@ class DataLogger(object):
             self.secondsWR = 0
             self.minutesWR = 0
             self.hoursWR = 0
+            self.secdecWR = 0
             logger.debug("DataLogger._reset_state: Values set")
             logger.debug(f"DataLogger._reset_state: WRValues = {self.WRValues}")
             logger.debug("DataLogger._reset_state: Releasing lock")
@@ -161,6 +163,8 @@ class DataLogger(object):
                 self.minutesWR = event['value']
             if event['type'] == 'display_hr':
                 self.hoursWR = event['value']
+            if event['type'] == 'display_sec_dec':
+                self.secdecWR = event['value']
         self.TimeElapsedcreator()
 
 
@@ -206,7 +210,7 @@ class DataLogger(object):
         with self._wr_lock:
             #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
             #self.elapsetime = int(self.elapsetime.total_seconds())
-            elapsed_time = int(self.hoursWR * 3600 + self.minutesWR * 60 + self.secondsWR)
+            elapsed_time = int(self.hoursWR * 3600 + self.minutesWR * 60 + self.secondsWR + (1 if self.secdecWR >= 5 else 0))
             self.WRValues.update({'elapsedtime': elapsed_time})
 
     def WRValuesStandstill(self):
