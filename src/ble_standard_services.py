@@ -336,7 +336,7 @@ class RowerData(Characteristic):
         # Most groups comprise single fields. 
         # Stroke_info and Expended_Energy are exceptions and comprise more than one data field which are transmitted
         # together or not at all
-        for flag, fields in FIELD_GROUPS.items():
+        for flag, fields in FIELD_GROUPS:
             include = bool(self._fields & flag)
             logger.debug(f"Field group: {self._fields}, Include: {include}")
             # STROKE_INFO is inverted — included when the bit is NOT set
