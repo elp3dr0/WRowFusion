@@ -178,7 +178,7 @@ class AppRowerData(RowerData):
         self.data_logger = wr_data_logger
 
     def rowerdata_cb(self):
-        logger.debug("Running ApplicationRowerData.rowerdata_cb")
+        logger.debug("Running AppRowerData.rowerdata_cb")
         if not self.data_logger.is_initialised:
             logger.debug("No WaterRower values available yet.")
             return self.notifying
@@ -188,15 +188,20 @@ class AppRowerData(RowerData):
             logger.warning("No WaterRower values available yet.")
             return self.notifying
         
+        logger.debug(f"Got values: {field_values}")
         payload_bytes = self.encode(field_values)
+        logger.debug(f"Generated payload: {payload_bytes}")
         if self.last_payload != payload_bytes:
+            logger.debug("Changed values in payload, so starting transmission")
             self.last_payload = payload_bytes
             value = [dbus.Byte(b) for b in payload_bytes]
             self.PropertiesChanged(GATT_CHRC_IFACE, {'Value': value}, [])
 
+        logger.debug("Exiting rowerdata_cb")
         return self.notifying
 
     def _update(self):
+        logger.debug("Entering AppRowerData _update to schedule rowerdata_cb")
         GLib.timeout_add(200, self.rowerdata_cb)
             
 ###### todo: function needed to get all the date from waterrower
