@@ -73,27 +73,23 @@ mainloop = None
 
 class InvalidArgsException(dbus.exceptions.DBusException):
     _dbus_error_name = "org.freedesktop.DBus.Error.InvalidArgs"
-    logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
 
 
 class NotSupportedException(dbus.exceptions.DBusException):
     _dbus_error_name = "org.bluez.Error.NotSupported"
-    logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
 
 
 class NotPermittedException(dbus.exceptions.DBusException):
     _dbus_error_name = "org.bluez.Error.NotPermitted"
-    logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
 
 
 class InvalidValueLengthException(dbus.exceptions.DBusException):
     _dbus_error_name = "org.bluez.Error.InvalidValueLength"
-    logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
 
 
 class FailedException(dbus.exceptions.DBusException):
     _dbus_error_name = "org.bluez.Error.Failed"
-    logger.error(f"Encountered DBus exception in BLE Server: {_dbus_error_name}")
+
 
 ###########################
 ## GATT helper functions ##
