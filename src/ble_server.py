@@ -30,7 +30,9 @@ from src.ble_standard_services import (
     FitnessMachineControlPoint,
     FitnessMachineFeature,
     HeartRateService,
-    HeartRateMeasurementCharacteristic,  
+    HeartRateMeasurementCharacteristic,
+    RowingFieldFlags,
+    RowerData, 
 )
 
 logger = logging.getLogger(__name__)
@@ -146,15 +148,24 @@ FTM_SUPPORTED_OPCODES = {
 
 # Specify which Fitness Machine Features our application supports
 FTM_SUPPORTED_FEATURES = (
-    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_CADENCE_SUPPORTED |
-    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_TOTAL_DISTANCE_SUPPORTED |
-    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_PACE_SUPPORTED |
-    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_EXPENDED_ENERGY_SUPPORTED |
-    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_HEART_RATE_MEASUREMENT_SUPPORTED |
-    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_ELAPSED_TIME_SUPPORTED |
-    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_POWER_MEASUREMENT_SUPPORTED
+    FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_CADENCE_SUPPORTED
+    | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_TOTAL_DISTANCE_SUPPORTED 
+    | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_PACE_SUPPORTED 
+    | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_EXPENDED_ENERGY_SUPPORTED 
+    | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_HEART_RATE_MEASUREMENT_SUPPORTED 
+    | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_ELAPSED_TIME_SUPPORTED 
+    | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_POWER_MEASUREMENT_SUPPORTED
 )
 
+ROWER_SUPPORTED_FIELDS = (
+    RowingFieldFlags.STROKE_INFO 
+    | RowingFieldFlags.TOTAL_DISTANCE
+    | RowingFieldFlags.INSTANT_PACE
+    | RowingFieldFlags.INSTANT_POWER
+    | RowingFieldFlags.EXPENDED_ENERGY
+    | RowingFieldFlags.HEART_RATE
+    | RowingFieldFlags.ELAPSED_TIME
+)
 
 def Convert_Waterrower_raw_to_byte():
     logger.debug(f"Entering Conert_Waterrower_raw_to_byte on WaterrowerValuesRaw:") # {WaterrowerValuesRaw}")
@@ -184,71 +195,30 @@ def Convert_Waterrower_raw_to_byte():
     return WRBytearray
 
 
-class RowerData(Characteristic):
-    logger.debug("Entering Class RowerData")
-    ROWING_UUID = '2ad1'
-    last_values = {}
-
+class ApplicationRowerData(RowerData):
     def __init__(self, bus, index, service):
-        logger.debug("Entering RowerData.init")
-        Characteristic.__init__(
-            self, bus, index,
-            self.ROWING_UUID,
-            ['notify'],
-            service)
-        self.notifying = False
-        self.iter = 0
+        super().__init__(bus, index, service, supported_fields=ROWER_SUPPORTED_FIELDS)
+        self.last_payload = None
 
     def rowerdata_cb(self):
-        logger.debug("Entering RowerData.rowerdata_cb")
-        if not WaterrowerValuesRaw:
-            logger.warning("RowerData.rowerdata_cb: WaterrowerValuesRaw is empty or not yet initialised.")
+        logger.debug("Running ApplicationRowerData.rowerdata_cb")
+
+        field_values = get_waterrower_values()
+        if not field_values:
+            logger.warning("No WaterRower values available yet.")
             return self.notifying
         
-        Waterrower_byte_values = Convert_Waterrower_raw_to_byte()
-        logger.debug(f"Rower.rowerdata: Got Waterrower_byte_values: {Waterrower_byte_values}")
-        if self.last_values != Waterrower_byte_values:
-            self.last_values = Waterrower_byte_values 
-            value = [dbus.Byte(0x2C), dbus.Byte(0x0B),
-                dbus.Byte(Waterrower_byte_values[0]), dbus.Byte(Waterrower_byte_values[1]), dbus.Byte(Waterrower_byte_values[2]),
-                dbus.Byte(Waterrower_byte_values[3]), dbus.Byte(Waterrower_byte_values[4]), dbus.Byte(Waterrower_byte_values[5]),
-                dbus.Byte(Waterrower_byte_values[6]), dbus.Byte(Waterrower_byte_values[7]),
-                dbus.Byte(Waterrower_byte_values[8]), dbus.Byte(Waterrower_byte_values[9]),
-                dbus.Byte(Waterrower_byte_values[10]), dbus.Byte(Waterrower_byte_values[11]),dbus.Byte(Waterrower_byte_values[12]),dbus.Byte(Waterrower_byte_values[13]),dbus.Byte(Waterrower_byte_values[14]),
-                dbus.Byte(Waterrower_byte_values[15]),
-                dbus.Byte(Waterrower_byte_values[16]), dbus.Byte(Waterrower_byte_values[17]),
-                ]
-            self.PropertiesChanged(GATT_CHRC_IFACE, { 'Value': value }, [])
+        payload_bytes = self.encode(field_values)
+        if self.last_payload != payload_bytes:
+            self.last_payload = payload_bytes
+            value = [dbus.Byte(b) for b in payload_bytes]
+            self.PropertiesChanged(GATT_CHRC_IFACE, {'Value': value}, [])
+
         return self.notifying
 
-    def _update_rowerdata_cb_value(self):
-        logger.debug("Entering RowerData.update_rowerdata_cb_value")
-        #print('Update Waterrower Rower Data')
-
-        if not self.notifying:
-            return
-
+    def _update(self):
         GLib.timeout_add(200, self.rowerdata_cb)
-
-    def StartNotify(self):
-        logger.debug("Entering RowerData.StartNotify")
-        if self.notifying:
-            print('Already notifying, nothing to do')
-            return
-
-        self.notifying = True
-        self._update_rowerdata_cb_value()
-
-    def StopNotify(self):
-        logger.debug("Entering RowerData.StopNotify")
-        if not self.notifying:
-            print('Not notifying, nothing to do')
-            return
-
-        self.notifying = False
-        self._update_rowerdata_cb_value()
-
-
+            
 ###### todo: function needed to get all the date from waterrower
 # 20 byte is max data send
 # example : 0x 2C-0B-00-00-00-00-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00

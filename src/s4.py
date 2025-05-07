@@ -99,7 +99,7 @@ class DataLogger(object):
                     'stroke_rate': 0,
                     'total_strokes': 0,
                     'total_distance_m': 0,
-                    'instantaneous pace': 0,
+                    'instant_pace': 0,
                     'speed': 0,
                     'watts': 0,
                     'total_kcal': 0,
@@ -137,7 +137,7 @@ class DataLogger(object):
                 self.WRValues.update({'total_distance_m': (event['value'])})
             if event['type'] == 'avg_distance_cmps':
                 if event['value'] == 0:
-                    self.WRValues.update({'instantaneous pace': 0})
+                    self.WRValues.update({'instant_pace': 0})
                     self.WRValues.update({'speed':0})
                 else:
                     PaceFromSpeed = (500 * 100) / event['value']
@@ -214,7 +214,7 @@ class DataLogger(object):
             self.WRValues_standstill = deepcopy(self.WRValues)
             self.WRValues_standstill.update({
                 'stroke_rate': 0,
-                'instantaneous pace': 0,
+                'instant_pace': 0,
                 'speed': 0,
                 'watts': 0,
             })

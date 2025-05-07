@@ -1,7 +1,10 @@
-from src.bleif import Service, Characteristic
 import dbus
 import logging
+import struct
 from enum import Enum, IntFlag
+from dataclasses import dataclass
+
+from src.bleif import Service, Characteristic
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +183,9 @@ class FitnessMachineControlPoint(Characteristic):
 
 
 class FitnessMachineFeature(Characteristic):
-    #Currently this supports only the Fitness Machine Field, not the Target Setting Features Field
+    # Currently this supports only the Fitness Machine Field, not the Target Setting Features Field
+    # The caller application should ensure that it sets the Feature bits and the RowerData flags such
+    # that they are in agreement (see RowerData class to which flags correspond to which feature bits)
     UUID = '2acc'
     '''
     Define the 8-byte flag array for the FTMS Feature Characteristic.
@@ -247,6 +252,103 @@ class HeartRateMeasurementCharacteristic(Characteristic):
             ['notify'],
             service)
         self.notifying = False
+
+    def StartNotify(self):
+        if self.notifying:
+            return
+        self.notifying = True
+        self._update()
+
+    def StopNotify(self):
+        self.notifying = False
+
+    def _update(self):
+        raise NotImplementedError("Must be implemented in subclass or injected")
+
+
+# Flag bitmask for all defined field groups
+class RowingFieldFlags(IntFlag):
+    STROKE_INFO = 1 << 0  # Shared: stroke rate & count (inverted flag)
+    AVERAGE_STROKE_RATE = 1 << 1
+    TOTAL_DISTANCE = 1 << 2
+    INSTANT_PACE = 1 << 3
+    AVERAGE_PACE = 1 << 4
+    INSTANT_POWER = 1 << 5
+    AVERAGE_POWER = 1 << 6
+    RESISTANCE_LEVEL = 1 << 7
+    EXPENDED_ENERGY = 1 << 8  # Shared: total energy, per hour, per min
+    HEART_RATE = 1 << 9
+    METABOLIC_EQUIVALENT = 1 << 10
+    ELAPSED_TIME = 1 << 11
+    REMAINING_TIME = 1 << 12
+
+# Metadata describing how to encode each group of fields
+@dataclass
+class Field:
+    name: str
+    format: str  # Format of the data (e.g. 'B', 'H', 'h', 'I') using the standard format chars of the struct module.
+    size: int
+    signed: bool = False
+
+# Map from flags to the fields in each group
+FIELD_GROUPS = [                                                                            ### CORRESPONDING Fitness Machine Feature Support bit ###
+    (RowingFieldFlags.STROKE_INFO, [                                                         # No corresponding Feature bit
+        Field("stroke_rate", "B", 1),    # uint8    
+        Field("stroke_count", "H", 2),   # uint16
+    ]),
+    (RowingFieldFlags.AVERAGE_STROKE_RATE, [Field("avg_stroke_rate", "B", 1)]),               # Cadence Supported (bit 1)
+    (RowingFieldFlags.TOTAL_DISTANCE, [Field("total_distance", "I", 3)]),  # 24-bit           # Total Distance Supported (bit 2)
+    (RowingFieldFlags.INSTANT_PACE, [Field("instant_pace", "H", 2)]),                         # Pace Supported (bit 5)
+    (RowingFieldFlags.AVERAGE_PACE, [Field("avg_pace", "H", 2)]),                             # Pace Supported (bit 5)
+    (RowingFieldFlags.INSTANT_POWER, [Field("instant_power", "h", 2, True)]),  # sint16       # Power Measurement Supported (bit 14)
+    (RowingFieldFlags.AVERAGE_POWER, [Field("avg_power", "h", 2, True)]),         # sint16    # Power Measurement Supported (bit 14)
+    (RowingFieldFlags.RESISTANCE_LEVEL, [Field("resistance", "B", 1)]),                       # Resistance Level Supported (bit 7)
+    (RowingFieldFlags.EXPENDED_ENERGY, [                                                     # Expended Energy Supported (bit 9)
+        Field("total_energy", "H", 2),
+        Field("energy_per_hour", "H", 2),
+        Field("energy_per_min", "B", 1),
+    ]),
+    (RowingFieldFlags.HEART_RATE, [Field("heart_rate", "B", 1)]),                             # Heart Rate Measurement Supported (bit 10)
+    (RowingFieldFlags.METABOLIC_EQUIVALENT, [Field("metabolic_equivalent", "B", 1)]),         # Metabolic Equivalent Supported (bit 11)
+    (RowingFieldFlags.ELAPSED_TIME, [Field("elapsed_time", "I", 3)]),  # 24-bit               # Elapsed Time Supported (bit 12)
+    (RowingFieldFlags.REMAINING_TIME, [Field("remaining_time", "I", 3)]),                     # Remaining Time Supported (bit 13)
+]
+
+class RowerData(Characteristic):
+    UUID = '2ad1'
+
+    def __init__(self, bus, index, service, supported_fields=RowingFieldFlags(0)):
+        super().__init__(
+            bus, index,
+            self.UUID,
+            ['notify'],
+            service)
+        self.notifying = False
+        self._fields = supported_fields
+
+    def encode(self, field_values: dict) -> bytes:
+        """Encode the characteristic value based on supported flags and current data."""
+        output = bytearray()
+        output += struct.pack("<H", self._fields)  # 2-byte flags field
+
+        for flag, fields in self.FIELD_GROUPS.items():
+            include = bool(self._fields & flag)
+
+            # STROKE_INFO is inverted — included when the bit is NOT set
+            if flag == RowingFieldFlags.STROKE_INFO:
+                include = not include
+
+            if include:
+                for field in fields:
+                    val = field_values.get(field.name, 0)
+                    if field.size == 3:
+                        # Struct doesn't support 3-byte values, so fall back to to_bytes which requires us to 
+                        # handle signedness manually.
+                        output += val.to_bytes(3, byteorder='little', signed=field.signed)
+                    else:
+                        output += struct.pack('<' + field.format, val)
+
+        return bytes(output)
 
     def StartNotify(self):
         if self.notifying:
