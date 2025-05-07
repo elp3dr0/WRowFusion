@@ -373,8 +373,8 @@ def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, wr_data_logger
     app.add_service(AppHeartRate(bus,3,hr_monitor))
 
     # Set a callback function to poll the WaterRower data every 100ms 
-    logger.debug("main: Set up Waterrower_poll recurring task")
-    GLib.timeout_add(100, Waterrower_poll)
+    #logger.debug("main: Set up Waterrower_poll recurring task")
+    #GLib.timeout_add(100, Waterrower_poll)
 
     logger.debug("main: associate Mainloop to mainloop")
     mainloop = MainLoop()
