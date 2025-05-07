@@ -157,8 +157,9 @@ class DataLogger(object):
                     self.WRValues.update({'speed':0})
                 else:
                     PaceFromSpeed = (500 * 100) / event['value']
+                    logger.debug(f"Pace computed from speed: {PaceFromSpeed}")
                     #print(f{PaceFromSpeed})
-                    self.WRValues.update({'instantaneous pace': PaceFromSpeed})
+                    self.WRValues.update({'instant_pace': PaceFromSpeed})
                     self.WRValues.update({'speed':event['value']})
             if event['type'] == 'watts':
                 self._WattsEventValue = event['value']
@@ -179,6 +180,8 @@ class DataLogger(object):
                 self._hoursWR = event['value']
             if event['type'] == 'display_sec_dec':
                 self._secdecWR = event['value']
+            if event['type'] == '500mps':
+                logger.debug(f"500mps pace: {event['value']}")
         self.TimeElapsedcreator()
 
 
@@ -238,6 +241,7 @@ class DataLogger(object):
             })
 
     def update_live_avg_power(self,watts):
+        logger.debug(f"Watts event reports Watts: {watts}")
         with self._wr_lock:
             if self._DrivePhase:
                 self._StrokeMaxPower = max(self._StrokeMaxPower, watts)
@@ -250,6 +254,7 @@ class DataLogger(object):
                 if len(self._RecentStrokesMaxPower) == NUM_STROKES_FOR_POWER_AVG:
                     live_avg_power = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
                     self.WRValues.update({'watts': live_avg_power})
+                    logger.debug(f"Live Average Power computed as: {live_avg_power}")
 
 
     def get_WRValues(self):
