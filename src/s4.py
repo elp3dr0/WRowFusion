@@ -51,18 +51,14 @@ IGNORE_LIST = ['graph', 'tank_volume']
 NUM_STROKES_FOR_POWER_AVG = 4
 
 class DataLogger(object):
-    def __init__(self, rower_interface):
-        self._rower_interface = rower_interface
-        self._rower_interface.register_callback(self.reset_requested)
-        self._rower_interface.register_callback(self.pulse_monitor)
-        self._rower_interface.register_callback(self.on_rower_event)
+    def __init__(self, rower_interface=None):
+        self._rower_interface = None
         self._stop_event = threading.Event()
-
         self._wr_lock = threading.RLock()
 
         self._RecentStrokesMaxPower = None
         self._StrokeMaxPower = None
-        self._DrivePhase = None        # Our _DrivePhase is set to True at when the S4 determines pulley accelleration
+        self._DrivePhase = None         # Our _DrivePhase is set to True at when the S4 determines pulley accelleration
                                         # and set to False when S4 detects pulley decelleration. It is therefore True
                                         # throughout the whole Drive phase of the stroke and False during recovery phase. 
         self._WattsEventValue = None
@@ -70,20 +66,38 @@ class DataLogger(object):
         self._PulseEventTime = None
         self._PaddleTurning = None
         self._RowerReset = None
+        self._secondsWR = None
+        self._minutesWR = None
+        self._hoursWR = None
+        self._secdecWR = None
         self.WRValues_rst = None
         self.WRValues = None
         self.WRValues_standstill = None
         self.TXValues = None
-        self.secondsWR = None
-        self.minutesWR = None
-        self.hoursWR = None
-        self.secdecWR = None
+
+        if rower_interface is not None:
+            self.initialise(rower_interface)
+
+    def initialise(self, rower_interface):
+        with self._wr_lock:
+            """Initialise the DataLogger once a rower interface becomes available."""
+            self._rower_interface = rower_interface
+            self._rower_interface.register_callback(self.reset_requested)
+            self._rower_interface.register_callback(self.pulse_monitor)
+            self._rower_interface.register_callback(self.on_rower_event)
+        logger.info("DataLogger successfully initialised with rower_interface.")
 
         # Initialise the attributes, particularly the WRValues dictionaries because subsequent
         # code tries to update the values of the dictionaries and so expect the dictionary keys
         # to exist already.
         self._reset_state()
 
+    @property
+    def is_initialised(self):
+        """Return True if the rower interface has been set."""
+        with self._wr_lock:
+            return self._rower_interface is not None
+    
     def _reset_state(self):
         logger.debug("DataLogger._reset_state: Attempting lock")
         with self._wr_lock:
@@ -96,6 +110,10 @@ class DataLogger(object):
             self._PulseEventTime = 0
             self._PaddleTurning = False
             self._RowerReset = True
+            self._secondsWR = 0
+            self._minutesWR = 0
+            self._hoursWR = 0
+            self._secdecWR = 0
             self.WRValues_rst = {
                     'stroke_rate': 0,
                     'total_strokes': 0,
@@ -112,10 +130,6 @@ class DataLogger(object):
             self.WRValues = deepcopy(self.WRValues_rst)
             self.WRValues_standstill = deepcopy(self.WRValues_rst)
             self.TXValues = deepcopy(self.WRValues_rst)
-            self.secondsWR = 0
-            self.minutesWR = 0
-            self.hoursWR = 0
-            self.secdecWR = 0
             logger.debug("DataLogger._reset_state: Values set")
             logger.debug(f"DataLogger._reset_state: WRValues = {self.WRValues}")
             logger.debug("DataLogger._reset_state: Releasing lock")
@@ -158,13 +172,13 @@ class DataLogger(object):
             if event['type'] == 'heart_rate':
                 self.WRValues.update({'heart_rate': (event['value'])})
             if event['type'] == 'display_sec':
-                self.secondsWR = event['value']
+                self._secondsWR = event['value']
             if event['type'] == 'display_min':
-                self.minutesWR = event['value']
+                self._minutesWR = event['value']
             if event['type'] == 'display_hr':
-                self.hoursWR = event['value']
+                self._hoursWR = event['value']
             if event['type'] == 'display_sec_dec':
-                self.secdecWR = event['value']
+                self._secdecWR = event['value']
         self.TimeElapsedcreator()
 
 
@@ -210,7 +224,7 @@ class DataLogger(object):
         with self._wr_lock:
             #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
             #self.elapsetime = int(self.elapsetime.total_seconds())
-            elapsed_time = int(self.hoursWR * 3600 + self.minutesWR * 60 + self.secondsWR + (1 if self.secdecWR >= 5 else 0))
+            elapsed_time = int(self._hoursWR * 3600 + self._minutesWR * 60 + self._secondsWR + (1 if self._secdecWR >= 5 else 0))
             self.WRValues.update({'elapsedtime': elapsed_time})
 
     def WRValuesStandstill(self):
@@ -300,7 +314,7 @@ def s4_heart_beat_task(hrm: HeartRateMonitor):
             time.sleep(0.5)
 
 
-def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
+def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor, wr_data_logger: DataLogger):
     logger.debug("s4_data_task: Initialising Rower class")
     S4 = Rower()
     logger.debug("s4_data_task: Opening Rower class")
@@ -313,7 +327,7 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
     S4.reset_request()
     logger.debug("s4_data_task: Initialising DataLogger")
 
-    WRtoBLEANT = DataLogger(S4)
+    wr_data_logger.initialise(S4)
     logger.info("Waterrower Ready and sending data to BLE and ANT Thread")
 
     while True:
@@ -332,8 +346,9 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
                 #        ext_hr_time = time.time()
                 #        print("ext_hr", ext_hr)
 
-            logger.debug("Calling CueBLEANT")
-            WRtoBLEANT.CueBLEANT(ble_out_q, ant_out_q, hrm)
+            #logger.debug("Calling CueBLEANT")
+            
+            #WRtoBLEANT.CueBLEANT(ble_out_q, ant_out_q, hrm)
             #logger.debug("Returned from CueBLEANT")
         except Exception as e:
             logger.exception(f"Exception in s4_data_task loop: {e}")

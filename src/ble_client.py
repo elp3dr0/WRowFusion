@@ -10,6 +10,7 @@ from dbus_next.constants import MessageType
 
 from bleak import BleakClient, BleakScanner, BleakError
 from bleak.backends.device import BLEDevice
+
 from src.heart_rate import HeartRateMonitor
 
 logger = logging.getLogger(__name__)

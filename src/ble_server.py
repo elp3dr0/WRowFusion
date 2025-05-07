@@ -35,6 +35,9 @@ from src.ble_standard_services import (
     RowerData, 
 )
 
+from src.heart_rate import HeartRateMonitor
+from src.s4 import DataLogger
+
 logger = logging.getLogger(__name__)
 
 
@@ -167,43 +170,20 @@ ROWER_SUPPORTED_FIELDS = (
     | RowingFieldFlags.ELAPSED_TIME
 )
 
-def Convert_Waterrower_raw_to_byte():
-    logger.debug(f"Entering Conert_Waterrower_raw_to_byte on WaterrowerValuesRaw:") # {WaterrowerValuesRaw}")
-    WRBytearray = []
-    #print("Ble Values: {0}".format(WaterrowerValuesRaw))
-    #todo refactor this part with the correct struct.pack e.g. 2 bytes use "H" instand of bitshifiting ?
-    #print(WaterrowerValuesRaw)
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['stroke_rate'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_strokes'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_strokes'] & 0xff00) >> 8))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_distance_m'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_distance_m'] & 0xff00) >> 8))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_distance_m'] & 0xff0000) >> 16))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['instantaneous pace'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['instantaneous pace'] & 0xff00) >> 8))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['watts'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['watts'] & 0xff00) >> 8))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_kcal'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_kcal'] & 0xff00) >> 8))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_kcal_hour'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_kcal_hour'] & 0xff00) >> 8))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_kcal_min'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['heart_rate'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['elapsedtime'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['elapsedtime'] & 0xff00) >> 8))
-    logger.debug(f"{WRBytearray}")
-    return WRBytearray
 
-
-class ApplicationRowerData(RowerData):
-    def __init__(self, bus, index, service):
+class AppRowerData(RowerData):
+    def __init__(self, bus, index, service, wr_data_logger: DataLogger):
         super().__init__(bus, index, service, supported_fields=ROWER_SUPPORTED_FIELDS)
         self.last_payload = None
+        self.data_logger = wr_data_logger
 
     def rowerdata_cb(self):
         logger.debug("Running ApplicationRowerData.rowerdata_cb")
-
-        field_values = get_waterrower_values()
+        if not self.data_logger.is_initialised:
+            logger.debug("No WaterRower values available yet.")
+            return self.notifying
+        
+        field_values = self.data_logger.get_WRValues()
         if not field_values:
             logger.warning("No WaterRower values available yet.")
             return self.notifying
@@ -309,7 +289,7 @@ def Waterrower_poll():
 
     return True
 
-def ble_server_task(out_q,ble_in_q, hr_monitor): #out_q
+def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, wr_data_logger: DataLogger): #out_q
     logger.debug("main: Entering main")
     global mainloop
     global out_q_reset
@@ -379,7 +359,7 @@ def ble_server_task(out_q,ble_in_q, hr_monitor): #out_q
     ftm_features = FitnessMachineFeature(bus, 0, ftm_service, supported_features=FTM_SUPPORTED_FEATURES)
 
     ftm_service.add_characteristic(ftm_features)
-    ftm_service.add_characteristic(RowerData(bus, 1, ftm_service))
+    ftm_service.add_characteristic(AppRowerData(bus, 1, ftm_service, wr_data_logger))
 
     ftm_cp = FitnessMachineControlPoint(bus, 2, ftm_service)
 
