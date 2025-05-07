@@ -116,8 +116,8 @@ class DataLogger(object):
             self._secdecWR = 0
             self.WRValues_rst = {
                     'stroke_rate': 0,
-                    'total_strokes': 0,
-                    'total_distance_m': 0,
+                    'stroke_count': 0,
+                    'total_distance': 0,
                     'instant_pace': 0,
                     'speed': 0,
                     'watts': 0,
@@ -125,7 +125,7 @@ class DataLogger(object):
                     'total_kcal_hour': 0,
                     'total_kcal_min': 0,
                     'heart_rate': 0,
-                    'elapsedtime': 0.0,
+                    'elapsed_time': 0.0,
                 }
             self.WRValues = deepcopy(self.WRValues_rst)
             self.WRValues_standstill = deepcopy(self.WRValues_rst)
@@ -147,10 +147,10 @@ class DataLogger(object):
                 self._DrivePhase = False
             if event['type'] == 'stroke_rate':
                 self.WRValues.update({'stroke_rate': (event['value']*2)})
-            if event['type'] == 'total_strokes':
-                self.WRValues.update({'total_strokes': event['value']})
-            if event['type'] == 'total_distance_m':
-                self.WRValues.update({'total_distance_m': (event['value'])})
+            if event['type'] == 'stroke_count':
+                self.WRValues.update({'stroke_count': event['value']})
+            if event['type'] == 'total_distance':
+                self.WRValues.update({'total_distance': (event['value'])})
             if event['type'] == 'avg_distance_cmps':
                 if event['value'] == 0:
                     self.WRValues.update({'instant_pace': 0})
@@ -225,7 +225,7 @@ class DataLogger(object):
             #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
             #self.elapsetime = int(self.elapsetime.total_seconds())
             elapsed_time = int(self._hoursWR * 3600 + self._minutesWR * 60 + self._secondsWR + (1 if self._secdecWR >= 5 else 0))
-            self.WRValues.update({'elapsedtime': elapsed_time})
+            self.WRValues.update({'elapsed_time': elapsed_time})
 
     def WRValuesStandstill(self):
         with self._wr_lock:

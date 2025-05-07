@@ -25,8 +25,8 @@ It appears, however, that it is exactly the opposite.
 '''
 
 MEMORY_MAP = {
-                '055': {'type': 'total_distance_m', 'size': 'double', 'base': 16, 'endian': 'big'},
-                '140': {'type': 'total_strokes', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big'},
                 '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},
                 '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big'},
                 '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},        # instant average distance in cm
