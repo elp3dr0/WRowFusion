@@ -242,20 +242,21 @@ class DataLogger(object):
             })
 
     def update_live_avg_power(self,watts):
-        logger.debug(f"Watts event reports Watts: {watts}")
+        logger.debug(f"update_live_avg_power - Watts event reports Watts: {watts}")
         with self._wr_lock:
             if self._DrivePhase:
                 self._StrokeMaxPower = max(self._StrokeMaxPower, watts)
             else:
                 if self._StrokeMaxPower:
                     self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
+                    logger.debug(f"update_live_avg_power - Stroke Max Power captured as: {self._StrokeMaxPower}")
                     self._StrokeMaxPower = 0
                 while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_POWER_AVG:
                     self._RecentStrokesMaxPower.pop(0)
                 if len(self._RecentStrokesMaxPower) == NUM_STROKES_FOR_POWER_AVG:
                     live_avg_power = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
                     self.WRValues.update({'watts': live_avg_power})
-                    logger.debug(f"Live Average Power computed as: {live_avg_power}")
+                    logger.debug(f"update_live_avg_power - Live Average Power computed as: {live_avg_power}")
 
 
     def get_WRValues(self):
