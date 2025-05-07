@@ -35,7 +35,7 @@ qualname=src.ble_server
 propagate=0
 
 [logger_src.ble_standard_services]
-level=DEBUG
+level=INFO
 handlers=consoleHandler, rotatingFileHandler
 qualname=src.ble_standard_services
 propagate=0
