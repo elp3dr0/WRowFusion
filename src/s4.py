@@ -183,6 +183,8 @@ class DataLogger(object):
                 self._secdecWR = event['value']
             if event['type'] == '500mps':
                 logger.debug(f"500mps pace: {event['value']}")
+                concept2power = 2.80 / pow( event['value']/ 500.0, 3)
+                logger.debug(f"concept2 power: {concept2power}")
         self.TimeElapsedcreator()
 
 
@@ -249,7 +251,7 @@ class DataLogger(object):
             else:
                 if self._StrokeMaxPower:
                     self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
-                    logger.debug(f"update_live_avg_power - Stroke Max Power captured as: {self._StrokeMaxPower}")
+                    logger.debug(f"update_live_avg_power - Stroke Max Power captured as: {self._StrokeMaxPower}. Stroke count: {self.WRValues['stroke_count']}")
                     self._StrokeMaxPower = 0
                 while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_POWER_AVG:
                     self._RecentStrokesMaxPower.pop(0)
