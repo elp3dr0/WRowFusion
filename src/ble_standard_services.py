@@ -330,17 +330,24 @@ class RowerData(Characteristic):
         """Encode the characteristic value based on supported flags and current data."""
         output = bytearray()
         output += struct.pack("<H", self._fields)  # 2-byte flags field
+        logger.debug("Encode loop - starting iteration through fields groups")
 
-        for flag, fields in self.FIELD_GROUPS.items():
+        # Iterate through the field groups to check whether the group should be included in the bluetooth payload.
+        # Most groups comprise single fields. 
+        # Stroke_info and Expended_Energy are exceptions and comprise more than one data field which are transmitted
+        # together or not at all
+        for flag, fields in FIELD_GROUPS.items():
             include = bool(self._fields & flag)
-
+            logger.debug(f"Field group: {self._fields}, Include: {include}")
             # STROKE_INFO is inverted — included when the bit is NOT set
             if flag == RowingFieldFlags.STROKE_INFO:
                 include = not include
 
             if include:
+                # Within the field group, iterate through each individual field and build the output byte array.
                 for field in fields:
                     val = field_values.get(field.name, 0)
+                    logger.debug(f"Build output byte array. Append field: {field.name}")
                     if field.size == 3:
                         # Struct doesn't support 3-byte values, so fall back to to_bytes which requires us to 
                         # handle signedness manually.
@@ -348,6 +355,7 @@ class RowerData(Characteristic):
                     else:
                         output += struct.pack('<' + field.format, val)
 
+        logger.debug(f"Bluetooth payload complete: {output}")
         return bytes(output)
 
     def StartNotify(self):
