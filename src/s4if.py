@@ -1,10 +1,11 @@
 # ---------------------------------------------------------------------------
-# Original code from the bfritscher Repo waterrower
+# Based on the inonoob repo "pirowflo"
+# https://github.com/inonoob/pirowflo
+# Which in turn was based on the bfritscher Repo "waterrower"
 # https://github.com/bfritscher/waterrower
+# Extensively refactored and expanded for WRowFusion
 # ---------------------------------------------------------------------------
-#
 
-# -*- coding: utf-8 -*-
 import threading
 import logging
 
@@ -12,10 +13,22 @@ import time
 import serial
 import serial.tools.list_ports
 
+from dataclasses import dataclass
+from typing import Any, Optional
+
+
 logger = logging.getLogger(__name__)
 
 '''
-The Water Rower S4 S5 USB Protocol Iss 1 04 specs incorrectly suggest that double digit data is 
+The MEMORY_MAP details the organisation of data within the S4 memory registers, how many bytes each datum
+occupies, the numerical base of its encoding, the LSB/MSB byte order (endianess), and whether the datum 
+should be requested as part of the high-frequency thread that requests data from the S4.
+
+By configuring a datum in the MEMORY MAP and equiping it with a key: value pair of 'on_demand_only': True (e.g. for tank size), 
+the application can still request the a read of the datum on demand. However it will not be requested as part of the
+high frequency request thread, leading to improved efficiency. 
+
+Note: The Water Rower S4 S5 USB Protocol Iss 1 04 specs incorrectly suggests that double digit data is 
 stored:
 - little endian (i.e. low byte first, high byte second) for primary data (i.e. data that is
 directly measured such as distance)
@@ -25,27 +38,34 @@ It appears, however, that it is exactly the opposite.
 '''
 
 MEMORY_MAP = {
-                '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big'},
-                '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big'},
-                '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},
-                '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big'},
-                '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},        # instant average distance in cm
-                '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},         # total distance per second in cm
-                '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big'},
-                '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big'},
-                '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big'},
-                '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big'},
-                # from zone math
-                '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big'},
-                '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little'},                # 500m Pace (secs)
-                '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big'},
-                # explore
-                # Stroke_pull is first subtracted from stroke_average then a modifier of 
-                # 1.25 multiplied by the result to generate the ratio value for display.
+                #'054': {'type': 'total_distance_dec', 'size': 'single', 'base': 10, 'endian': 'big'},       # tenths of metres 0-9 (decimal place of the distance)
+                '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big'},           # distance in metres since reset
+                '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},                    # instantaneous power
+                '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big'},               # calories since reset
+                '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'on_demand_only': True}, # tank volume in litres
+                # Stroke counter
+                #   Stroke_pull is first subtracted from stroke_average then a modifier of 
+                #   1.25 multiplied by the result to generate the ratio value for display.
+                '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big'},             # total strokes since reset
                 '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big'},    # average time for a whole stroke
                 '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big'},     # average time for a pull (acc to dec)
-                #other
-                '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'not_in_loop': True},
+                # Speed
+                '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},         # total distance per second in cm
+                '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},        # instantaneous average distance in cm
+                # Values stored for zone maths
+                '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big'},               # instantaneous heart rate
+                '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little'},                # instantaneious 500m Pace (secs)
+                '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big'},              # instantaneous strokes per min
+                # Clock Display
+                '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big'},          # tenths of seconds 0-9
+                '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big'},              # seconds 0-59
+                '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big'},              # minutes 0-59
+                '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big'},               # hours 0-9
+                # Workout total times/distances/limits
+                '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big'},       # total workout time
+                '1EA': {'type': 'workout_total_mps', 'size': 'double', 'base': 16, 'endian': 'big'},        # total workout m/s
+                '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big'},    # total workout strokes
+                '1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'big'},            # limit value for workouts
              }
 
 # Packet identifiers as speicified in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
@@ -55,19 +75,21 @@ MEMORY_MAP = {
 # RESPONSE sent from device to PC
 
 USB_REQUEST = "USB"                # First packet to be sent in order to instruct S4 to establish communications
-WR_RESPONSE = "_WR_"               # Hardware Type response to acknowledge USB_REQUEST and initiate sending packets
-EXIT_REQUEST = "EXIT"              # Application is exiting, stop sending packets
-OK_RESPONSE = "OK"                 # Packet Accepted - Sent in cases where no other reply would otherwise be given.
-ERROR_RESPONSE = "ERROR"           # Unknown packet recieved.
-PING_RESPONSE = "PING"             # Ping sent once per second while no rowing is occuring
-RESET_REQUEST = "RESET"            # Request the rowing computer to reset (equivalent to user holding on button for 2 secs), disable interactive mode
 MODEL_INFORMATION_REQUEST = "IV?"  # Request Model Information
-MODEL_INFORMATION_RESPONSE = "IV"  # Current model information IV+Model(4 or 5)+Firmware Version High+Firmware Version Low (e.g for Firmware 02.10, High is 02, low is 10)
 READ_MEMORY_REQUEST = "IR"         # Read a memory location IR+(S=Single,D=Double,T=Triple) + XXX (XXX is in ACH format)
+RESET_REQUEST = "RESET"            # Request the rowing computer to reset (equivalent to user holding on button for 2 secs), disable interactive mode
+EXIT_REQUEST = "EXIT"              # Application is exiting, stop sending packets
+
+WR_RESPONSE = "_WR_"               # Hardware Type response to acknowledge USB_REQUEST and initiate sending packets
+MODEL_INFORMATION_RESPONSE = "IV"  # Current model information IV+Model(4 or 5)+Firmware Version High+Firmware Version Low (e.g for Firmware 02.10, High is 02, low is 10)
 READ_MEMORY_RESPONSE = "ID"        # Value from a memory location ID +(type) + Y3 Y2 Y1
 STROKE_START_RESPONSE = "SS"       # Start of stroke (just a packet - no data. Can be sent with very minor movement of paddle even if no rowing is occuring.)
 STROKE_END_RESPONSE = "SE"         # End of stroke (just a packet - no data. Can be sent with very minor movement of paddle even if no rowing is occuring.)
 PULSE_COUNT_RESPONSE = "P"         # Pulse Count XX in the last 25mS, ACH value. Pulses are triggered by pins on the pulley and so pulse count corresponds to pulley rotation.
+OK_RESPONSE = "OK"                 # Packet Accepted - Sent in cases where no other reply would otherwise be given.
+PING_RESPONSE = "PING"             # Ping sent once per second while no rowing is occuring
+ERROR_RESPONSE = "ERROR"           # Unknown packet recieved.
+
 
 # Display Settings (not used) allow the PC to set the required display parameters.
 DISPLAY_SET_INTENSITY_MPS_REQUEST = "DIMS"          # Set Intensity - Metres per second
@@ -87,10 +109,10 @@ DISPLAY_SET_DISTANCE_STROKES_REQUEST = "DDST"       # Set Distance - Strokes
 
 # Interactive mode
 
-INTERACTIVE_MODE_START_RESPONSE = "AIS"        # interactive mode requested by device
-INTERACTIVE_MODE_START_ACCEPT_REQUEST = "AIA"  # confirm interactive mode, key input is redirect to PC
-INTERACTIVE_MODE_END_REQUEST = "AIE"           # cancel interactive mode
-INTERACTIVE_KEYPAD_RESET_RESPONSE = "AKR"      # RESET key pressed, interactive mode will be cancelled
+INTERACTIVE_MODE_START_RESPONSE = "AIS"        # interactive mode requested by S4 user (sent from S4 to PC)
+INTERACTIVE_MODE_START_ACCEPT_REQUEST = "AIA"  # confirm interactive mode (sent from PC to S4). S4 key input will be redirected to PC.
+INTERACTIVE_MODE_END_REQUEST = "AIE"           # cancel interactive mode (sent from PC to S4)
+INTERACTIVE_KEYPAD_RESET_RESPONSE = "AKR"      # RESET key pressed, interactive mode will be cancelled (sent from S4 to PC)
 INTERACTIVE_KEYPAD_UNITS_RESPONSE = "AK1"      # Units button pressed
 INTERACTIVE_KEYPAD_ZONES_RESPONSE = "AK2"      # Zones button pressed
 INTERACTIVE_KEYPAD_WORKOUT_RESPONSE = "AK3"    # Workout button pressed
@@ -114,44 +136,113 @@ UNIT_MILES = 2
 UNIT_KM = 3
 UNIT_STROKES = 4
 
-SIZE_MAP = {'single': 'IRS',
-            'double': 'IRD',
-            'triple': 'IRT',}
+SIZE_MAP = {
+    'single': {'request': 'IRS', 'response': 'IDS'},
+    'double': {'request': 'IRD', 'response': 'IDD'},
+    'triple': {'request': 'IRT', 'response': 'IDT'},
+    }
 
-UNIT_MAP = {'meters': 1,
-            'miles': 2,
-            'km': 3,
-            'strokes': 4}
+UNIT_MAP = {
+    'meters': 1,
+    'miles': 2,
+    'km': 3,
+    'strokes': 4,
+    }
 
 SIZE_PARSE_MAP = {'single': lambda cmd: cmd[6:8],
                   'double': lambda cmd: cmd[6:10],
                   'triple': lambda cmd: cmd[6:12]}
 
+EXPECTED_RESPONSE_MAP = {
+    USB_REQUEST: WR_RESPONSE, 
+    MODEL_INFORMATION_REQUEST: MODEL_INFORMATION_RESPONSE, 
+    EXIT_REQUEST: OK_RESPONSE, 
+    RESET_REQUEST: OK_RESPONSE,
+    READ_MEMORY_REQUEST: READ_MEMORY_RESPONSE,
+}
+
 # PROGRAM CONTROL DELAYS
-PORT_SCAN_RETRY_DELAY = 5
+PORT_SCAN_RETRY_DELAY = 5   
 SERIAL_OPEN_RETRY_DELAY = 5
 
+# CUSTOM EXCEPTIONS
+class SerialNotConnectedError(Exception):
+    pass
+
+class EventParseError(Exception):
+    pass
+
+# CUSTOM DATACLASS
+@dataclass
+class S4Event:
+    type: str
+    value: Optional[Any] = None
+    raw: Optional[str] = None
+    at: int = int(round(time.time() * 1000))  # timestamp in ms
+
+    @staticmethod
+    def build(type: str, value: Any = None, raw: str = None) -> 'S4Event':
+        return S4Event(type=type, value=value, raw=raw, at=int(round(time.time() * 1000)))
+
+    @classmethod
+    def parse_line(cls, line: bytes) -> Optional['S4Event']:
+        try:
+            cmd = line.strip().decode('utf8')
+        except UnicodeDecodeError as e:
+            logger.error(f"Failed to decode line from S4: {line!r}, error: {e}")
+            raise  # or raise a custom exception if you prefer
+            
+        if cmd == STROKE_START_RESPONSE:
+            return cls.build(type='stroke_start', raw=cmd)
+        elif cmd == STROKE_END_RESPONSE:
+            return cls.build(type='stroke_end', raw=cmd)
+        elif cmd == OK_RESPONSE:
+            return cls.build(type='ok', raw=cmd)
+        elif cmd[:2] == MODEL_INFORMATION_RESPONSE:
+            return cls.build(type='model', raw=cmd)
+        elif cmd[:2] == READ_MEMORY_RESPONSE:
+            return read_reply(cmd)
+        elif cmd == PING_RESPONSE:
+            return cls.build(type='ping', raw=cmd)
+        elif cmd[:1] == PULSE_COUNT_RESPONSE:
+            return cls.build(type='pulse', raw=cmd)
+        elif cmd == ERROR_RESPONSE:
+            return cls.build(type='error', raw=cmd)
+        else:
+            logger.warning(f"Unrecognised command line captured from S4: {cmd}")
+            return None
+
+# HELPER FUNCTIONS
 def find_port():
+    logger.info(f"Searching for serial port...")
     attempts = 0
     while True:
+        # If a port isn't found, the code will remain in this loop.
         attempts += 1
         ports = serial.tools.list_ports.comports()
         for (i, (path, name, _)) in enumerate(ports):
             if "WR-S4" in name:
-                logger.info("port found: %s" % path)
+                logger.info(f"Serial port found: {path}")
                 return path
-        # If a port isn't found, the code will remain in this loop.
-        # This will have the effect that any code asking for Rower.open() will
-        # not recieve control back until:
-        # - the port is found, otherwise the code loops here
-        # - and the serial is open without error, otherwise the code loops in _find_serial()
-        #  
-        #print("port not found retrying in 5s")
+        
         if ((attempts - 1) % 360) == 0: # message every ~30 minutes
-          logger.warning("port not found in %d attempts; retrying every 5s",
-              attempts)
+            logger.warning(f"Serial port not found in {attempts}; retrying every {PORT_SCAN_RETRY_DELAY}s")
         time.sleep(PORT_SCAN_RETRY_DELAY)
 
+
+def get_address_of_data_type(data_type: str) -> str:
+    """
+    Gets the S4 memory address for a data type.
+    Args: data_type (str): The type of the datum as defined in MEMORY_MAP (e.g., 'total_distance').
+    Returns:
+        str: The register address where the data type is stored in S4 memory
+    """
+    for address, data in MEMORY_MAP.items():
+        if data['type'] == data_type:
+            return address
+    logger.error(f"Cannot request data type {data_type} via serial connection because the data type has not been configured in MEMORY_MAP.")
+    raise ValueError(f"Data type {data_type} not found in MEMORY MAP")
+    
 
 def build_daemon(target):
     t = threading.Thread(target=target)
@@ -159,18 +250,11 @@ def build_daemon(target):
     return t
 
 
-def build_event(type, value=None, raw=None):
-    return {"type": type,
-            "value": value,
-            "raw": raw,
-            "at": int(round(time.time() * 1000))}
-
-
 def is_live_thread(t):
     return t and t.is_alive()
 
 
-def read_reply(cmd):
+def read_reply(cmd: str) -> Optional[S4Event]:
     address = cmd[3:6]
     memory = MEMORY_MAP.get(address)
     if memory:
@@ -180,12 +264,12 @@ def read_reply(cmd):
         value_str = value_fn(cmd)
 
         if value_str is None:
-            logger.error('unknown size: %s', size)
+            logger.warning(f"Could not read S4 reply due to unrecognised data size: {size}")
         else:
             value = int(value_str, base=memory['base'])
 
             if endian == 'little':
-                # Swap bytes if necessary (only for double and triple types)
+                # Swap bytes if necessary (not applicable for single, so only for double and triple types)
                 if size == 'double' and len(value_str) == 4:
                     high = int(value_str[0:2], 16)
                     low = int(value_str[2:4], 16)
@@ -196,57 +280,84 @@ def read_reply(cmd):
                     low  = int(value_str[4:6], 16)
                     value = (low << 16) | (mid << 8) | high
 
-            return build_event(memory['type'], value, cmd)
+            return S4Event.build(memory['type'], value, cmd)
     else:
-        logger.error('cannot read reply for %s', cmd)
+        logger.warning(f"This application's MEMORY MAP has not been configured to read S4 reply for command {cmd}.")
 
 
-def event_from(line):
-    try:
-        cmd = line.strip()  # to ensure no space are in front or at the back call the function strip()
-        cmd = cmd.decode('utf8')  # decode from bytes to utf8 string to remove b' prefix
-        logger.debug(f"Reading line captured from S4: {cmd}")
-        if cmd == STROKE_START_RESPONSE:  # "SS" packet received from waterrower
-            return build_event(type='stroke_start', raw=cmd)  # Create a dict with the name stroke_start and the raw command used for it "SS"
-        elif cmd == STROKE_END_RESPONSE:  # "SE" packet received from waterrower
-            return build_event(type='stroke_end', raw=cmd)  # Create a dict with the name stroke_end and the raw command used for it "SE"
-        elif cmd == OK_RESPONSE:  # If waterrower response "OK" do nothing
-            return None
-        elif cmd[:2] == MODEL_INFORMATION_RESPONSE:  # If MODEL information has been request, the model responce would be "IV"
-            return build_event(type='model', raw=cmd)
-        elif cmd[:2] == READ_MEMORY_RESPONSE:  # if after memory request the response comes from the waterrower
-            return read_reply(cmd)  # proced to the function read_reply which strips away everything and keeps the value and create the event dict for that request
-        elif cmd[:4] == PING_RESPONSE:  # WaterRower sends PING every second when the the rower is in standstill
-            return build_event(type='ping', raw=cmd)
-        elif cmd[:1] == PULSE_COUNT_RESPONSE:  # Pulse count the amount of 25 teeth passed 25teeth passed = P1
-            return build_event(type='pulse', raw=cmd)
-        elif cmd == ERROR_RESPONSE:  # If Waterrower responds with an error
-            return build_event(type='error', raw=cmd) 
-        else:
-            logger.debug(f"Unhandled line captured from S4: {cmd}")
-            return None
-    except Exception as e:
-        logger.error('could not build event for: %s %s', line, e)
+def get_expected_response_prefix(request_type: str, address: Optional[str] = None) -> str:
+    """
+    Returns the expected response prefix for a given request type.
+    Args:
+        request_type (str): The type of request (e.g., "USB", "IR").
+        address (str, optional): The memory address for READ_MEMORY_REQUEST ("IR").
+    Returns:
+        str: The expected response prefix.
+    Raises:
+        ValueError: If the request_type is invalid or address is missing for "IR".
+    """
+    if request_type == READ_MEMORY_REQUEST:
+        if address is None:
+            raise ValueError("Address is required for READ_MEMORY_REQUEST (IR)")
+        if address not in MEMORY_MAP:
+            raise ValueError(f"Address {address} not found in MEMORY_MAP")
+        size = MEMORY_MAP[address]['size']
+        return SIZE_MAP[size]['response'] + address
+    elif request_type in EXPECTED_RESPONSE_MAP:
+        return EXPECTED_RESPONSE_MAP[request_type]
+    else:
+        raise ValueError(f"Invalid request type: {request_type}")
+    
+def get_request_string(request_type: str, address: Optional[str] = None) -> str:
+    """
+    Returns the string to be sent to the S4 for a given request type.
+    Args:
+        request_type (str): The type of request (e.g., "USB", "IR").
+        address (str, optional): The memory address for READ_MEMORY_REQUEST ("IR").
+    Returns:
+        str: The request string.
+    Raises:
+        ValueError: If the request_type is invalid or address is missing for "IR".
+    """
+    if request_type == READ_MEMORY_REQUEST:
+        if address is None:
+            raise ValueError("Address is required for READ_MEMORY_REQUEST (IR)")
+        if address not in MEMORY_MAP:
+            raise ValueError(f"Address {address} not found in MEMORY_MAP")
+        size = MEMORY_MAP[address]['size']
+        return SIZE_MAP[size]['request'] + address
+    elif request_type in EXPECTED_RESPONSE_MAP:
+        return request_type
+    else:
+        raise ValueError(f"Invalid request type: {request_type}")
 
 
 class Rower(object):
     def __init__(self, options=None):
-        logger.debug("Rower._init_")
         self._callbacks = set()
         self._stop_event = threading.Event()
-        self._demo = False
         # if options and options.demo:
         #     from demo import FakeS4
         #     self._serial = FakeS4()
         #     self._demo = True
         # else:
+        self._demo = False
         self._serial = serial.Serial()
         self._serial.baudrate = 19200
+        self._request_thread = None
+        self._capture_thread = None
+        self._response_event = threading.Event()  # For on-demand responses
+        self._current_response = None
 
+        self._start_threads()
+
+    def _start_threads(self):
+        logger.debug("Create and start S4 data request and capture threads...")
         self._request_thread = build_daemon(target=self.start_requesting)
         self._capture_thread = build_daemon(target=self.start_capturing)
         self._request_thread.start()
         self._capture_thread.start()
+        logger.debug("S4 data request and capture threads started.")
 
     def is_connected(self):
         return self._serial.isOpen() and is_live_thread(self._request_thread) and \
@@ -254,44 +365,40 @@ class Rower(object):
 
     def _find_serial(self):
         if not self._demo:
-            logger.debug("Rower._find_serial: Calling ._find_port")
             self._serial.port = find_port()
 
         try:
-            logger.debug("Rower._find_serial: Calling ._serial.open")
+            logger.debug("Attempting to open serial port...")
             self._serial.open()
-            logger.info("serial open")
+            logger.info("Serial port open.")
         except serial.SerialException as e:
-            print("serial open error waiting")
+            logger.error(f"Error encountered opening serial port: {e}. Retrying in {SERIAL_OPEN_RETRY_DELAY} seconds")
             time.sleep(SERIAL_OPEN_RETRY_DELAY)
             self._serial.close()
             self._find_serial()
 
     def open(self):
-        logger.debug("Rower.open: Testing for existing connection")
+        # Any caller asking for Rower.open() will not recieve control back until:
+        # - the port is found, otherwise the code loops in find_port()
+        # - and the serial is open without error, otherwise the code loops in _find_serial()
+
         if self._serial and self._serial.isOpen():
-            logger.debug("Rower.open: Calling ._serial._close")
+            logger.debug("Closing existing serial connection.")
             self._serial.close()
-        logger.debug("Rower.open: Calling _find_serial")
+
         self._find_serial()
 
-        logger.debug("Rower.open: Calling _is_set")
         if self._stop_event.is_set():
-            #print("reset threads")
-            logger.info("Rower.open: reset threads")
+            logger.info("Reset S4 communication: clear stop event.")
             self._stop_event.clear()
-            self._request_thread = build_daemon(target=self.start_requesting)
-            self._capture_thread = build_daemon(target=self.start_capturing)
-            self._request_thread.start()
-            logger.info("Thread daemon _request started")
-            self._capture_thread.start()
-            logger.info("Thread daemon _capture started")
+            self._start_threads()
 
-        logger.debug("Rower.open: Write USB_Request")
+        logger.info("Initiating communication with S4 monitor.")
         self.write(USB_REQUEST)
 
     def close(self):
-        self.notify_callbacks(build_event("exit"))
+        logger.debug("Closing serial communications with S4.")
+        self.notify_callbacks(S4Event.build("exit"))
         if self._stop_event:
             self._stop_event.set()
         if self._serial and self._serial.isOpen():
@@ -299,14 +406,13 @@ class Rower(object):
             time.sleep(0.1)  # time for capture and request loops to stop running
             self._serial.close()
 
-    def write(self, raw):
+    def write(self, raw: str):
         try:
             self._serial.write(str.encode(raw.upper() + '\r\n'))
             self._serial.flush()
         except Exception as e:
             print(e)
-            #print("Serial error try to reconnect")
-            logger.error("Serial error try to reconnect")
+            logger.error(f"Serial write communication error: {e}. Trying to reconnect.")
             self.open()
 
     def start_capturing(self):
@@ -314,18 +420,19 @@ class Rower(object):
             if self._serial.isOpen():
                 try:
                     line = self._serial.readline()
-                    event = event_from(line)
+                    event = S4Event.parse_line(line)
                     if event:
                         self.notify_callbacks(event)
-                except Exception as e:
-                    #print("could not read %s" % e)
-                    logger.error("could not read %s" % e)
+                except serial.SerialException as e:
+                    logger.error(f"Serial read communication error: {e}. Trying to reset input buffer.")
                     try:
                         self._serial.reset_input_buffer()
-                    except Exception as e2:
-                        #print("could not reset_input_buffer %s" % e2)
-                        logger.error("could not reset_input_buffer %s" % e2)
-
+                    except serial.SerialException as e2:
+                        logger.error(f"Could not reset serial input buffer: {e2}")
+                    raise  # Re-raise the original serial exception
+                except TypeError as e:
+                    logger.error(f"TypeError  error: {e}.")
+                    raise
             else:
                 self._stop_event.wait(0.1)
 
@@ -333,35 +440,97 @@ class Rower(object):
         while not self._stop_event.is_set():
             if self._serial.isOpen():
                 for address in MEMORY_MAP:
-                    if 'not_in_loop' not in MEMORY_MAP[address]:
+                    if 'on_demand_only' not in MEMORY_MAP[address] or MEMORY_MAP[address]['on_demand_only'] != True:
                         self.request_address(address)
                         self._stop_event.wait(0.025)
             else:
                 self._stop_event.wait(0.1)
 
 
-    def reset_request(self):
+    def request_reset(self):
+        logger.debug("Sending reset request to S4 via serial connection.")
         self.write(RESET_REQUEST)
-        self.notify_callbacks(build_event('reset'))
-        logger.info("Rower.reset_request: Reset requested")
+        self.notify_callbacks(S4Event.build('reset'))
 
-    def request_info(self):
-        self.write(MODEL_INFORMATION_REQUEST)
-        self.request_address('0A9')
 
-    def request_address(self, address):
+    def request_address(self, address: str):
+        """
+        Requests a datum from the S4 monitor by its memory address.
+        Args: address (str): The address of the S4 memory register where the desired datum is stored (e.g., '055').
+        """
+        if not address in MEMORY_MAP:
+            logger.error(f"Cannot request address {address} via serial connection because the address has not been configured in MEMORY_MAP.")
+            raise ValueError(f"Address {address} not found in MEMORY_MAP")
+        
         size = MEMORY_MAP[address]['size']
-        cmd = SIZE_MAP[size]
+        cmd = SIZE_MAP[size]['request']
         self.write(cmd + address)
 
+
+    def request_on_demand(self, request_type: str, address: Optional[str] = None) -> S4Event:
+    
+        request = get_request_string(request_type, address)
+        expected_response_prefix = get_expected_response_prefix(request_type, address)
+
+        try:
+            self._serial.reset_input_buffer()
+            self.write(request)
+            return self.capture_on_demand_response(expected_response_prefix)
+        except Exception:
+            logger.error(f"Error during on-demand request with command: {request_type} and address: {address}")
+            raise
+
+
+    def capture_on_demand_response(self, expected_response_prefix: str, timeout=2) -> S4Event:
+        """
+        Reads from the serial port until a response with the expected prefix is received, or timeout.
+        Args:
+            expected_response_prefix (str): The expected beginning of the response.
+            timeout (int): Maximum time to wait in seconds.
+        Returns:
+            S4Event: The complete parsed response if received before timeout.
+        Raises:
+            SerialNotConnectedError: If the serial port is not open.
+            TimeoutError: If the expected response is not received within the timeout.
+            serial.SerialException: If an error occurs during serial communication.
+            TypeError:If a type error occurs
+        """
+
+        if not self._serial or not self._serial.isOpen():
+            raise SerialNotConnectedError("Serial port is not connected.")
+            
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                line = self._serial.readline()
+                if not line:
+                    continue    # No data received, so return to the top of the while and iterate again.
+                    
+                cmd = line.strip().decode('utf8')
+                if cmd.startswith(expected_response_prefix):
+                    return S4Event.parse_line(line)
+            except serial.SerialException as e:
+                logger.error(f"Serial read communication error: {e}. Trying to reset input buffer.")
+                try:
+                    self._serial.reset_input_buffer()
+                except serial.SerialException as e2:
+                    logger.error(f"Could not reset serial input buffer: {e2}")
+                raise  # Re-raise the original serial exception
+            except TypeError as e:
+                logger.error(f"TypeError  error: {e}.")
+                raise
+        logger.error(f"Timeout waiting for response with prefix {expected_response_prefix}")
+        raise TimeoutError(f"Timeout waiting for response with prefix {expected_response_prefix}")
+
     def register_callback(self, cb):
-        logger.debug(f"Rower.register_callback: Registering callback - {cb}")
+        logger.debug(f"Registering serial communication callback - {cb}")
         self._callbacks.add(cb)
 
     def remove_callback(self, cb):
+        logger.debug(f"De-registering serial communication callback - {cb}")
         self._callbacks.remove(cb)
 
-    def notify_callbacks(self, event):
+    def notify_callbacks(self, event: S4Event):
 #        logger.debug(f"Rower.notify_callbacks: Notifing callbacks of event {event}")
         for cb in self._callbacks:
 #            logger.debug(f"Rower.notify_callbacks: Notifying callback {cb} of event {event}")

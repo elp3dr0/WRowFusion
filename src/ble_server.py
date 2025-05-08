@@ -1,10 +1,11 @@
-#!/usr/bin/env python3
-
 # ---------------------------------------------------------------------------
-# Original code from the PunchThrough Repo espresso-ble
+# Based on the inonoob repo "pirowflo"
+# https://github.com/inonoob/pirowflo
+# Which in turn was based on the PunchThrough Repo espresso-ble
 # https://github.com/PunchThrough/espresso-ble
+# Extensively refactored and expanded for WRowFusion
 # ---------------------------------------------------------------------------
-#
+
 import logging
 from queue import Empty
 import signal

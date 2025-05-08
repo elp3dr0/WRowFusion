@@ -1,5 +1,10 @@
-import dbus
+# ---------------------------------------------------------------------------
+# Based on the inonoob repo "pirowflo"
+# https://github.com/inonoob/pirowflo
+# Extensively refactored and expanded for WRowFusion
+# ---------------------------------------------------------------------------
 
+import dbus
 import logging
 
 DBUS_OM_IFACE = "org.freedesktop.DBus.ObjectManager"

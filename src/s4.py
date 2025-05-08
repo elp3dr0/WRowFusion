@@ -1,3 +1,10 @@
+# ---------------------------------------------------------------------------
+# Based on the inonoob repo "pirowflo"
+# https://github.com/inonoob/pirowflo
+# Extensively refactored and expanded for WRowFusion
+# ---------------------------------------------------------------------------
+
+
 import threading
 import logging
 import time
@@ -333,7 +340,7 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor, wr_data_logg
     # which polls the S4 will not be executed unecessarily before an S4 is
     # connected
     
-    S4.reset_request()
+    S4.request_reset()
     logger.debug("s4_data_task: Initialising DataLogger")
 
     wr_data_logger.initialise(S4)
@@ -347,7 +354,7 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor, wr_data_logg
                 parts = ResetRequest_ble.split()
                 cmd = parts[0]
                 if cmd == "reset_ble":
-                    S4.reset_request()
+                    S4.request_reset()
                 #elif cmd == "hr":
                 #    new_hr = int(parts[1])
                 #    if new_hr != ext_hr:
