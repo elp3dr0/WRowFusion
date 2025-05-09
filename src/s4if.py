@@ -38,14 +38,12 @@ It appears, however, that it is exactly the opposite.
 '''
 
 MEMORY_MAP = {
-                '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big'},       # tenths of metres 0-9 (decimal place of the distance)
+                '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big'},       # centimetres component of distance to nearest 5cm (i.e. 0-95).
                 '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big'},           # distance in metres since reset
                 '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},                    # instantaneous power
                 '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big'},               # calories since reset
                 '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'on_demand_only': True}, # tank volume in litres
                 # Stroke counter
-                #   Stroke_pull is first subtracted from stroke_average then a modifier of 
-                #   1.25 multiplied by the result to generate the ratio value for display.
                 '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big'},             # total strokes since reset
                 '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big'},    # average time for a whole stroke
                 '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big'},     # average time for a pull (acc to dec)
@@ -67,6 +65,32 @@ MEMORY_MAP = {
                 '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big'},    # total workout strokes
                 '1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'big'},            # limit value for workouts
              }
+
+'''
+Notes:
+(*) total_distance_dec holds the centimetres part of the distance to the nearest 5cm, not "0.1m count (only counts up from 0-9)"
+    as documented in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
+(*) Any effort to combine the cm value with the metres value will be complicated by the serial delivery. As the values are recieved 
+    one after the other, care must be taken to retrieve the cm component and the metres component with minimal delay in between. 
+    Consider a request being written to the serial for the cms component when the actual distance is 138.95 cms. The rower will 
+    respond with 95cms. If the distance were to change by just 5cm before the second request for the metres component is received, 
+    then the rower will report a metres component of 139m. Combining the components would make the distance appear to be 139.95
+    - neither reflecting the 138.95m at the time of the first request, nor the 139.0m at the time of the second request. 
+(*) Watts are available intermittently. The overwhelming majority of requests for Watts receive a response with value 0.
+    Non-zero Watts are sometimes returned for one or two readings per stroke (typically at the same value), but often with
+    no non-zero readings for one or two strokes at a time. To have availability at all times, average the watts over a number
+    of non-zero readings for a number of different strokes. Averaging readings from 4 different strokes appears to match the
+    S4 watts display closely. Or use the concept2 formula which derives power from 500m pace.
+(*) From the documenation in Water Rower S4 S5 USB Protocol Iss 1 04.pdf:
+    "Stroke_pull is first subtracted from stroke_average then a modifier of 1.25 multiplied by the result to generate the ratio 
+    value for display." It is unclear where this ratio is ever displayed, or what it intends to signify. The naming as a ratio
+    does not match the computation that is described.
+(*) 500m Pace is computed by the S4 only when units of /500m are selected on screen. If other units are being displayed, the 
+    value of 0 is stored in the 500m pace memory register and 0 is returned over the serial connection. To have availability
+    at all times, compute the 500m pace from the avg_distance_cmps.
+
+
+'''
 
 # Packet identifiers as speicified in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
 
