@@ -136,9 +136,9 @@ class Advertisement(dbus.service.Object):
             properties["LocalName"] = dbus.String(self.local_name)
         if self.discoverable is not None and self.discoverable == True:
             properties['Discoverable'] = dbus.Boolean(self.discoverable)
-        if self.include_tx_power is not None:
-            properties["IncludeTxPower"] = dbus.Boolean(self.include_tx_power)
-
+        if self.include_tx_power:
+            #properties["IncludeTxPower"] = dbus.Boolean(self.include_tx_power)
+            properties['Includes'] = dbus.Array(["tx-power"], signature='s')
         if self.data is not None:
             properties["Data"] = dbus.Dictionary(self.data, signature="yv")
         return {LE_ADVERTISEMENT_IFACE: properties}
