@@ -195,9 +195,10 @@ class DataLogger(object):
                 logger.debug(f"500mps pace: {event.value}")
             if event.value is not None and event.value != 0:
                 concept2power = 2.80 / pow(event.value / 500.0, 3)
+                logger.debug(f"concept2 power: {concept2power}")
             else:
                 concept2power = 0  # Or another default value
-            logger.debug(f"concept2 power: {concept2power}")
+                logger.debug(f"concept2 power: {concept2power}")
         self.TimeElapsedcreator()
 
 
