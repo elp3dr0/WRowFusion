@@ -146,61 +146,82 @@ class DataLogger(object):
         logger.debug("DataLogger._reset_state: Lock released.")
 
     def on_rower_event(self, event: S4Event):
-
         logger.debug(f"Received event: {event}")
-        with self._wr_lock:
-            if event.type in IGNORE_LIST:
-                logger.debug(f"Ignoring event in ignore list: {event.type}")
-                return
-            if event.type == 'stroke_start':
-                self._DrivePhase = True
-            if event.type == 'stroke_end':
-                self._DrivePhase = False
-            if event.type == 'stroke_rate':
-                self.WRValues.update({'stroke_rate': (event.value*2)})
-            if event.type == 'stroke_count':
-                self.WRValues.update({'stroke_count': event.value})
-            if event.type == 'total_distance':
-                self.WRValues.update({'total_distance': (event.value)})
-            if event.type == 'avg_distance_cmps':
-                if event.value == 0:
-                    self.WRValues.update({'instant_pace': 0})
-                    self.WRValues.update({'speed':0})
-                else:
-                    PaceFromSpeed = (500 * 100) / event.value
-                    logger.debug(f"Pace computed from speed: {PaceFromSpeed}")
-                    #print(f{PaceFromSpeed})
-                    self.WRValues.update({'instant_pace': PaceFromSpeed})
-                    self.WRValues.update({'speed':event.value})
-            if event.type == 'watts':
-                self._WattsEventValue = event.value
-                self.update_live_avg_power(self._WattsEventValue)
-            if event.type == 'total_kcal':
-                self.WRValues.update({'total_kcal': ((event.value+500)/1000)})  # convert calories into kCal (add 500 first to implement arithmetic rounding rather than rounding down)
-            if event.type == 'total_kcal_h':  # must calclatre it first
-                self.WRValues.update({'total_kcal': 0})
-            if event.type == 'total_kcal_min':  # must calclatre it first
-                self.WRValues.update({'total_kcal': 0})
-            if event.type == 'heart_rate':
-                self.WRValues.update({'heart_rate': (event.value)})
-            if event.type == 'display_sec':
-                self._secondsWR = event.value
-            if event.type == 'display_min':
-                self._minutesWR = event.value
-            if event.type == 'display_hr':
-                self._hoursWR = event.value
-            if event.type == 'display_sec_dec':
-                self._secdecWR = event.value
-            if event.type == '500mps':
-                logger.debug(f"500mps pace: {event.value}")
-            if event.value is not None and event.value != 0:
-                concept2power = 2.80 / pow(event.value / 500.0, 3)
-                logger.debug(f"concept2 power: {concept2power}")
-            else:
-                concept2power = 0  # Or another default value
-                logger.debug(f"concept2 power: {concept2power}")
-        self.TimeElapsedcreator()
 
+        if event.type in IGNORE_LIST:
+            logger.debug(f"Ignoring event in ignore list: {event.type}")
+            return
+
+        handlers = {
+            'stroke_start': lambda evt: setattr(self, '_DrivePhase', True),
+            'stroke_end': lambda evt: setattr(self, '_DrivePhase', False),
+            'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate': evt.value * 2}),
+            'stroke_count': lambda evt: self.WRValues.update({'stroke_count': evt.value}),
+            'total_distance': lambda evt: self.WRValues.update({'total_distance': evt.value}),
+            'avg_distance_cmps': self._handle_avg_distance_cmps,
+            'watts': self._handle_watts,
+            'total_kcal': lambda evt: self.WRValues.update({'total_kcal': (evt.value + 500) / 1000}),
+            'heart_rate': lambda evt: self.WRValues.update({'heart_rate': evt.value}),
+            'display_sec': lambda evt: setattr(self, '_secondsWR', evt.value),
+            'display_min': lambda evt: setattr(self, '_minutesWR', evt.value),
+            'display_hr': lambda evt: setattr(self, '_hoursWR', evt.value),
+            'display_sec_dec': lambda evt: setattr(self, '_secdecWR', evt.value),
+            '500mps': lambda evt: self._handle_500mps(evt),
+        }
+
+        with self._wr_lock:
+            handler = handlers.get(event.type)
+            if not handler:
+                logger.warning(f"On Rower Event received unhandled event type: {event.type}")
+                return
+            
+            handler(event)
+            if event.type in {'display_sec', 'display_min', 'display_hr', 'display_sec_dec'}:
+                self._compute_elapsed_time()
+        
+    def _handle_avg_distance_cmps(self, evt: S4Event):
+        if evt.value == 0:
+            self.WRValues.update({'instant_pace': 0, 'speed': 0})
+        else:
+            pace = (500 * 100) / evt.value
+            logger.debug(f"Pace computed from speed: {pace}")
+            self.WRValues.update({'instant_pace': pace, 'speed': evt.value})
+
+    def _handle_watts(self, evt: S4Event):
+        self._WattsEventValue = evt.value
+        self._update_live_avg_power(self._WattsEventValue)
+
+    def _handle_500mps(self, evt: S4Event):
+        logger.debug(f"500mps pace: {evt.value}")
+        if evt.value:
+            concept2power = 2.80 / pow(evt.value / 500.0, 3)
+        else:
+            concept2power = 0
+        logger.debug(f"concept2 power: {concept2power}")
+
+    def _compute_elapsed_time(self):
+        with self._wr_lock:
+            #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
+            #self.elapsetime = int(self.elapsetime.total_seconds())
+            elapsed_time = int(self._hoursWR * 3600 + self._minutesWR * 60 + self._secondsWR + (1 if self._secdecWR >= 5 else 0))
+            self.WRValues.update({'elapsed_time': elapsed_time})
+
+    def _update_live_avg_power(self,watts):
+        logger.debug(f"update_live_avg_power - Watts event reports Watts: {watts}")
+        with self._wr_lock:
+            if self._DrivePhase:
+                self._StrokeMaxPower = max(self._StrokeMaxPower, watts)
+            else:
+                if self._StrokeMaxPower:
+                    self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
+                    logger.debug(f"update_live_avg_power - Stroke Max Power captured as: {self._StrokeMaxPower}. Stroke count: {self.WRValues['stroke_count']}")
+                    self._StrokeMaxPower = 0
+                while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_POWER_AVG:
+                    self._RecentStrokesMaxPower.pop(0)
+                if len(self._RecentStrokesMaxPower) == NUM_STROKES_FOR_POWER_AVG:
+                    live_avg_power = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
+                    self.WRValues.update({'watts': live_avg_power})
+                    logger.debug(f"update_live_avg_power - Live Average Power computed as: {live_avg_power}")
 
     def pulse_monitor(self,event: S4Event):
         # As a callback, this function is called by the notifier each time any event 
@@ -240,12 +261,6 @@ class DataLogger(object):
                 self._reset_state()
                 logger.info("value reseted")
 
-    def TimeElapsedcreator(self):
-        with self._wr_lock:
-            #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
-            #self.elapsetime = int(self.elapsetime.total_seconds())
-            elapsed_time = int(self._hoursWR * 3600 + self._minutesWR * 60 + self._secondsWR + (1 if self._secdecWR >= 5 else 0))
-            self.WRValues.update({'elapsed_time': elapsed_time})
 
     def WRValuesStandstill(self):
         with self._wr_lock:
@@ -257,22 +272,6 @@ class DataLogger(object):
                 'watts': 0,
             })
 
-    def update_live_avg_power(self,watts):
-        logger.debug(f"update_live_avg_power - Watts event reports Watts: {watts}")
-        with self._wr_lock:
-            if self._DrivePhase:
-                self._StrokeMaxPower = max(self._StrokeMaxPower, watts)
-            else:
-                if self._StrokeMaxPower:
-                    self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
-                    logger.debug(f"update_live_avg_power - Stroke Max Power captured as: {self._StrokeMaxPower}. Stroke count: {self.WRValues['stroke_count']}")
-                    self._StrokeMaxPower = 0
-                while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_POWER_AVG:
-                    self._RecentStrokesMaxPower.pop(0)
-                if len(self._RecentStrokesMaxPower) == NUM_STROKES_FOR_POWER_AVG:
-                    live_avg_power = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
-                    self.WRValues.update({'watts': live_avg_power})
-                    logger.debug(f"update_live_avg_power - Live Average Power computed as: {live_avg_power}")
 
 
     def get_WRValues(self):
