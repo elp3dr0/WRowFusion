@@ -19,6 +19,7 @@
 
 ## 🔄 Data Handling
 - [ ] Replace deque with shared DataLogger instance
+- [ ] Replace reset q with object
 - [ ] Make DataLogger accessible across threads
 - [ ] Evaluate thread safety of DataLogger callbacks
 
