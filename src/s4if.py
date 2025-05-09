@@ -38,7 +38,7 @@ It appears, however, that it is exactly the opposite.
 '''
 
 MEMORY_MAP = {
-                '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 10, 'endian': 'big'},       # tenths of metres 0-9 (decimal place of the distance)
+                '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big'},       # tenths of metres 0-9 (decimal place of the distance)
                 '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big'},           # distance in metres since reset
                 '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},                    # instantaneous power
                 '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big'},               # calories since reset
