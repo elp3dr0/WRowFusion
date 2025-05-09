@@ -38,7 +38,7 @@ It appears, however, that it is exactly the opposite.
 '''
 
 MEMORY_MAP = {
-                #'054': {'type': 'total_distance_dec', 'size': 'single', 'base': 10, 'endian': 'big'},       # tenths of metres 0-9 (decimal place of the distance)
+                '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 10, 'endian': 'big'},       # tenths of metres 0-9 (decimal place of the distance)
                 '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big'},           # distance in metres since reset
                 '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},                    # instantaneous power
                 '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big'},               # calories since reset
@@ -190,21 +190,21 @@ class S4Event:
             cmd = line.strip().decode('utf8')
         except UnicodeDecodeError as e:
             logger.error(f"Failed to decode line from S4: {line!r}, error: {e}")
-            raise  # or raise a custom exception if you prefer
-            
+            return None
+
         if cmd == STROKE_START_RESPONSE:
             return cls.build(type='stroke_start', raw=cmd)
         elif cmd == STROKE_END_RESPONSE:
             return cls.build(type='stroke_end', raw=cmd)
         elif cmd == OK_RESPONSE:
             return cls.build(type='ok', raw=cmd)
-        elif cmd[:2] == MODEL_INFORMATION_RESPONSE:
+        elif cmd.startswith(MODEL_INFORMATION_RESPONSE):
             return cls.build(type='model', raw=cmd)
-        elif cmd[:2] == READ_MEMORY_RESPONSE:
+        elif cmd.startswith(READ_MEMORY_RESPONSE):
             return read_reply(cmd)
         elif cmd == PING_RESPONSE:
             return cls.build(type='ping', raw=cmd)
-        elif cmd[:1] == PULSE_COUNT_RESPONSE:
+        elif cmd.startswith(PULSE_COUNT_RESPONSE):
             return cls.build(type='pulse', raw=cmd)
         elif cmd == ERROR_RESPONSE:
             return cls.build(type='error', raw=cmd)
@@ -255,82 +255,93 @@ def is_live_thread(t):
 
 
 def read_reply(cmd: str) -> Optional[S4Event]:
+    if len(cmd) < 6:
+        logger.warning(f"Failed to parse S4 read memory response: the received command was too short to contain address: {cmd!r}")
+        return None
+    
     address = cmd[3:6]
     memory = MEMORY_MAP.get(address)
-    if memory:
-        size = memory['size']
-        endian = memory.get('endian', 'big')  # Default to big if unspecified
-        value_fn = SIZE_PARSE_MAP.get(size, lambda cmd: None)
-        value_str = value_fn(cmd)
+    if not memory:
+        logger.warning(f"Failed to parse S4 read memory response: MEMORY_MAP has not been configured for the recieved command: {cmd!r}.")
+        return None
 
-        if value_str is None:
-            logger.warning(f"Could not read S4 reply due to unrecognised data size: {size}")
-        else:
-            value = int(value_str, base=memory['base'])
+    size = memory['size']
+    endian = memory.get('endian', 'big')  # Default to big if unspecified
+    # Get the appropriate function to extract the value from the command string depending on whether it's single, double, triple.
+    # Default to None if size isn't found in PARSE_MAP
+    value_fn = SIZE_PARSE_MAP.get(size, lambda cmd: None) 
 
-            if endian == 'little':
-                # Swap bytes if necessary (not applicable for single, so only for double and triple types)
-                if size == 'double' and len(value_str) == 4:
-                    high = int(value_str[0:2], 16)
-                    low = int(value_str[2:4], 16)
-                    value = (low << 8) | high
-                elif size == 'triple' and len(value_str) == 6:
-                    high = int(value_str[0:2], 16)
-                    mid  = int(value_str[2:4], 16)
-                    low  = int(value_str[4:6], 16)
-                    value = (low << 16) | (mid << 8) | high
+    if not value_fn:
+        logger.warning(f"Failed to parse S4 read memory response: Unsupported size '{size}' for address {address} in command: {cmd!r}")
+        return None
+    
+    # Apply the function to extract the value from the command (will return zero length str if cmd is too short for example)
+    value_str = value_fn(cmd)
 
-            return S4Event.build(memory['type'], value, cmd)
-    else:
-        logger.warning(f"This application's MEMORY MAP has not been configured to read S4 reply for command {cmd}.")
+    if value_str is None:
+        logger.warning(f"Failed to parse S4 read memory reponse: Could not extract a value of size: {size} from command: {cmd!r}")
+        return None
+    
+    try:
+        value = int(value_str, base=memory['base'])
+    except ValueError as e:
+        logger.warning(f"Failed to parse S4 read memory reponse: Invalid number format in value '{value_str}' from command: {cmd!r} — Error: {e}")
+        return None
+    
+    # Swap bytes if necessary (not applicable for single, so only for double and triple types)
+    if endian == 'little':
+        try:
+            if size == 'double' and len(value_str) == 4:
+                high = int(value_str[0:2], 16)
+                low = int(value_str[2:4], 16)
+                value = (low << 8) | high
+            elif size == 'triple' and len(value_str) == 6:
+                high = int(value_str[0:2], 16)
+                mid  = int(value_str[2:4], 16)
+                low  = int(value_str[4:6], 16)
+                value = (low << 16) | (mid << 8) | high
+        except ValueError as e:
+            logger.warning(f"Failed to parse S4 read memory reponse: Error during byte-swapping for little-endian data in command: {cmd!r} — {e}")
+            return None
+        
+    return S4Event.build(memory['type'], value, cmd)
 
 
-def get_expected_response_prefix(request_type: str, address: Optional[str] = None) -> str:
+def get_command_string(prefix_type: str, request_type: str, address: Optional[str] = None) -> str:
     """
-    Returns the expected response prefix for a given request type.
+    Returns the string to be sent to or received from the S4 for a given request type.
     Args:
+        prefix_type (str): Either "request" or "response" to specify which prefix to get.
         request_type (str): The type of request (e.g., "USB", "IR").
         address (str, optional): The memory address for READ_MEMORY_REQUEST ("IR").
     Returns:
-        str: The expected response prefix.
+        str: The request or response string.
     Raises:
-        ValueError: If the request_type is invalid or address is missing for "IR".
+        ValueError: If the request_type is invalid, address is missing for "IR", or prefix_type is invalid.
     """
+    if prefix_type not in ('request', 'response'):
+        raise ValueError(f"Invalid prefix type: {prefix_type}. Must be 'request' or 'response'.")
+    
     if request_type == READ_MEMORY_REQUEST:
         if address is None:
             raise ValueError("Address is required for READ_MEMORY_REQUEST (IR)")
         if address not in MEMORY_MAP:
             raise ValueError(f"Address {address} not found in MEMORY_MAP")
         size = MEMORY_MAP[address]['size']
-        return SIZE_MAP[size]['response'] + address
+        if not size:
+            raise ValueError(f"MEMORY_MAP is missing size definition for address {address}")
+        prefix = SIZE_MAP[size][prefix_type]
+        if not prefix:
+            raise ValueError(f"SIZE_MAP is missing {prefix_type} definition for size '{size}'")
+        return prefix + address
     elif request_type in EXPECTED_RESPONSE_MAP:
-        return EXPECTED_RESPONSE_MAP[request_type]
+        if prefix_type == 'request':
+            return request_type
+        else:
+            return EXPECTED_RESPONSE_MAP[request_type]
     else:
         raise ValueError(f"Invalid request type: {request_type}")
     
-def get_request_string(request_type: str, address: Optional[str] = None) -> str:
-    """
-    Returns the string to be sent to the S4 for a given request type.
-    Args:
-        request_type (str): The type of request (e.g., "USB", "IR").
-        address (str, optional): The memory address for READ_MEMORY_REQUEST ("IR").
-    Returns:
-        str: The request string.
-    Raises:
-        ValueError: If the request_type is invalid or address is missing for "IR".
-    """
-    if request_type == READ_MEMORY_REQUEST:
-        if address is None:
-            raise ValueError("Address is required for READ_MEMORY_REQUEST (IR)")
-        if address not in MEMORY_MAP:
-            raise ValueError(f"Address {address} not found in MEMORY_MAP")
-        size = MEMORY_MAP[address]['size']
-        return SIZE_MAP[size]['request'] + address
-    elif request_type in EXPECTED_RESPONSE_MAP:
-        return request_type
-    else:
-        raise ValueError(f"Invalid request type: {request_type}")
-
 
 class Rower(object):
     def __init__(self, options=None):
@@ -411,7 +422,6 @@ class Rower(object):
             self._serial.write(str.encode(raw.upper() + '\r\n'))
             self._serial.flush()
         except Exception as e:
-            print(e)
             logger.error(f"Serial write communication error: {e}. Trying to reconnect.")
             self.open()
 
@@ -468,14 +478,30 @@ class Rower(object):
 
 
     def request_on_demand(self, request_type: str, address: Optional[str] = None) -> S4Event:
-    
-        request = get_request_string(request_type, address)
-        expected_response_prefix = get_expected_response_prefix(request_type, address)
+        """Sends a request to the S4 monitor and waits for the response.
+        Constructs the request and expected response prefix using the request type and optional address.
+        Sends the request via serial, clears the input buffer beforehand, and waits for the matching response.
+        Args:
+            request_type (str): Type of request to send (e.g., 'IR').
+            address (str, optional): Memory address to query, required for memory reads.
+        Returns:
+            S4Event: Parsed response from the S4 monitor.
+            For events that do not expect a response, the S4Event dict will be empty other than type = 'None'.
+            The caller can therefore deduce that the expected response was not received if this function returns None
+            and the caller can therefore take appropriate action.
+        Raises:
+            Exception: If any error occurs during serial I/O or response handling.
+        """
+        request = get_command_string('request', request_type, address)
+        expected_response_prefix = get_command_string('response', request_type, address)
 
         try:
             self._serial.reset_input_buffer()
             self.write(request)
-            return self.capture_on_demand_response(expected_response_prefix)
+            if expected_response_prefix:
+                return self.capture_on_demand_response(expected_response_prefix)
+            else:
+                return S4Event.build('None')
         except Exception:
             logger.error(f"Error during on-demand request with command: {request_type} and address: {address}")
             raise
@@ -519,7 +545,7 @@ class Rower(object):
             except TypeError as e:
                 logger.error(f"TypeError  error: {e}.")
                 raise
-        logger.error(f"Timeout waiting for response with prefix {expected_response_prefix}")
+        logger.warning(f"Timeout waiting for response with prefix {expected_response_prefix}")
         raise TimeoutError(f"Timeout waiting for response with prefix {expected_response_prefix}")
 
     def register_callback(self, cb):
