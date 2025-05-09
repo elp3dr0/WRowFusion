@@ -208,6 +208,8 @@ class S4Event:
             return cls.build(type='pulse', raw=cmd)
         elif cmd == ERROR_RESPONSE:
             return cls.build(type='error', raw=cmd)
+        elif cmd == WR_RESPONSE:
+            return cls.build(type='wr', raw=cmd)
         else:
             logger.warning(f"Unrecognised command line captured from S4: {cmd}")
             return None

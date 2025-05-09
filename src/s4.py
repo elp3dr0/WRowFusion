@@ -12,7 +12,10 @@ from gpiozero import DigitalOutputDevice
 from copy import deepcopy
 #from datetime import timedelta
 
-from src.s4if import Rower
+from src.s4if import (
+    Rower,
+    S4Event,
+)
 from src.heart_rate import HeartRateMonitor
 
 logger = logging.getLogger(__name__)
@@ -52,7 +55,7 @@ heartbeat_signal = DigitalOutputDevice(HEARTBEAT_PIN, active_high=True, initial_
 # Specified in milliseconds
 NO_ROWING_PULSE_GAP = 300
 
-IGNORE_LIST = ['graph', 'tank_volume']
+IGNORE_LIST = ['graph', 'tank_volume', 'wr']
 
 # Smooth the displayed power by finding the average max power output over a number of strokes 
 NUM_STROKES_FOR_POWER_AVG = 4
@@ -85,7 +88,7 @@ class DataLogger(object):
         if rower_interface is not None:
             self.initialise(rower_interface)
 
-    def initialise(self, rower_interface):
+    def initialise(self, rower_interface: Rower):
         with self._wr_lock:
             """Initialise the DataLogger once a rower interface becomes available."""
             self._rower_interface = rower_interface
@@ -142,60 +145,60 @@ class DataLogger(object):
             logger.debug("DataLogger._reset_state: Releasing lock")
         logger.debug("DataLogger._reset_state: Lock released.")
 
-    def on_rower_event(self, event):
+    def on_rower_event(self, event: S4Event):
 
         logger.debug(f"Received event: {event}")
         with self._wr_lock:
-            if event['type'] in IGNORE_LIST:
-                logger.debug(f"Ignoring event in ignore list: {event['type']}")
+            if event.type in IGNORE_LIST:
+                logger.debug(f"Ignoring event in ignore list: {event.type}")
                 return
-            if event['type'] == 'stroke_start':
+            if event.type == 'stroke_start':
                 self._DrivePhase = True
-            if event['type'] == 'stroke_end':
+            if event.type == 'stroke_end':
                 self._DrivePhase = False
-            if event['type'] == 'stroke_rate':
-                self.WRValues.update({'stroke_rate': (event['value']*2)})
-            if event['type'] == 'stroke_count':
-                self.WRValues.update({'stroke_count': event['value']})
-            if event['type'] == 'total_distance':
-                self.WRValues.update({'total_distance': (event['value'])})
-            if event['type'] == 'avg_distance_cmps':
-                if event['value'] == 0:
+            if event.type == 'stroke_rate':
+                self.WRValues.update({'stroke_rate': (event.value*2)})
+            if event.type == 'stroke_count':
+                self.WRValues.update({'stroke_count': event.value})
+            if event.type == 'total_distance':
+                self.WRValues.update({'total_distance': (event.value)})
+            if event.type == 'avg_distance_cmps':
+                if event.value == 0:
                     self.WRValues.update({'instant_pace': 0})
                     self.WRValues.update({'speed':0})
                 else:
-                    PaceFromSpeed = (500 * 100) / event['value']
+                    PaceFromSpeed = (500 * 100) / event.value
                     logger.debug(f"Pace computed from speed: {PaceFromSpeed}")
                     #print(f{PaceFromSpeed})
                     self.WRValues.update({'instant_pace': PaceFromSpeed})
-                    self.WRValues.update({'speed':event['value']})
-            if event['type'] == 'watts':
-                self._WattsEventValue = event['value']
+                    self.WRValues.update({'speed':event.value})
+            if event.type == 'watts':
+                self._WattsEventValue = event.value
                 self.update_live_avg_power(self._WattsEventValue)
-            if event['type'] == 'total_kcal':
-                self.WRValues.update({'total_kcal': ((event['value']+500)/1000)})  # convert calories into kCal (add 500 first to implement arithmetic rounding rather than rounding down)
-            if event['type'] == 'total_kcal_h':  # must calclatre it first
+            if event.type == 'total_kcal':
+                self.WRValues.update({'total_kcal': ((event.value+500)/1000)})  # convert calories into kCal (add 500 first to implement arithmetic rounding rather than rounding down)
+            if event.type == 'total_kcal_h':  # must calclatre it first
                 self.WRValues.update({'total_kcal': 0})
-            if event['type'] == 'total_kcal_min':  # must calclatre it first
+            if event.type == 'total_kcal_min':  # must calclatre it first
                 self.WRValues.update({'total_kcal': 0})
-            if event['type'] == 'heart_rate':
-                self.WRValues.update({'heart_rate': (event['value'])})
-            if event['type'] == 'display_sec':
-                self._secondsWR = event['value']
-            if event['type'] == 'display_min':
-                self._minutesWR = event['value']
-            if event['type'] == 'display_hr':
-                self._hoursWR = event['value']
-            if event['type'] == 'display_sec_dec':
-                self._secdecWR = event['value']
-            if event['type'] == '500mps':
-                logger.debug(f"500mps pace: {event['value']}")
-                concept2power = 2.80 / pow( event['value']/ 500.0, 3)
+            if event.type == 'heart_rate':
+                self.WRValues.update({'heart_rate': (event.value)})
+            if event.type == 'display_sec':
+                self._secondsWR = event.value
+            if event.type == 'display_min':
+                self._minutesWR = event.value
+            if event.type == 'display_hr':
+                self._hoursWR = event.value
+            if event.type == 'display_sec_dec':
+                self._secdecWR = event.value
+            if event.type == '500mps':
+                logger.debug(f"500mps pace: {event.value}")
+                concept2power = 2.80 / pow( event.value/ 500.0, 3)
                 logger.debug(f"concept2 power: {concept2power}")
         self.TimeElapsedcreator()
 
 
-    def pulse_monitor(self,event):
+    def pulse_monitor(self,event: S4Event):
         # As a callback, this function is called by the notifier each time any event 
         # is captured from the S4. The function detects when the paddle is stationary
         # by checking when the S4 last reported a pulse event (pulses are triggered as
@@ -207,8 +210,8 @@ class DataLogger(object):
         # paddle is assumed to be stationary and no rowing is taking place.
         self._LastCheckForPulse = int(round(time.time() * 1000))
         with self._wr_lock:
-            if event['type'] == 'pulse':
-                self._PulseEventTime = event['at']
+            if event.type == 'pulse':
+                self._PulseEventTime = event.at
                 self._RowerReset = False
 
             if self._PulseEventTime:
@@ -224,8 +227,8 @@ class DataLogger(object):
                 self._RecentStrokesMaxPower = []
                 self.WRValuesStandstill()
 
-    def reset_requested(self,event):
-        if event['type'] == 'reset':
+    def reset_requested(self,event: S4Event):
+        if event.type == 'reset':
             logger.debug("DataLogger.reset_requested: Requesting Lock")
             with self._wr_lock:
                 logger.debug("DataLogger.reset_requested: Lock attained")
