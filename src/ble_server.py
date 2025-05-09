@@ -14,6 +14,7 @@ import dbus.exceptions
 import dbus.mainloop.glib
 import dbus.service
 import struct
+import time
 
 from src.bleif import (
     Advertisement,
@@ -323,6 +324,7 @@ def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, wr_data_logger
     # powered property on the controller to on
     logger.debug("main: Set bluez powered property to on")
     adapter_props.Set(ADAPTER_IFACE, "Powered", dbus.Boolean(1))
+    time.sleep(1.0)
 
     # Get manager objs
     logger.debug("main: Getting Bluez GATT MANAGER IFACE")
@@ -387,6 +389,7 @@ def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, wr_data_logger
     agent_manager.RegisterAgent(AGENT_PATH, "NoInputNoOutput") # register the bluetooth agent with no input and output which should avoid asking for pairing 
 
     logger.debug("main: calling admanager.RegisterAdvertisement")
+    time.sleep(0.5)
     ad_manager.RegisterAdvertisement(
         advertisement.get_path(),
         {},
@@ -395,7 +398,7 @@ def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, wr_data_logger
     )
 
     logger.info("main: Calling service_manager.RegisterApplication to Registering GATT application...")
-
+    time.sleep(0.5)
     service_manager.RegisterApplication(
         app.get_path(),
         {},
