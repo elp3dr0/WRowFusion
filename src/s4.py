@@ -27,7 +27,7 @@ This module:
 
 In the case of 2)
 3 callback functions are registered to the s4if.Rower class. Those functions get exectuted as soon as any of the 
-events for which we watch is recieved from the s4 via the Rower.start_capturing() method.
+events for which we watch is recieved from the s4 via the Rower._start_capturing() method.
 Each of the three callback functions create a dict of WaterRower data, each with a different value set. 
 1) reset_requested: Intention is to reset the S4, so all values should be set to 0 even if old values persist in the WR memory.
    These 'reset' values are stored in the WRValues_rst dictionary.
@@ -46,6 +46,13 @@ Avoids bloated functions: A single on_event() could become long and messy.
 Allows early returns: Each callback can quickly return if the event is not relevant.
 '''
 
+# Watts calculation configuration
+# * True to use the Concept2 formula for calculating watts, or 
+# * False to use the rolling average of values reported by the Waterrower
+USE_CONCEPT2_POWER = False  
+
+# Smooth the displayed power and bridge gaps in reported Watts by finding the average max power output over a number of strokes 
+NUM_STROKES_FOR_ROLLING_AVG_WATTS = 4
 
 # Define GPIO pin
 HEARTBEAT_PIN = 18
@@ -55,10 +62,30 @@ heartbeat_signal = DigitalOutputDevice(HEARTBEAT_PIN, active_high=True, initial_
 # Specified in milliseconds
 NO_ROWING_PULSE_GAP = 300
 
-IGNORE_LIST = ['graph', 'tank_volume', 'wr']
-
-# Smooth the displayed power by finding the average max power output over a number of strokes 
-NUM_STROKES_FOR_POWER_AVG = 4
+IGNORE_LIST = [
+    'wr', 'ok', 'ping', 'model', 'pulse', 'error', 'exit', 'reset',
+    'none',
+    #'total_distance_dec',
+    #'total_distance',
+    #'watts',
+    #'total_kcal',
+    'tank_volume',      # Recommend ignore
+    #'stroke_count',
+    #'avg_time_stroke_whole',
+    #'avg_time_stroke_pull',
+    #'total_speed_cmps',
+    #'heart_rate',
+    '500mps',           # Recommend ignore
+    #'stroke_rate', 
+    #'display_hr', 
+    #'display_min', 
+    #'display_sec',
+    #'display_sec_dec',
+    #'workout_total_time',
+    #'workout_total_mps',
+    #'workout_total_strokes',
+    #'workout_limit',
+    ]
 
 class DataLogger(object):
     def __init__(self, rower_interface=None):
@@ -72,6 +99,8 @@ class DataLogger(object):
                                         # and set to False when S4 detects pulley decelleration. It is therefore True
                                         # throughout the whole Drive phase of the stroke and False during recovery phase. 
         self._WattsEventValue = None
+        self._RollingAvgWatts = None
+        self._Concept2Watts = None
         self._LastCheckForPulse = None
         self._PulseEventTime = None
         self._PaddleTurning = None
@@ -80,6 +109,13 @@ class DataLogger(object):
         self._minutesWR = None
         self._hoursWR = None
         self._secdecWR = None
+        self._TotalDistanceM = None     # The total distance in m, ignoring the value in the dec register
+        self._TotalDistanceDec = None   # The cm component of the total distance (i.e. the component that would follow a decimal point)
+        self._TotalDistanceCM = None    # The total distance in cm (i.e. _TotalDistanceM * 100 + _TotalDistanceDec)
+        self._StrokeDuration = None     # Units: ms
+        self._DriveDuration = None      # Units: ms
+        self.TankVolume = None
+        self.WRWorkout = None
         self.WRValues_rst = None
         self.WRValues = None
         self.WRValues_standstill = None
@@ -116,6 +152,8 @@ class DataLogger(object):
             self._StrokeMaxPower = 0
             self._DrivePhase = False
             self._WattsEventValue = 0
+            self._RollingAvgWatts = 0
+            self._Concept2Watts = 0
             self._LastCheckForPulse = 0
             self._PulseEventTime = 0
             self._PaddleTurning = False
@@ -124,18 +162,31 @@ class DataLogger(object):
             self._minutesWR = 0
             self._hoursWR = 0
             self._secdecWR = 0
+            self._TotalDistanceM = 0
+            self._TotalDistanceDec = 0
+            self._TotalDistanceCM = 0
+            self._StrokeDuration = 0
+            self._DriveDuration = 0
+            self.TankVolume = 0
+            self.WRWorkout = {
+                'total_time': 0,
+                'total_mps': 0,
+                'total_strokes': 0,
+                'limit': 0,
+                }
             self.WRValues_rst = {
-                    'stroke_rate': 0,
-                    'stroke_count': 0,
-                    'total_distance': 0,
-                    'instant_pace': 0,
-                    'speed': 0,
-                    'watts': 0,
-                    'total_kcal': 0,
-                    'total_kcal_hour': 0,
-                    'total_kcal_min': 0,
-                    'heart_rate': 0,
-                    'elapsed_time': 0.0,
+                'stroke_rate': 0,
+                'stroke_count': 0,
+                'total_distance': 0,
+                'instant_pace': 0,
+                'speed': 0,
+                'watts': 0,
+                'total_kcal': 0,
+                'total_kcal_hour': 0,
+                'total_kcal_min': 0,
+                'heart_rate': 0,
+                'elapsed_time': 0.0,
+                'stroke_ratio': 0.0,
                 }
             self.WRValues = deepcopy(self.WRValues_rst)
             self.WRValues_standstill = deepcopy(self.WRValues_rst)
@@ -155,18 +206,26 @@ class DataLogger(object):
         handlers = {
             'stroke_start': lambda evt: setattr(self, '_DrivePhase', True),
             'stroke_end': lambda evt: setattr(self, '_DrivePhase', False),
-            'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate': evt.value * 2}),
-            'stroke_count': lambda evt: self.WRValues.update({'stroke_count': evt.value}),
-            'total_distance': lambda evt: self.WRValues.update({'total_distance': evt.value}),
-            'avg_distance_cmps': self._handle_avg_distance_cmps,
+            'total_distance': lambda evt: self._handle_total_distance(evt),
+            'total_distance_dec': lambda evt: self._handle_total_distance_dec(evt),
             'watts': self._handle_watts,
             'total_kcal': lambda evt: self.WRValues.update({'total_kcal': (evt.value + 500) / 1000}),
+            'tank_volume': lambda evt: setattr(self, 'TankVolume', evt.value),
+            'stroke_count': lambda evt: self.WRValues.update({'stroke_count': evt.value}),
+            'avg_time_stroke_whole': lambda evt: setattr(self, '_StrokeDuration', evt.value * 25),
+            'avg_time_stroke_pull': lambda evt: setattr(self, '_DriveDuration', evt.value * 25),
+            'avg_distance_cmps': self._handle_avg_distance_cmps,
             'heart_rate': lambda evt: self.WRValues.update({'heart_rate': evt.value}),
+            '500mps': lambda evt: self._handle_500mps(evt),
+            'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate': evt.value * 2}),
             'display_sec': lambda evt: setattr(self, '_secondsWR', evt.value),
             'display_min': lambda evt: setattr(self, '_minutesWR', evt.value),
             'display_hr': lambda evt: setattr(self, '_hoursWR', evt.value),
             'display_sec_dec': lambda evt: setattr(self, '_secdecWR', evt.value),
-            '500mps': lambda evt: self._handle_500mps(evt),
+            'workout_total_time': lambda evt: self.WRWorkout.update({'total_time': evt.value}),
+            'workout_total_mps': lambda evt: self.WRWorkout.update({'total_mps': evt.value}),
+            'workout_total_strokes': lambda evt: self.WRWorkout.update({'total_strokes': evt.value}),
+            'workout_limit': lambda evt: self.WRWorkout.update({'limit': evt.value}),
         }
 
         with self._wr_lock:
@@ -176,9 +235,22 @@ class DataLogger(object):
                 return
             
             handler(event)
-            if event.type in {'display_sec', 'display_min', 'display_hr', 'display_sec_dec'}:
+            # In the memory map, the time components are listed in order of increasing signficance: dec, sec, min, hr
+            # and so are requested and also responded in that order. Therefore the elapsed time can be calculated
+            # on receipt of the hr response.
+            if event.type == 'display_sec_dec':
                 self._compute_elapsed_time()
-        
+            elif event.type == 'avg_time_stroke_pull':
+                self._compute_stroke_ratio()
+
+    def _handle_total_distance(self, evt: S4Event):
+        self.WRValues.update({'total_distance': evt.value})
+        self._TotalDistanceM = evt.value
+
+    def _handle_total_distance_dec(self, evt: S4Event):
+        self._TotalDistanceDec = evt.value
+        self._TotalDistanceCM = max(self._TotalDistanceCM, self._TotalDistanceM * 100 + evt.value)
+
     def _handle_avg_distance_cmps(self, evt: S4Event):
         if evt.value == 0:
             self.WRValues.update({'instant_pace': 0, 'speed': 0})
@@ -189,7 +261,7 @@ class DataLogger(object):
 
     def _handle_watts(self, evt: S4Event):
         self._WattsEventValue = evt.value
-        self._update_live_avg_power(self._WattsEventValue)
+        self._update_rolling_avg_watts(self._WattsEventValue)
 
     def _handle_500mps(self, evt: S4Event):
         logger.debug(f"500mps pace: {evt.value}")
@@ -206,7 +278,14 @@ class DataLogger(object):
             elapsed_time = int(self._hoursWR * 3600 + self._minutesWR * 60 + self._secondsWR + (1 if self._secdecWR >= 5 else 0))
             self.WRValues.update({'elapsed_time': elapsed_time})
 
-    def _update_live_avg_power(self,watts):
+    def _compute_stroke_ratio(self):
+        with self._wr_lock:
+            if self._StrokeDuration and self._DriveDuration:
+                strokeratio = (self._StrokeDuration - self._DriveDuration) / self._DriveDuration
+                logger.debug(f"Stroke ratio calculated as: {strokeratio}")
+                self.WRValues.update({'stroke_ratio': (self._StrokeDuration - self._DriveDuration) / self._DriveDuration})
+
+    def _update_rolling_avg_watts(self,watts):
         logger.debug(f"update_live_avg_power - Watts event reports Watts: {watts}")
         with self._wr_lock:
             if self._DrivePhase:
@@ -216,12 +295,17 @@ class DataLogger(object):
                     self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
                     logger.debug(f"update_live_avg_power - Stroke Max Power captured as: {self._StrokeMaxPower}. Stroke count: {self.WRValues['stroke_count']}")
                     self._StrokeMaxPower = 0
-                while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_POWER_AVG:
+                while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_ROLLING_AVG_WATTS:
                     self._RecentStrokesMaxPower.pop(0)
-                if len(self._RecentStrokesMaxPower) == NUM_STROKES_FOR_POWER_AVG:
-                    live_avg_power = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
-                    self.WRValues.update({'watts': live_avg_power})
-                    logger.debug(f"update_live_avg_power - Live Average Power computed as: {live_avg_power}")
+                # Start reporting power from the first received value, rather than waiting for the buffer to fill
+                #if len(self._RecentStrokesMaxPower) == NUM_STROKES_FOR_ROLLING_AVG_WATTS:
+                if self._RecentStrokesMaxPower:
+                    rolling_avg_watts = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
+                    self._RollingAvgWatts = rolling_avg_watts
+                    logger.debug(f"update_live_avg_power - Live Average Power computed as: {rolling_avg_watts}")
+                    if USE_CONCEPT2_POWER == False:
+                        self.WRValues.update({'watts': rolling_avg_watts})
+                    
 
     def pulse_monitor(self,event: S4Event):
         # As a callback, this function is called by the notifier each time any event 
