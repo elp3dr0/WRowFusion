@@ -227,6 +227,7 @@ class DataLogger(object):
             'workout_total_mps': lambda evt: self.WRWorkout.update({'total_mps': evt.value}),
             'workout_total_strokes': lambda evt: self.WRWorkout.update({'total_strokes': evt.value}),
             'workout_limit': lambda evt: self.WRWorkout.update({'limit': evt.value}),
+            'ms_stored': lambda evt: None,
         }
 
         with self._wr_lock:

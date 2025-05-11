@@ -50,6 +50,7 @@ MEMORY_MAP = {
                 # Speed
                 '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},         # total distance per second in cm
                 '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},        # instantaneous average distance in cm
+                '14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big'},
                 # Values stored for zone maths
                 '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big'},               # instantaneous heart rate
                 '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little', 'exclude_from_poll_loop': False},   # instantaneious 500m Pace (secs)
