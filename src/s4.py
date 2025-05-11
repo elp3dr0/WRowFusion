@@ -65,26 +65,27 @@ NO_ROWING_PULSE_GAP = 300
 IGNORE_LIST = [
     'wr', 'ok', 'ping', 'model', 'pulse', 'error', 'exit', 'reset',
     'none',
-    #'total_distance_dec',
-    #'total_distance',
-    #'watts',
-    #'total_kcal',
+    'total_distance_dec',
+    'total_distance',
+    'watts',
+    'total_kcal',
     'tank_volume',      # Recommend ignore
-    #'stroke_count',
-    #'avg_time_stroke_whole',
-    #'avg_time_stroke_pull',
+    'stroke_count',
+    'avg_time_stroke_whole',
+    'avg_time_stroke_pull',
     #'total_speed_cmps',
-    #'heart_rate',
+    #'avg_distance_cmps',
+    'heart_rate',
     '500mps',           # Recommend ignore
-    #'stroke_rate', 
-    #'display_hr', 
-    #'display_min', 
-    #'display_sec',
-    #'display_sec_dec',
-    #'workout_total_time',
-    #'workout_total_mps',
-    #'workout_total_strokes',
-    #'workout_limit',
+    'stroke_rate', 
+    'display_hr', 
+    'display_min', 
+    'display_sec',
+    'display_sec_dec',
+    'workout_total_time',
+    'workout_total_mps',
+    'workout_total_strokes',
+    'workout_limit',
     ]
 
 class DataLogger(object):
@@ -281,7 +282,7 @@ class DataLogger(object):
     def _compute_stroke_ratio(self):
         with self._wr_lock:
             if self._StrokeDuration and self._DriveDuration:
-                strokeratio = (self._StrokeDuration - self._DriveDuration) / self._DriveDuration
+                strokeratio = (self._StrokeDuration - self._DriveDuration) / (self._DriveDuration * 1.25)
                 logger.debug(f"Stroke ratio calculated as: {strokeratio}")
                 self.WRValues.update({'stroke_ratio': (self._StrokeDuration - self._DriveDuration) / self._DriveDuration})
 

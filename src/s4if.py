@@ -47,27 +47,6 @@ MEMORY_MAP = {
                 '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big'},             # total strokes since reset
                 '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big'},    # average time for a whole stroke measured in number of 25ms periods
                 '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big'},     # average time for a pull (acc to dec) measured in number of 25ms periods
-                # Unknown
-                '144': {'type': '144 single', 'size': 'single', 'base': 16, 'endian': 'big'},
-                '145': {'type': '145 single', 'size': 'single', 'base': 16, 'endian': 'big'},
-                '146': {'type': '146 single', 'size': 'single', 'base': 16, 'endian': 'big'},
-                '147': {'type': '147 single', 'size': 'single', 'base': 16, 'endian': 'big'},
-                '144': {'type': '144 double', 'size': 'double', 'base': 16, 'endian': 'big'},
-                '145': {'type': '145 double', 'size': 'double', 'base': 16, 'endian': 'big'},
-                '146': {'type': '146 double', 'size': 'double', 'base': 16, 'endian': 'big'},
-                '144': {'type': '144 triple', 'size': 'triple', 'base': 16, 'endian': 'big'},
-                '145': {'type': '145 triple', 'size': 'triple', 'base': 16, 'endian': 'big'},
-                '14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big'},
-                '1E4': {'type': '1E4 single', 'size': 'single', 'base': 16, 'endian': 'big'},
-                '1E5': {'type': '1E5 single', 'size': 'single', 'base': 16, 'endian': 'big'},
-                '1E6': {'type': '1E6 single', 'size': 'single', 'base': 16, 'endian': 'big'},
-                '1E7': {'type': '1E7 single', 'size': 'single', 'base': 16, 'endian': 'big'},
-                '1E4': {'type': '1E4 double', 'size': 'double', 'base': 16, 'endian': 'big'},
-                '1E5': {'type': '1E5 double', 'size': 'double', 'base': 16, 'endian': 'big'},
-                '1E6': {'type': '1E6 double', 'size': 'double', 'base': 16, 'endian': 'big'},
-                '1E4': {'type': '1E4 triple', 'size': 'triple', 'base': 16, 'endian': 'big'},
-                '1E5': {'type': '1E5 triple', 'size': 'triple', 'base': 16, 'endian': 'big'},
-
                 # Speed
                 '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},         # total distance per second in cm
                 '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},        # instantaneous average distance in cm
@@ -103,14 +82,18 @@ Notes:
     of non-zero readings for a number of different strokes. Averaging readings from 4 different strokes appears to match the
     S4 watts display closely. Or use the concept2 formula which derives power from 500m pace.
 (*) stroke_average and stroke_pull appear to be measured in number of 25ms periods. 
-(*) From the documenation in Water Rower S4 S5 USB Protocol Iss 1 04.pdf:
+(*) The ratio can be displayed on the S4 intermittently by selecting Advanced program 5. It is not documented where in the memory
+    register the display value is stored. The documenation in Water Rower S4 S5 USB Protocol Iss 1 04.pdf states:
     "Stroke_pull is first subtracted from stroke_average then a modifier of 1.25 multiplied by the result to generate the ratio 
-    value for display." It is unclear where this ratio is ever displayed, or what it intends to signify. The naming as a ratio
-    does not match the computation that is described.
+    value for display."
+    From emprical evidence, it seems that the waterrower actually performs the following calcualtion:
+    (stroke duration - stroke pull)/(stroke pull * 1.25)
 (*) total_speed_cmps is highly volatile. On the test rower, it appeared to oscilate between a bigger reading and a smaller reading.
     During light rowing, a single drive phase of the stroke might see values of 140 +/-35 (smaller reading) and 350 +/-35 (higher 
     reading), while a single recovery phase might see values of 35 +/-35 (smaller reading) 210 +/-35 (higher reading).
-    The avg_distance_cmps is much smoother, and might be more useful for computing meaningful speed/pace etc. 
+    The avg_distance_cmps is much smoother, and might be more useful for computing meaningful speed/pace etc.
+    Note that m_s_stored value appears to fill to 32 and the top out, so maybe avg_distance_cmps aims to average over 32 readings
+    of the total_speed_cmps.  
 (*) 500m Pace is computed by the S4 only when units of /500m are selected on screen. If other units are being displayed, the 
     value of 0 is stored in the 500m pace memory register and 0 is returned over the serial connection. To have availability
     at all times, compute the 500m pace from the avg_distance_cmps.
