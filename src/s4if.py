@@ -13,6 +13,7 @@ import time
 import serial
 import serial.tools.list_ports
 
+from enum import IntFlag
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -38,6 +39,9 @@ It appears, however, that it is exactly the opposite.
 '''
 
 MEMORY_MAP = {
+                # Flags
+                '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'exclude_from_poll_loop': True},  # Describe the workout mode: extended zones and distance/duration modes.
+                # Fundanental data
                 '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big'},           # distance in metres since reset
                 '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big'},       # centimetres component of distance to nearest 5cm (i.e. 0-95).
                 '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},                    # instantaneous power
@@ -48,9 +52,9 @@ MEMORY_MAP = {
                 '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big'},    # average time for a whole stroke measured in number of 25ms periods
                 '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big'},     # average time for a pull (acc to dec) measured in number of 25ms periods
                 # Speed
-                '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},         # total distance per second in cm
+                #'148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},         # total distance per second in cm
                 '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},        # instantaneous average distance in cm
-                '14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big'},
+                #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big'},
                 # Values stored for zone maths
                 '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big'},               # instantaneous heart rate
                 '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little', 'exclude_from_poll_loop': False},   # instantaneious 500m Pace (secs)
@@ -189,6 +193,7 @@ WORKOUT_INTERVAL_START_SET_DISTANCE_REQUEST = "WII"  # Define an interval distan
 WORKOUT_INTERVAL_START_SET_DURATION_REQUEST = "WIU"  # Define an interval duration workout
 WORKOUT_INTERVAL_ADD_END_REQUEST = "WIN"             # Add/End an interval to a workout XXXX(==FFFFF to end) + YYYY
 
+
 # UNITS
 UNIT_METERS = 1
 UNIT_MILES = 2
@@ -224,6 +229,49 @@ EXPECTED_RESPONSE_MAP = {
 PORT_SCAN_RETRY_DELAY = 5   
 SERIAL_OPEN_RETRY_DELAY = 5
 
+# FLAG BIT FIELDS
+class WorkoutMode(IntFlag):
+    ZONE_HEARTRATE              = 1 << 0  # fzone_hr
+    ZONE_INTENSITY              = 1 << 1  # fzone_int
+    ZONE_STROKERATE             = 1 << 2  # fzone_sr
+    PROGNOSTICS_ACTIVE          = 1 << 3  # fprognostics
+    WORKOUT_DISTANCE            = 1 << 4  # fworkout_dis
+    WORKOUT_DURATION            = 1 << 5  # fworkout_dur
+    WORKOUT_DISTANCE_INTERVAL   = 1 << 6  # fworkout_dis_i
+    WORKOUT_DURATION_INTERVAL   = 1 << 7  # fworkout_dur_i
+
+    @classmethod
+    def decode_hex(cls, hex_str: str) -> "WorkoutMode":
+        """
+        Create a WorkoutMode instance from a hexadecimal string.
+        Args:
+            hex_str (str): A two-digit hex string (e.g., 'A0', '00', '1F') representing
+                           the 8-bit bitfield read from the S4 memory register.
+        Returns:
+            WorkoutMode: A combined flag instance representing the active workout modes.
+        Usage:
+            This method is typically used to convert the raw hex value returned by the S4 monitor
+            into a readable and operable set of flags represented by a WorkoutMode object. E.g.
+            >>> mode = WorkoutMode.decode_hex("22")
+            >>> print(mode)
+            WorkoutMode.WORKOUT_DURATION|ZONE_HEARTRATE
+            >>> if WorkoutMode.WORKOUT_DURATION in mode print("Duration-based workout is active.")
+        """
+        return cls(int(hex_str, 16))
+
+    def describe(self) -> list[str]:
+        """
+        Get a list of human-readable flag names currently set in this WorkoutMode.
+        Returns:
+            List[str]: A list of active workout mode names (e.g., ['DURATION', 'DISTANCE_INTERVAL']).
+        Usage:
+            This method is useful for displaying or logging the current workout modes in effect.
+            >>> mode = WorkoutMode.decode_hex("22")
+            >>> mode.describe()
+            ['WORKOUT_DURATION', 'ZONE_HEARTRATE']
+        """
+        return [mode.name for mode in WorkoutMode if mode in self]
+    
 # CUSTOM EXCEPTIONS
 class SerialNotConnectedError(Exception):
     pass

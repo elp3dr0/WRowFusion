@@ -24,8 +24,11 @@
 - [ ] Evaluate thread safety of DataLogger callbacks
 - [ ] Remove TXValues from s4.py if shared access to DataLogger is working
 - [ ] Remove CueToBLEANT from s4.py if shared access to DataLogger is working
-- [ ] See what's in registers 144 - 147: Stroke ratio?
-
+- [ ] I want my application to be responsive to the workout mode that someone has selected on the S4. What frequency should I poll those at? Should the polling 
+        be another loop in s4if, or should it be application side? Store the modes when the flags are read.
+- [ ] Respond to the workout mode in application side logic. E.g. store the workout limit field as a duration limit or distance limit.
+- [x] See what's in registers 144-147 and 1E4-1E7. Result - s4 returns an error response when a request to read those addresses is sent 
+- 
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)
 - [ ] Add support for ANT+ HR broadcast
