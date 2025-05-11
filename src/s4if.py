@@ -40,13 +40,13 @@ It appears, however, that it is exactly the opposite.
 
 MEMORY_MAP = {
                 # Flags
-                '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'exclude_from_poll_loop': True},  # Describe the workout mode: extended zones and distance/duration modes.
+                '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'exclude_from_poll_loop': False},  # Describe the workout mode: extended zones and distance/duration modes.
                 # Fundanental data
                 '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big'},           # distance in metres since reset
                 '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big'},       # centimetres component of distance to nearest 5cm (i.e. 0-95).
                 '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},                    # instantaneous power
                 '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big'},               # calories since reset
-                '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'exclude_from_poll_loop': True}, # tank volume in litres
+                '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'exclude_from_poll_loop': False}, # tank volume in litres
                 # Stroke counter
                 '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big'},             # total strokes since reset
                 '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big'},    # average time for a whole stroke measured in number of 25ms periods
