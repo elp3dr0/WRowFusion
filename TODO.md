@@ -22,6 +22,9 @@
 - [ ] Replace reset q with object
 - [ ] Make DataLogger accessible across threads
 - [ ] Evaluate thread safety of DataLogger callbacks
+- [ ] Remove TXValues from s4.py if shared access to DataLogger is working
+- [ ] Remove CueToBLEANT from s4.py if shared access to DataLogger is working
+- [ ] See what's in registers 144 - 147: Stroke ratio?
 
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)
