@@ -24,7 +24,7 @@ The MEMORY_MAP details the organisation of data within the S4 memory registers, 
 occupies, the numerical base of its encoding, the LSB/MSB byte order (endianess), and whether the datum 
 should be requested as part of the high-frequency thread that requests data from the S4.
 
-By configuring a datum in the MEMORY MAP and equiping it with a key: value pair of 'on_demand_only': True (e.g. for tank size), 
+By configuring a datum in the MEMORY MAP and equiping it with a key: value pair of 'exclude_from_poll_loop': True (e.g. for tank size), 
 the application can still request the a read of the datum on demand. However it will not be requested as part of the
 high frequency request thread, leading to improved efficiency. 
 
@@ -38,27 +38,27 @@ It appears, however, that it is exactly the opposite.
 '''
 
 MEMORY_MAP = {
-                '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big'},       # centimetres component of distance to nearest 5cm (i.e. 0-95).
                 '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big'},           # distance in metres since reset
+                '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big'},       # centimetres component of distance to nearest 5cm (i.e. 0-95).
                 '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},                    # instantaneous power
                 '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big'},               # calories since reset
-                '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'on_demand_only': True}, # tank volume in litres
+                '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'exclude_from_poll_loop': True}, # tank volume in litres
                 # Stroke counter
                 '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big'},             # total strokes since reset
-                '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big'},    # average time for a whole stroke
-                '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big'},     # average time for a pull (acc to dec)
+                '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big'},    # average time for a whole stroke measured in number of 25ms periods
+                '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big'},     # average time for a pull (acc to dec) measured in number of 25ms periods
                 # Speed
                 '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},         # total distance per second in cm
                 '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},        # instantaneous average distance in cm
                 # Values stored for zone maths
                 '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big'},               # instantaneous heart rate
-                '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little'},                # instantaneious 500m Pace (secs)
+                '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little', 'exclude_from_poll_loop': True},   # instantaneious 500m Pace (secs)
                 '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big'},              # instantaneous strokes per min
-                # Clock Display
-                '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big'},          # tenths of seconds 0-9
-                '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big'},              # seconds 0-59
-                '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big'},              # minutes 0-59
+                # Clock Display - Capture time components in reverse order for time elapsed accuracy  
                 '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big'},               # hours 0-9
+                '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big'},              # minutes 0-59
+                '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big'},              # seconds 0-59
+                '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big', 'exclude_from_poll_loop': True},          # tenths of seconds 0-9
                 # Workout total times/distances/limits
                 '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big'},       # total workout time
                 '1EA': {'type': 'workout_total_mps', 'size': 'double', 'base': 16, 'endian': 'big'},        # total workout m/s
@@ -81,15 +81,45 @@ Notes:
     no non-zero readings for one or two strokes at a time. To have availability at all times, average the watts over a number
     of non-zero readings for a number of different strokes. Averaging readings from 4 different strokes appears to match the
     S4 watts display closely. Or use the concept2 formula which derives power from 500m pace.
+(*) stroke_average and stroke_pull appear to be measured in number of 25ms periods. 
 (*) From the documenation in Water Rower S4 S5 USB Protocol Iss 1 04.pdf:
     "Stroke_pull is first subtracted from stroke_average then a modifier of 1.25 multiplied by the result to generate the ratio 
     value for display." It is unclear where this ratio is ever displayed, or what it intends to signify. The naming as a ratio
     does not match the computation that is described.
+(*) total_speed_cmps is highly volatile. On the test rower, it appeared to oscilate between a bigger reading and a smaller reading.
+    During light rowing, a single drive phase of the stroke might see values of 140 +/-35 (smaller reading) and 350 +/-35 (higher 
+    reading), while a single recovery phase might see values of 35 +/-35 (smaller reading) 210 +/-35 (higher reading).
+    The avg_distance_cmps is much smoother, and might be more useful for computing meaningful speed/pace etc. 
 (*) 500m Pace is computed by the S4 only when units of /500m are selected on screen. If other units are being displayed, the 
     value of 0 is stored in the 500m pace memory register and 0 is returned over the serial connection. To have availability
     at all times, compute the 500m pace from the avg_distance_cmps.
+(*) Because the time components are sent in separate packets, the delays between packets being recieved can result in errors
+    when recombining the time elements. Consider the two scenarios below. In practice, there's a 25ms gap between each response
+    even when the requests are made immediately one after the other. The tables illustrate the errors encountered when the
+    components are requested in order of significance and reverse order.
+                                    Recieved component
+    Time of request         Big to small        Small to big
+    1.59.59.925             hr:     01          dec:     9 (wr min resolution is 100ms)
+    1.59.59.950             min:    59          sec:    59 
+    1.59.59.975             sec:    59          min:    59
+    2.00.00.000             dec:     0          hr:     02
+    Apparent time:          01:59:59:0          02:59:59:9
+    Innaccuracy:           -00:00:01:0         +00:59:59:9
 
+    Time of request         Big to small        Small to big
+    1.59.59.850             hr:     01          dec:     8 (wr min resolution is 100ms)
+    2.00.00.100             min:    00          sec:    00 
+    2.00.00.350             sec:    00          min:    00
+    2.00.00.600             dec:     6          hr:     02
+    Apparent time:          01:00:00:6          02:00:00:8
+    Innaccuracy:           -01:00:00:0         +00:00:00:2
 
+    Therefore, large albeit short-lived errors can occur irrespective of which order you request the components.
+    Applications that cannot tolerate such errors will have to implement strategies to eliminate them, for example
+    by comparing the difference in compiled times since last computed and ignoring unlikely values, or comparing time 
+    components since last received and being confident only in values that match the last reported set.
+    As the most significant components (hr and min) are least volatile, it makes sense to request them first because
+    they are less likely to change over the short period of time when you are requesting and receiving the time components.
 '''
 
 # Packet identifiers as speicified in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
@@ -200,12 +230,12 @@ class EventParseError(Exception):
 @dataclass
 class S4Event:
     type: str
-    value: Optional[Any] = None
+    value: Optional[int] = None
     raw: Optional[str] = None
     at: int = int(round(time.time() * 1000))  # timestamp in ms
 
     @staticmethod
-    def build(type: str, value: Any = None, raw: str = None) -> 'S4Event':
+    def build(type: str, value: Optional[int] = None, raw: Optional[str] = None) -> 'S4Event':
         return S4Event(type=type, value=value, raw=raw, at=int(round(time.time() * 1000)))
 
     @classmethod
@@ -390,8 +420,8 @@ class Rower(object):
 
     def _start_threads(self):
         logger.debug("Create and start S4 data request and capture threads...")
-        self._request_thread = build_daemon(target=self.start_requesting)
-        self._capture_thread = build_daemon(target=self.start_capturing)
+        self._request_thread = build_daemon(target=self._start_requesting)
+        self._capture_thread = build_daemon(target=self._start_capturing)
         self._request_thread.start()
         self._capture_thread.start()
         logger.debug("S4 data request and capture threads started.")
@@ -451,7 +481,7 @@ class Rower(object):
             logger.error(f"Serial write communication error: {e}. Trying to reconnect.")
             self.open()
 
-    def start_capturing(self):
+    def _start_capturing(self):
         while not self._stop_event.is_set():
             if self._serial.isOpen():
                 try:
@@ -472,11 +502,11 @@ class Rower(object):
             else:
                 self._stop_event.wait(0.1)
 
-    def start_requesting(self):
+    def _start_requesting(self):
         while not self._stop_event.is_set():
             if self._serial.isOpen():
                 for address in MEMORY_MAP:
-                    if 'on_demand_only' not in MEMORY_MAP[address] or MEMORY_MAP[address]['on_demand_only'] != True:
+                    if 'exclude_from_poll_loop' not in MEMORY_MAP[address] or MEMORY_MAP[address]['exclude_from_poll_loop'] != True:
                         self.request_address(address)
                         self._stop_event.wait(0.025)
             else:
@@ -512,7 +542,7 @@ class Rower(object):
             address (str, optional): Memory address to query, required for memory reads.
         Returns:
             S4Event: Parsed response from the S4 monitor.
-            For events that do not expect a response, the S4Event dict will be empty other than type = 'None'.
+            For events that do not expect a response, the S4Event dict will be empty other than type = 'none'.
             The caller can therefore deduce that the expected response was not received if this function returns None
             and the caller can therefore take appropriate action.
         Raises:
@@ -527,7 +557,7 @@ class Rower(object):
             if expected_response_prefix:
                 return self.capture_on_demand_response(expected_response_prefix)
             else:
-                return S4Event.build('None')
+                return S4Event.build('none')
         except Exception:
             logger.error(f"Error during on-demand request with command: {request_type} and address: {address}")
             raise
