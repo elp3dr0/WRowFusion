@@ -47,6 +47,16 @@ MEMORY_MAP = {
                 '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big'},             # total strokes since reset
                 '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big'},    # average time for a whole stroke measured in number of 25ms periods
                 '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big'},     # average time for a pull (acc to dec) measured in number of 25ms periods
+                # Unknown
+                '144': {'type': '144 single', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '145': {'type': '145 single', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '146': {'type': '146 single', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '147': {'type': '147 single', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '144': {'type': '144 double', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '145': {'type': '145 double', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '146': {'type': '146 double', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '144': {'type': '144 triple', 'size': 'triple', 'base': 16, 'endian': 'big'},
+                '145': {'type': '145 triple', 'size': 'triple', 'base': 16, 'endian': 'big'},
                 # Speed
                 '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},         # total distance per second in cm
                 '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},        # instantaneous average distance in cm
