@@ -238,7 +238,7 @@ class DataLogger(object):
             # In the memory map, the time components are listed in order of increasing signficance: dec, sec, min, hr
             # and so are requested and also responded in that order. Therefore the elapsed time can be calculated
             # on receipt of the hr response.
-            if event.type == 'display_sec_dec':
+            if event.type == 'display_sec':
                 self._compute_elapsed_time()
             elif event.type == 'avg_time_stroke_pull':
                 self._compute_stroke_ratio()

@@ -57,12 +57,23 @@ MEMORY_MAP = {
                 '146': {'type': '146 double', 'size': 'double', 'base': 16, 'endian': 'big'},
                 '144': {'type': '144 triple', 'size': 'triple', 'base': 16, 'endian': 'big'},
                 '145': {'type': '145 triple', 'size': 'triple', 'base': 16, 'endian': 'big'},
+                '14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '1E4': {'type': '1E4 single', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '1E5': {'type': '1E5 single', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '1E6': {'type': '1E6 single', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '1E7': {'type': '1E7 single', 'size': 'single', 'base': 16, 'endian': 'big'},
+                '1E4': {'type': '1E4 double', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '1E5': {'type': '1E5 double', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '1E6': {'type': '1E6 double', 'size': 'double', 'base': 16, 'endian': 'big'},
+                '1E4': {'type': '1E4 triple', 'size': 'triple', 'base': 16, 'endian': 'big'},
+                '1E5': {'type': '1E5 triple', 'size': 'triple', 'base': 16, 'endian': 'big'},
+
                 # Speed
                 '148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},         # total distance per second in cm
                 '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},        # instantaneous average distance in cm
                 # Values stored for zone maths
                 '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big'},               # instantaneous heart rate
-                '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little', 'exclude_from_poll_loop': True},   # instantaneious 500m Pace (secs)
+                '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little', 'exclude_from_poll_loop': False},   # instantaneious 500m Pace (secs)
                 '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big'},              # instantaneous strokes per min
                 # Clock Display - Capture time components in reverse order for time elapsed accuracy  
                 '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big'},               # hours 0-9
