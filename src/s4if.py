@@ -39,37 +39,57 @@ It appears, however, that it is exactly the opposite.
 '''
 
 MEMORY_MAP = {
-                # Flags
-                '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'exclude_from_poll_loop': False},  # Describe the workout mode: extended zones and distance/duration modes.
-                # Fundanental data
-                '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big'},           # distance in metres since reset
-                '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big'},       # centimetres component of distance to nearest 5cm (i.e. 0-95).
-                '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big'},                    # instantaneous power
-                '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big'},               # calories since reset
-                '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'exclude_from_poll_loop': False}, # tank volume in litres
-                # Stroke counter
-                '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big'},             # total strokes since reset
-                '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big'},    # average time for a whole stroke measured in number of 25ms periods
-                '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big'},     # average time for a pull (acc to dec) measured in number of 25ms periods
-                # Speed
-                #'148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},         # total distance per second in cm
-                '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big'},        # instantaneous average distance in cm
-                #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big'},
-                # Values stored for zone maths
-                '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big'},               # instantaneous heart rate
-                '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little', 'exclude_from_poll_loop': False},   # instantaneious 500m Pace (secs)
-                '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big'},              # instantaneous strokes per min
-                # Clock Display - Capture time components in reverse order for time elapsed accuracy  
-                '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big'},               # hours 0-9
-                '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big'},              # minutes 0-59
-                '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big'},              # seconds 0-59
-                '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big', 'exclude_from_poll_loop': True},          # tenths of seconds 0-9
-                # Workout total times/distances/limits
-                '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big'},       # total workout time
-                '1EA': {'type': 'workout_total_mps', 'size': 'double', 'base': 16, 'endian': 'big'},        # total workout m/s
-                '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big'},    # total workout strokes
-                '1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'big'},            # limit value for workouts
-             }
+    # Flags
+    '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Describe the workout mode: extended zones and distance/duration modes.
+    # Fundanental data
+    '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},          # distance in metres since reset
+    '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
+    '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},                   # instantaneous power
+    '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big', 'frequency': 'high'},              # calories since reset
+    '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False}, # tank volume in decilitres
+    # Stroke counter
+    '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},            # total strokes since reset
+    '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},   # average time for a whole stroke measured in number of 25ms periods
+    '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},    # average time for a pull (acc to dec) measured in number of 25ms periods
+    # Speed
+    #'148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},        # total distance per second in cm
+    '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},       # instantaneous average distance in cm
+    #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},
+    # Values stored for zone maths
+    '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},              # instantaneous heart rate
+    '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'exclude_from_poll_loop': False},   # instantaneious 500m Pace (secs)
+    '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},              # instantaneous strokes per min
+    # Clock Display - Capture time components in reverse order for time elapsed accuracy  
+    '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},              # hours 0-9
+    '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},             # minutes 0-59
+    '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},             # seconds 0-59
+    '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': True},   # tenths of seconds 0-9
+    # Workout total times/distances/limits
+    '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},       # total workout time
+    '1EA': {'type': 'workout_total_mps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},        # total workout m/s
+    '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},    # total workout strokes
+    '1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low'},         # limit value for workouts
+    # Intervals
+    '1B0': {'type': 'workout_work1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1B2': {'type': 'workout_rest1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1B4': {'type': 'workout_work2', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1B6': {'type': 'workout_rest2', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1B8': {'type': 'workout_work3', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1BA': {'type': 'workout_rest3', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1BC': {'type': 'workout_work4', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1BE': {'type': 'workout_rest4', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1C0': {'type': 'workout_work5', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1C2': {'type': 'workout_rest5', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1C4': {'type': 'workout_work6', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1C6': {'type': 'workout_rest6', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1C8': {'type': 'workout_work7', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1CA': {'type': 'workout_rest7', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1CC': {'type': 'workout_work8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1CE': {'type': 'workout_rest8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1D0': {'type': 'workout_work9', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    # No workout interval
+    '1D9': {'type': 'workout_inter', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    }
 
 '''
 Notes:
@@ -129,6 +149,17 @@ Notes:
     components since last received and being confident only in values that match the last reported set.
     As the most significant components (hr and min) are least volatile, it makes sense to request them first because
     they are less likely to change over the short period of time when you are requesting and receiving the time components.
+(*) workout_limit acts as a tally of the workout phases of the intervals. For distance based intervals, the distance of 
+    each interval is subtracted from 64000. And then for distance intervals, the value 2 is added as the least significant digit.
+    E.g. for distance intervals:
+        Interval 1 = 1000m
+        Limit = 64000 - 1000 + 2 = 63002
+        Interval 2 = 2050m
+        Limit = 63002 - 2050 = 60952
+    The maximum distance allowed for the first interval is 62500m.
+    The total maximum distance allowed for all intervals is 64000m
+    When a non-interval distance is set, then the limit is 64002, regardless of the distance target so this field cannot
+    be used to compute target distance for non-interval workouts.
 '''
 
 # Packet identifiers as speicified in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
@@ -228,6 +259,8 @@ EXPECTED_RESPONSE_MAP = {
 # PROGRAM CONTROL DELAYS
 PORT_SCAN_RETRY_DELAY = 5   
 SERIAL_OPEN_RETRY_DELAY = 5
+HIGH_FREQ_INTERVAL = 0.025
+LOW_FREQ_INTERVAL = 2.0
 
 # FLAG BIT FIELDS
 class WorkoutMode(IntFlag):
@@ -453,6 +486,7 @@ def get_command_string(prefix_type: str, request_type: str, address: Optional[st
     
 
 class Rower(object):
+
     def __init__(self, options=None):
         self._callbacks = set()
         self._stop_event = threading.Event()
@@ -462,9 +496,11 @@ class Rower(object):
         #     self._demo = True
         # else:
         self._demo = False
-        self._serial = serial.Serial()
+        self._serial: serial.Serial = serial.Serial()   # Include type hint for IntelliSense
         self._serial.baudrate = 19200
-        self._request_thread = None
+        self._serial_lock = threading.Lock()
+        self._high_freq_request_thread = None
+        self._low_freq_request_thread = None        
         self._capture_thread = None
         self._response_event = threading.Event()  # For on-demand responses
         self._current_response = None
@@ -473,40 +509,57 @@ class Rower(object):
 
     def _start_threads(self):
         logger.debug("Create and start S4 data request and capture threads...")
-        self._request_thread = build_daemon(target=self._start_requesting)
+        self._high_freq_request_thread = build_daemon(target=self._start_requesting("high"))
+        self._low_freq_request_thread = build_daemon(target=self._start_requesting("low"))
         self._capture_thread = build_daemon(target=self._start_capturing)
-        self._request_thread.start()
+        self._high_freq_request_thread.start()
+        self._low_freq_request_thread.start()
         self._capture_thread.start()
         logger.debug("S4 data request and capture threads started.")
 
     def is_connected(self):
-        return self._serial.isOpen() and is_live_thread(self._request_thread) and \
+        with self._serial_lock:
+            serial_open = self._serial.isOpen()
+        return (
+            serial_open and
+            is_live_thread(self._request_thread) and
             is_live_thread(self._capture_thread)
+        )
 
     def _find_serial(self):
-        if not self._demo:
-            self._serial.port = find_port()
+        while True:
+            if not self._demo:
+                with self._serial_lock:
+                    self._serial.port = find_port()
 
-        try:
-            logger.debug("Attempting to open serial port...")
-            self._serial.open()
-            logger.info("Serial port open.")
-        except serial.SerialException as e:
-            logger.error(f"Error encountered opening serial port: {e}. Retrying in {SERIAL_OPEN_RETRY_DELAY} seconds")
-            time.sleep(SERIAL_OPEN_RETRY_DELAY)
-            self._serial.close()
-            self._find_serial()
-
+            try:
+                logger.debug("Attempting to open serial port...")
+                with self._serial_lock:
+                    self._serial.open()
+                logger.info("Serial port open.")
+                break # Successfully opened, exit loop
+            except serial.SerialException as e:
+                logger.error(f"Error encountered opening serial port: {e}. Retrying in {SERIAL_OPEN_RETRY_DELAY} seconds")
+                time.sleep(SERIAL_OPEN_RETRY_DELAY)
+                with self._serial_lock:
+                    try:
+                        self._serial.close()
+                    except Exception as e_close:
+                        logger.warning(f"Failed to close serial during retry: {e_close}")
+                
     def open(self):
         # Any caller asking for Rower.open() will not recieve control back until:
         # - the port is found, otherwise the code loops in find_port()
         # - and the serial is open without error, otherwise the code loops in _find_serial()
+        with self._serial_lock:
+            if self._serial and self._serial.isOpen():
+                logger.debug("Closing existing serial connection.")
+                try:
+                    self._serial.close()
+                except serial.SerialException as e:
+                    logger.warning(f"Exception closing serial: {e}")
 
-        if self._serial and self._serial.isOpen():
-            logger.debug("Closing existing serial connection.")
-            self._serial.close()
-
-        self._find_serial()
+            self._find_serial()
 
         if self._stop_event.is_set():
             logger.info("Reset S4 communication: clear stop event.")
@@ -521,15 +574,17 @@ class Rower(object):
         self.notify_callbacks(S4Event.build("exit"))
         if self._stop_event:
             self._stop_event.set()
-        if self._serial and self._serial.isOpen():
-            self.write(EXIT_REQUEST)
-            time.sleep(0.1)  # time for capture and request loops to stop running
-            self._serial.close()
+        with self._serial_lock:
+            if self._serial and self._serial.isOpen():
+                self.write(EXIT_REQUEST)
+                time.sleep(0.1)  # time for capture and request loops to stop running
+                self._serial.close()
 
     def write(self, raw: str):
         try:
-            self._serial.write(str.encode(raw.upper() + '\r\n'))
-            self._serial.flush()
+            with self._serial_lock:
+                self._serial.write(str.encode(raw.upper() + '\r\n'))
+                self._serial.flush()
         except Exception as e:
             logger.error(f"Serial write communication error: {e}. Trying to reconnect.")
             self.open()
@@ -538,14 +593,16 @@ class Rower(object):
         while not self._stop_event.is_set():
             if self._serial.isOpen():
                 try:
-                    line = self._serial.readline()
+                    with self._serial_lock:
+                        line = self._serial.readline()
                     event = S4Event.parse_line(line)
                     if event:
                         self.notify_callbacks(event)
                 except serial.SerialException as e:
                     logger.error(f"Serial read communication error: {e}. Trying to reset input buffer.")
                     try:
-                        self._serial.reset_input_buffer()
+                        with self._serial_lock:
+                            self._serial.reset_input_buffer()
                     except serial.SerialException as e2:
                         logger.error(f"Could not reset serial input buffer: {e2}")
                     raise  # Re-raise the original serial exception
@@ -555,13 +612,21 @@ class Rower(object):
             else:
                 self._stop_event.wait(0.1)
 
-    def _start_requesting(self):
+    def _start_requesting(self, freq: str ="high"):
         while not self._stop_event.is_set():
-            if self._serial.isOpen():
-                for address in MEMORY_MAP:
-                    if 'exclude_from_poll_loop' not in MEMORY_MAP[address] or MEMORY_MAP[address]['exclude_from_poll_loop'] != True:
-                        self.request_address(address)
-                        self._stop_event.wait(0.025)
+            with self._serial_lock:
+                is_open = self._serial.isOpen()
+
+            if is_open:
+                for address, meta in MEMORY_MAP.items():
+                    if meta.get("frequency", "high") != freq:
+                        continue    # This address doesn't match the frequency we're looking for, so skip to the next address in the loop
+                    if meta.get("exclude_from_poll_loop", False):
+                        continue    # The Memory Map specifies that this address should be excluded from the polling loop, so skip to the next address in the loop
+                    
+                    self.request_address(address)
+                    interval = HIGH_FREQ_INTERVAL if freq == "high" else LOW_FREQ_INTERVAL
+                    self._stop_event.wait(interval)
             else:
                 self._stop_event.wait(0.1)
 

@@ -26,6 +26,7 @@
 - [ ] Remove CueToBLEANT from s4.py if shared access to DataLogger is working
 - [ ] I want my application to be responsive to the workout mode that someone has selected on the S4. What frequency should I poll those at? Should the polling 
         be another loop in s4if, or should it be application side? Store the modes when the flags are read.
+- [ ] The workout flags are currently being converted to decimal on import, so adjust the decode_flags method to accept either int or hex string.
 - [ ] Respond to the workout mode in application side logic. E.g. store the workout limit field as a duration limit or distance limit.
 - [x] See what's in registers 144-147 and 1E4-1E7. Result - s4 returns an error response when a request to read those addresses is sent 
 - 
