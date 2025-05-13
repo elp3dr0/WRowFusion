@@ -498,9 +498,7 @@ class Rower(object):
         #     self._demo = True
         # else:
         self._demo = False
-        logger.debug("About to set the serial in the init")
         self._serial: serial.Serial = serial.Serial()   # Include type hint for IntelliSense
-        logger.debug("Got past the serial line")
         self._serial.baudrate = 19200
         self._serial_lock = threading.Lock()
         self._high_freq_request_thread = None
@@ -513,8 +511,8 @@ class Rower(object):
 
     def _start_threads(self):
         logger.debug("Create and start S4 data request and capture threads...")
-        self._high_freq_request_thread = build_daemon(target=self._start_requesting("high"))
-        self._low_freq_request_thread = build_daemon(target=self._start_requesting("low"))
+        self._high_freq_request_thread = build_daemon(target=lambda: self._start_requesting("high"))
+        self._low_freq_request_thread = build_daemon(target=lambda: self._start_requesting("low"))
         self._capture_thread = build_daemon(target=self._start_capturing)
         self._high_freq_request_thread.start()
         self._low_freq_request_thread.start()
