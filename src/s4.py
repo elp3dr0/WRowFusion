@@ -119,10 +119,27 @@ class DataLogger(object):
         self._DriveDuration = None      # Units: ms
         self.TankVolume = None
         self.WRWorkout = None
+        self._TempLowFreq = None
         self.WRValues_rst = None
         self.WRValues = None
         self.WRValues_standstill = None
         self.TXValues = None
+
+
+        self.data_logger = logging.getLogger('wrowfusion.data')
+        self.data_logger.setLevel(logging.INFO)
+
+        # Create file handler
+        data_handler = logging.FileHandler('/tmp/wrowfusion_data.log')
+        data_handler.setLevel(logging.INFO)
+
+        # Optional: simple format
+        formatter = logging.Formatter('%(asctime)s - %(message)s')
+        data_handler.setFormatter(formatter)
+
+        # Avoid adding multiple handlers if already configured
+        if not self.data_logger.handlers:
+            self.data_logger.addHandler(data_handler)
 
         if rower_interface is not None:
             self.initialise(rower_interface)
@@ -180,6 +197,7 @@ class DataLogger(object):
                 'total_strokes': 0,
                 'limit': 0,
                 }
+            self._TempLowFreq = {}
             self.WRValues_rst = {
                 'stroke_rate': 0,
                 'stroke_count': 0,
@@ -229,10 +247,33 @@ class DataLogger(object):
             'display_min': lambda evt: setattr(self, '_minutesWR', evt.value),
             'display_hr': lambda evt: setattr(self, '_hoursWR', evt.value),
             'display_sec_dec': lambda evt: setattr(self, '_secdecWR', evt.value),
-            'workout_total_time': lambda evt: self.WRWorkout.update({'total_time': evt.value}),
-            'workout_total_mps': lambda evt: self.WRWorkout.update({'total_mps': evt.value}),
-            'workout_total_strokes': lambda evt: self.WRWorkout.update({'total_strokes': evt.value}),
-            'workout_limit': lambda evt: self.WRWorkout.update({'limit': evt.value}),
+            #'workout_total_time': lambda evt: self.WRWorkout.update({'total_time': evt.value}),
+            #'workout_total_mps': lambda evt: self.WRWorkout.update({'total_mps': evt.value}),
+            #'workout_total_strokes': lambda evt: self.WRWorkout.update({'total_strokes': evt.value}),
+            #'workout_limit': lambda evt: self.WRWorkout.update({'limit': evt.value}),
+            'workout_total_time': lambda evt: self._print_data (evt),
+            'workout_total_mps': lambda evt: self._print_data (evt),
+            'workout_total_strokes': lambda evt: self._print_data (evt),
+            'workout_limit': lambda evt: self._print_data (evt),
+            'workout_total_time': lambda evt: self._print_data(evt),
+            'workout_work1': lambda evt: self._print_data(evt),
+            'workout_rest1': lambda evt: self._print_data(evt),
+            'workout_work2': lambda evt: self._print_data(evt),
+            'workout_rest2': lambda evt: self._print_data(evt),
+            'workout_work3': lambda evt: self._print_data(evt),
+            'workout_rest3': lambda evt: self._print_data(evt),
+            'workout_work4': lambda evt: self._print_data(evt),
+            'workout_rest4': lambda evt: self._print_data(evt),
+            'workout_work5': lambda evt: self._print_data(evt),
+            'workout_rest5': lambda evt: self._print_data(evt),
+            'workout_work6': lambda evt: self._print_data(evt),
+            'workout_rest6': lambda evt: self._print_data(evt),
+            'workout_work7': lambda evt: self._print_data(evt),
+            'workout_rest7': lambda evt: self._print_data(evt),
+            'workout_work8': lambda evt: self._print_data(evt),
+            'workout_rest8': lambda evt: self._print_data(evt),
+            'workout_work9': lambda evt: self._print_data(evt),
+            'workout_inter': lambda evt: self._print_data(evt),
         }
 
         with self._wr_lock:
@@ -354,6 +395,17 @@ class DataLogger(object):
                     if USE_CONCEPT2_POWER == False:
                         self.WRValues.update({'watts': rolling_avg_watts})
                     
+    def _print_data(self, evt: S4Event):
+        eventtype = evt.type
+        value = evt.value
+        oldvalue = self._TempLowFreq.get(eventtype)
+        if oldvalue is not None:
+            if oldvalue != value:
+                self.data_logger.info(f"{eventtype} updated to: {value!r} from {oldvalue!r}")
+                self._TempLowFreq[eventtype] = value
+        else:
+            self.data_logger.info(f"{eventtype} initialised at: {value!r}")
+            self._TempLowFreq[eventtype] = value
 
     def pulse_monitor(self,event: S4Event):
         # As a callback, this function is called by the notifier each time any event 
