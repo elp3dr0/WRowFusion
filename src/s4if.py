@@ -611,7 +611,7 @@ class Rower(object):
 
                     if not line:
                         time.sleep(0.005) # avoid tight loop, reduce CPU load
-                    elif:
+                    else:
                         event = S4Event.parse_line(line)
                         if event:
                             self.notify_callbacks(event)
