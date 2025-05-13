@@ -261,6 +261,9 @@ EXPECTED_RESPONSE_MAP = {
 PORT_SCAN_RETRY_DELAY = 5   
 SERIAL_OPEN_RETRY_DELAY = 5
 SERIAL_REQUEST_DELAY = 0.025    # The delay inserted between successive requests written to the serial device. Default is 0.025
+SERIAL_READ_TIMEOUT = 0.01      # The maximum time allowed for each serial read. This ensures that the read operation 
+                                # does not block for too long, allowing the lock to be released promptly (e.g. in the case 
+                                # of an empty buffer or no data available). Default is 0.01 as reads typically take ~0.0015 and almost always <0.005
 HIGH_FREQ_PAUSE = 0             # Delay inserted every 10 requests of high-frequency request loop.
                                 # Default is 0. Set a small value (e.g. 0.1) if incoming data appears sluggish or jerky 
                                 # which may indicate the read thread is being starved of serial access.
@@ -503,7 +506,7 @@ class Rower(object):
         self._demo = False
         self._serial: serial.Serial = serial.Serial()   # Include type hint for IntelliSense
         self._serial.baudrate = 19200
-        self._serial.timeout = 0.05
+        self._serial.timeout = SERIAL_READ_TIMEOUT
         self._serial_lock = threading.RLock()
         self._high_freq_request_thread = None
         self._low_freq_request_thread = None        
@@ -605,10 +608,14 @@ class Rower(object):
                         line = self._serial.readline()  # The self._serial.timeout ensures this read doesn't block indefinitely and prevents the lock from being held too long 
                     duration = time.perf_counter() - start
                     logger.debug(f"Readline took {duration:.4f} seconds")
+
+                    if not line:
+                        time.sleep(0.005) # avoid tight loop, reduce CPU load
+                    elif:
+                        event = S4Event.parse_line(line)
+                        if event:
+                            self.notify_callbacks(event)
                     
-                    event = S4Event.parse_line(line)
-                    if event:
-                        self.notify_callbacks(event)
                 except serial.SerialException as e:
                     logger.error(f"Serial read communication error: {e}. Trying to reset input buffer.")
                     try:
