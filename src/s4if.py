@@ -603,11 +603,8 @@ class Rower(object):
         while not self._stop_event.is_set():
             if self._serial.isOpen():
                 try:
-                    start = time.perf_counter()
                     with self._serial_lock:
                         line = self._serial.readline()  # The self._serial.timeout ensures this read doesn't block indefinitely and prevents the lock from being held too long 
-                    duration = time.perf_counter() - start
-                    logger.debug(f"Readline took {duration:.4f} seconds")
 
                     if not line:
                         time.sleep(0.005) # avoid tight loop, reduce CPU load
