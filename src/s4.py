@@ -126,20 +126,20 @@ class DataLogger(object):
         self.TXValues = None
 
 
-        self.data_logger = logging.getLogger('wrowfusion.data')
-        self.data_logger.setLevel(logging.INFO)
+#        self.data_logger = logging.getLogger('wrowfusion.data')
+#        self.data_logger.setLevel(logging.INFO)
 
         # Create file handler
-        data_handler = logging.FileHandler('/tmp/wrowfusion_data.log')
-        data_handler.setLevel(logging.INFO)
+#        data_handler = logging.FileHandler('/tmp/wrowfusion_data.log')
+#        data_handler.setLevel(logging.INFO)
 
         # Optional: simple format
-        formatter = logging.Formatter('%(asctime)s - %(message)s')
-        data_handler.setFormatter(formatter)
+#        formatter = logging.Formatter('%(asctime)s - %(message)s')
+#        data_handler.setFormatter(formatter)
 
         # Avoid adding multiple handlers if already configured
-        if not self.data_logger.handlers:
-            self.data_logger.addHandler(data_handler)
+#        if not self.data_logger.handlers:
+#            self.data_logger.addHandler(data_handler)
 
         if rower_interface is not None:
             self.initialise(rower_interface)
@@ -293,6 +293,7 @@ class DataLogger(object):
 
     def _handle_workout_flags(self, evt: S4Event):
 
+        self._print_data(evt)
         mode = WorkoutMode(evt.value)
 
         is_duration = WorkoutMode.WORKOUT_DURATION in mode or WorkoutMode.WORKOUT_DURATION_INTERVAL in mode
@@ -401,10 +402,10 @@ class DataLogger(object):
         oldvalue = self._TempLowFreq.get(eventtype)
         if oldvalue is not None:
             if oldvalue != value:
-                self.data_logger.info(f"{eventtype} updated to: {value!r} from {oldvalue!r}")
+                #self.data_logger.info(f"{eventtype} updated to: {value!r} from {oldvalue!r}")
                 self._TempLowFreq[eventtype] = value
         else:
-            self.data_logger.info(f"{eventtype} initialised at: {value!r}")
+            #self.data_logger.info(f"{eventtype} initialised at: {value!r}")
             self._TempLowFreq[eventtype] = value
 
     def pulse_monitor(self,event: S4Event):
