@@ -54,10 +54,10 @@ MEMORY_MAP = {
     # Speed
     #'148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},        # total distance per second in cm
     '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},       # instantaneous average distance in cm
-    #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},
+    #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},               # Probably the number of readings (or registers) over which the speed is averaged
     # Values stored for zone maths
     '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},              # instantaneous heart rate
-    '1A5': {'type': '500mps', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'exclude_from_poll_loop': False},   # instantaneious 500m Pace (secs)
+    '1A5': {'type': '500m_pace', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'exclude_from_poll_loop': False},   # instantaneious 500m Pace (secs)
     '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},              # instantaneous strokes per min
     # Clock Display - Capture time components in reverse order for time elapsed accuracy  
     '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},              # hours 0-9
@@ -117,8 +117,9 @@ Notes:
     During light rowing, a single drive phase of the stroke might see values of 140 +/-35 (smaller reading) and 350 +/-35 (higher 
     reading), while a single recovery phase might see values of 35 +/-35 (smaller reading) 210 +/-35 (higher reading).
     The avg_distance_cmps is much smoother, and might be more useful for computing meaningful speed/pace etc.
-    Note that m_s_stored value appears to fill to 32 and the top out, so maybe avg_distance_cmps aims to average over 32 readings
-    of the total_speed_cmps.  
+    Note that m_s_stored value appears to fill to 32 and then tops out, so maybe avg_distance_cmps aims to average over 32 readings
+    of the total_speed_cmps, or perhaps 16 readings (32 octets) which matches up with the wording in Water Rower Series 4 Rowing 
+    Algorithm pdf.
 (*) 500m Pace is computed by the S4 only when units of /500m are selected on screen. If other units are being displayed, the 
     value of 0 is stored in the 500m pace memory register and 0 is returned over the serial connection. To have availability
     at all times, compute the 500m pace from the avg_distance_cmps.

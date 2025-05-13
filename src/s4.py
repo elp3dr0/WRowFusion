@@ -15,6 +15,7 @@ from copy import deepcopy
 from src.s4if import (
     Rower,
     S4Event,
+    WorkoutMode, 
 )
 from src.heart_rate import HeartRateMonitor
 
@@ -76,7 +77,7 @@ IGNORE_LIST = [
     #'total_speed_cmps',
     #'avg_distance_cmps',
     #'heart_rate',
-    '500mps',           # Recommend ignore
+    '500m_pace',           # Recommend ignore
     #'stroke_rate', 
     #'display_hr', 
     #'display_min', 
@@ -102,6 +103,7 @@ class DataLogger(object):
         self._WattsEventValue = None
         self._RollingAvgWatts = None
         self._Concept2Watts = None
+        self._500mPace = None
         self._LastCheckForPulse = None
         self._PulseEventTime = None
         self._PaddleTurning = None
@@ -155,6 +157,7 @@ class DataLogger(object):
             self._WattsEventValue = 0
             self._RollingAvgWatts = 0
             self._Concept2Watts = 0
+            self._500mPace = 0
             self._LastCheckForPulse = 0
             self._PulseEventTime = 0
             self._PaddleTurning = False
@@ -170,6 +173,8 @@ class DataLogger(object):
             self._DriveDuration = 0
             self.TankVolume = 0
             self.WRWorkout = {
+                'type': None,
+                'intervals': False,
                 'total_time': 0,
                 'total_mps': 0,
                 'total_strokes': 0,
@@ -180,7 +185,7 @@ class DataLogger(object):
                 'stroke_count': 0,
                 'total_distance': 0,
                 'instant_pace': 0,
-                'speed': 0,
+                'speed_cmps': 0,
                 'watts': 0,
                 'total_kcal': 0,
                 'total_kcal_hour': 0,
@@ -207,17 +212,18 @@ class DataLogger(object):
         handlers = {
             'stroke_start': lambda evt: setattr(self, '_DrivePhase', True),
             'stroke_end': lambda evt: setattr(self, '_DrivePhase', False),
+            'workout_flags': lambda evt: self._handle_workout_flags(evt),
             'total_distance': lambda evt: self._handle_total_distance(evt),
             'total_distance_dec': lambda evt: self._handle_total_distance_dec(evt),
-            'watts': self._handle_watts,
+            'watts': lambda evt: self._handle_watts(evt),
             'total_kcal': lambda evt: self.WRValues.update({'total_kcal': (evt.value + 500) / 1000}),
             'tank_volume': lambda evt: setattr(self, 'TankVolume', evt.value),
             'stroke_count': lambda evt: self.WRValues.update({'stroke_count': evt.value}),
             'avg_time_stroke_whole': lambda evt: setattr(self, '_StrokeDuration', evt.value * 25),
             'avg_time_stroke_pull': lambda evt: setattr(self, '_DriveDuration', evt.value * 25),
-            'avg_distance_cmps': self._handle_avg_distance_cmps,
+            'avg_distance_cmps': lambda evt: self._handle_avg_distance_cmps(evt),
             'heart_rate': lambda evt: self.WRValues.update({'heart_rate': evt.value}),
-            '500mps': lambda evt: self._handle_500mps(evt),
+            '500m_pace': lambda evt: self._handle_500m_pace(evt),
             'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate': evt.value * 2}),
             'display_sec': lambda evt: setattr(self, '_secondsWR', evt.value),
             'display_min': lambda evt: setattr(self, '_minutesWR', evt.value),
@@ -227,7 +233,6 @@ class DataLogger(object):
             'workout_total_mps': lambda evt: self.WRWorkout.update({'total_mps': evt.value}),
             'workout_total_strokes': lambda evt: self.WRWorkout.update({'total_strokes': evt.value}),
             'workout_limit': lambda evt: self.WRWorkout.update({'limit': evt.value}),
-            'ms_stored': lambda evt: None,
         }
 
         with self._wr_lock:
@@ -245,33 +250,74 @@ class DataLogger(object):
             elif event.type == 'avg_time_stroke_pull':
                 self._compute_stroke_ratio()
 
+    def _handle_workout_flags(self, evt: S4Event):
+
+        mode = WorkoutMode(evt.value)
+
+        is_duration = WorkoutMode.WORKOUT_DURATION in mode or WorkoutMode.WORKOUT_DURATION_INTERVAL in mode
+        is_distance = WorkoutMode.WORKOUT_DISTANCE in mode or WorkoutMode.WORKOUT_DISTANCE_INTERVAL in mode
+        is_interval = WorkoutMode.WORKOUT_DURATION_INTERVAL in mode or WorkoutMode.WORKOUT_DISTANCE_INTERVAL in mode
+
+        with self._wr_lock:
+            if is_duration:
+                self.WRWorkout['type'] = "duration"
+            elif is_distance:
+                self.WRWorkout['type'] = "distance"
+
+            self.WRWorkout['intervals'] = is_interval
+                
     def _handle_total_distance(self, evt: S4Event):
-        self.WRValues.update({'total_distance': evt.value})
-        self._TotalDistanceM = evt.value
+        with self._wr_lock:
+            self.WRValues.update({'total_distance': evt.value})
+            self._TotalDistanceM = evt.value
 
     def _handle_total_distance_dec(self, evt: S4Event):
-        self._TotalDistanceDec = evt.value
-        self._TotalDistanceCM = max(self._TotalDistanceCM, self._TotalDistanceM * 100 + evt.value)
+        with self._wr_lock:
+            self._TotalDistanceDec = evt.value
+            self._TotalDistanceCM = max(self._TotalDistanceCM, self._TotalDistanceM * 100 + evt.value)
 
     def _handle_avg_distance_cmps(self, evt: S4Event):
-        if evt.value == 0:
-            self.WRValues.update({'instant_pace': 0, 'speed': 0})
-        else:
-            pace = (500 * 100) / evt.value
-            logger.debug(f"Pace computed from speed: {pace}")
-            self.WRValues.update({'instant_pace': pace, 'speed': evt.value})
+        speed = evt.value   # cm per sec
+        
+        with self._wr_lock:
+            if speed == 0:
+                updates = {'instant_pace': 0, 'speed_cmps': 0}
+                if USE_CONCEPT2_POWER:
+                    updates['watts'] = 0
+                self.WRValues.update(updates)
+                return
+            
+            self.WRValues['speed_cmps'] = speed
+
+            # Prefer using the 500mPace from the S4 if it is being captured and not ignored.
+            # Otherwise compute the 500m pace from the speed.
+            if not self._500mPace:
+                pace = 50000 / speed
+                logger.debug(f"500m pace computed from speed: {pace}")
+                self.WRValues['instant_pace'] = pace
+
+            C2watts = 2.80 / pow(speed / 100.0, 3)
+            self._Concept2Watts = C2watts
+            logger.debug(f"Power calculated from speed using Concept2 formula: {C2watts}")
+
+            if USE_CONCEPT2_POWER:
+                self.WRValues['watts'] = C2watts
 
     def _handle_watts(self, evt: S4Event):
-        self._WattsEventValue = evt.value
-        self._update_rolling_avg_watts(self._WattsEventValue)
+        with self._wr_lock:
+            self._WattsEventValue = evt.value
+            self._update_rolling_avg_watts(self._WattsEventValue)
 
-    def _handle_500mps(self, evt: S4Event):
-        logger.debug(f"500mps pace: {evt.value}")
-        if evt.value:
-            concept2power = 2.80 / pow(evt.value / 500.0, 3)
-        else:
-            concept2power = 0
-        logger.debug(f"concept2 power: {concept2power}")
+    def _handle_500m_pace(self, evt: S4Event):
+        # The WR will report 500m pace only when it is the selected intensity display value
+        # on the S4. If the S4 is being reporting a non-zero value, then this function will
+        # prefer the value reported by the S4 over the value derived from the cm/s speed.
+        # To always use the value derived from speed, add 500m_pace to the IGNORE_LIST. 
+        with self._wr_lock:
+            self._500mPace = evt.value
+            if evt.value:
+                self.WRValues.update({'instant_pace': evt.value}),
+
 
     def _compute_elapsed_time(self):
         with self._wr_lock:
@@ -354,7 +400,7 @@ class DataLogger(object):
             self.WRValues_standstill.update({
                 'stroke_rate': 0,
                 'instant_pace': 0,
-                'speed': 0,
+                'speed_cmps': 0,
                 'watts': 0,
             })
 

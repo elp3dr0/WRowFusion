@@ -28,8 +28,12 @@
         be another loop in s4if, or should it be application side? Store the modes when the flags are read.
 - [ ] The workout flags are currently being converted to decimal on import, so adjust the decode_flags method to accept either int or hex string.
 - [ ] Respond to the workout mode in application side logic. E.g. store the workout limit field as a duration limit or distance limit.
-- [x] See what's in registers 144-147 and 1E4-1E7. Result - s4 returns an error response when a request to read those addresses is sent 
-- 
+- [x] See what's in registers 144-147 and 1E4-1E7. Result - s4 returns an error response when a request to read those addresses is sent
+- [ ] Decide whether to inc sec_dec. In anycase decide whether to round or not and adjust the code as necessary.
+- [ ] Handle all the rest of the workout data
+- [ ] Figure out how to indicate just row or workout, and how to determine just row conditions - is it flags =0 or flags <16?
+- [ ] Temp code that prints to console the low freq data whenever its value changes.
+
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)
 - [ ] Add support for ANT+ HR broadcast
