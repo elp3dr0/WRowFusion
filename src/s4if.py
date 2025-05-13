@@ -500,6 +500,7 @@ class Rower(object):
         self._demo = False
         self._serial: serial.Serial = serial.Serial()   # Include type hint for IntelliSense
         self._serial.baudrate = 19200
+        self._serial.timeout = 0.05
         self._serial_lock = threading.RLock()
         self._high_freq_request_thread = None
         self._low_freq_request_thread = None        
@@ -616,6 +617,7 @@ class Rower(object):
                 self._stop_event.wait(0.1)
 
     def _start_requesting(self, freq: str ="high"):
+        counter = 0
         while not self._stop_event.is_set():
             with self._serial_lock:
                 is_open = self._serial.isOpen()
@@ -628,8 +630,16 @@ class Rower(object):
                         continue    # The Memory Map specifies that this address should be excluded from the polling loop, so skip to the next address in the loop
                     
                     self.request_address(address)
-                    interval = HIGH_FREQ_INTERVAL if freq == "high" else LOW_FREQ_INTERVAL
-                    self._stop_event.wait(interval)
+                    self._stop_event.wait(0.025)
+                
+                counter += 1
+
+                if freq == "low":
+                    self._stop_event.wait(LOW_FREQ_INTERVAL)
+                elif freq == "high":
+                    if counter % 10 == 0:
+                        #self._stop_event.wait(0.1)  # Short pause to give other threads time
+                        counter = 0
             else:
                 self._stop_event.wait(0.1)
 
