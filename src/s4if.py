@@ -489,6 +489,7 @@ def get_command_string(prefix_type: str, request_type: str, address: Optional[st
 class Rower(object):
 
     def __init__(self, options=None):
+        logger.debug("Entering Rower class Init")
         self._callbacks = set()
         self._stop_event = threading.Event()
         # if options and options.demo:
@@ -497,7 +498,9 @@ class Rower(object):
         #     self._demo = True
         # else:
         self._demo = False
+        logger.debug("About to set the serial in the init")
         self._serial: serial.Serial = serial.Serial()   # Include type hint for IntelliSense
+        logger.debug("Got past the serial line")
         self._serial.baudrate = 19200
         self._serial_lock = threading.Lock()
         self._high_freq_request_thread = None
