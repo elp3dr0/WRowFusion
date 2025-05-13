@@ -47,6 +47,7 @@
 - [ ] Investigate error: "src.ble_client: HeartRateBLEScanner Monitor loop error: [org.bluez.Error.InProgress] Operation already in progress. Retrying in 60 seconds." Likely to do with existing discovery process? Encountered after installation over previous installation. Or possibly whenever the service is restarted without a reboot. Currently a reboot clears it.
 - [ ] Add Body Sensor Location Characteristic to Heart Rate service in ble_standard_service and BLE Server (see Bluetooth HRP V10 pdf)
 - [ ] Add Heart Rate Control Point Characteristic to Heart Rate Service in ble_standard_service and application logic to handle reset events and computation of total session kcals, broadcasting that value to Heart rate clients. (see Bluetooth HRP V10 pdf and HRS Spec V10 pdf)
+- [ ] IIRC, the BLE server custom exceptions are defined in ble_if and are repeated in ble_server. Instead they should just be imported (can they be made subclasses of a parent class which is then imported in one class?)
 
 ## 🖧 Comms with S4
 - [ ] Consider handling situation when S4 gets disconnected from serial port. Currently
