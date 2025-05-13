@@ -260,8 +260,11 @@ EXPECTED_RESPONSE_MAP = {
 # PROGRAM CONTROL DELAYS
 PORT_SCAN_RETRY_DELAY = 5   
 SERIAL_OPEN_RETRY_DELAY = 5
-HIGH_FREQ_INTERVAL = 0.025
-LOW_FREQ_INTERVAL = 2.0
+SERIAL_REQUEST_DELAY = 0.025    # The delay inserted between successive requests written to the serial device. Default is 0.025
+HIGH_FREQ_PAUSE = 0             # Delay inserted every 10 requests of high-frequency request loop.
+                                # Default is 0. Set a small value (e.g. 0.1) if incoming data appears sluggish or jerky 
+                                # which may indicate the read thread is being starved of serial access.
+LOW_FREQ_PAUSE = 2.0            # Delay between successive polls of the low-frequency data set (e.g. workout parameters).
 
 # FLAG BIT FIELDS
 class WorkoutMode(IntFlag):
@@ -597,8 +600,12 @@ class Rower(object):
         while not self._stop_event.is_set():
             if self._serial.isOpen():
                 try:
+                    start = time.perf_counter()
                     with self._serial_lock:
-                        line = self._serial.readline()
+                        line = self._serial.readline()  # The self._serial.timeout ensures this read doesn't block indefinitely and prevents the lock from being held too long 
+                    duration = time.perf_counter() - start
+                    logger.debug(f"Readline took {duration:.4f} seconds")
+                    
                     event = S4Event.parse_line(line)
                     if event:
                         self.notify_callbacks(event)
@@ -630,15 +637,14 @@ class Rower(object):
                         continue    # The Memory Map specifies that this address should be excluded from the polling loop, so skip to the next address in the loop
                     
                     self.request_address(address)
-                    self._stop_event.wait(0.025)
-                
-                counter += 1
+                    self._stop_event.wait(SERIAL_REQUEST_DELAY)
 
                 if freq == "low":
-                    self._stop_event.wait(LOW_FREQ_INTERVAL)
-                elif freq == "high":
+                    self._stop_event.wait(LOW_FREQ_PAUSE)
+                elif freq == "high" and HIGH_FREQ_PAUSE:
+                    counter += 1
                     if counter % 10 == 0:
-                        #self._stop_event.wait(0.1)  # Short pause to give other threads time
+                        self._stop_event.wait(HIGH_FREQ_PAUSE)  # Short pause to give other threads time
                         counter = 0
             else:
                 self._stop_event.wait(0.1)
