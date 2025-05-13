@@ -500,7 +500,7 @@ class Rower(object):
         self._demo = False
         self._serial: serial.Serial = serial.Serial()   # Include type hint for IntelliSense
         self._serial.baudrate = 19200
-        self._serial_lock = threading.Lock()
+        self._serial_lock = threading.RLock()
         self._high_freq_request_thread = None
         self._low_freq_request_thread = None        
         self._capture_thread = None
@@ -553,6 +553,7 @@ class Rower(object):
         # Any caller asking for Rower.open() will not recieve control back until:
         # - the port is found, otherwise the code loops in find_port()
         # - and the serial is open without error, otherwise the code loops in _find_serial()
+        
         with self._serial_lock:
             if self._serial and self._serial.isOpen():
                 logger.debug("Closing existing serial connection.")
