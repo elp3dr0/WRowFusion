@@ -41,7 +41,7 @@ qualname=src.ble_standard_services
 propagate=0
 
 [logger_src.bleif]
-level=INFO
+level=DEBUG
 handlers=consoleHandler, rotatingFileHandler
 qualname=src.bleif
 propagate=0
