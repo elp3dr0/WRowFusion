@@ -32,7 +32,8 @@
 - [ ] Decide whether to inc sec_dec. In anycase decide whether to round or not and adjust the code as necessary.
 - [ ] Handle all the rest of the workout data
 - [ ] Figure out how to indicate just row or workout, and how to determine just row conditions - is it flags =0 or flags <16?
-- [ ] Temp code that prints to console the low freq data whenever its value changes.
+- [ ] Check the total workout mps is in cm and reflect in docstring
+- [ ] Check when the workout stuff is updated and update the documentation
 
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)

@@ -231,6 +231,8 @@ class DataLogger(object):
             'stroke_start': lambda evt: setattr(self, '_DrivePhase', True),
             'stroke_end': lambda evt: setattr(self, '_DrivePhase', False),
             'workout_flags': lambda evt: self._handle_workout_flags(evt),
+            'distance1_flags': lambda evt: self._print_data(evt),
+            'distance2_flags': lambda evt: self._print_data(evt),
             'total_distance': lambda evt: self._handle_total_distance(evt),
             'total_distance_dec': lambda evt: self._handle_total_distance_dec(evt),
             'watts': lambda evt: self._handle_watts(evt),

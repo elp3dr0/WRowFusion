@@ -40,7 +40,9 @@ It appears, however, that it is exactly the opposite.
 
 MEMORY_MAP = {
     # Flags
-    '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Describe the workout mode: extended zones and distance/duration modes.
+    '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Describes the workout mode: extended zones and distance/duration modes.
+    '042': {'type': 'distance1_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Specifies the selected unit of distance (m, miles, km, stroke, cal, etc).
+    '043': {'type': 'distance2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Specifies the selected unit of distance
     # Fundanental data
     '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},          # distance in metres since reset
     '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
@@ -88,11 +90,16 @@ MEMORY_MAP = {
     '1CE': {'type': 'workout_rest8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
     '1D0': {'type': 'workout_work9', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
     # No workout interval
-    '1D9': {'type': 'workout_inter', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low'},
+    '1D9': {'type': 'workout_inter', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low'},    # the total number of work and rest periods plus 1
     }
 
 '''
 Notes:
+(*) workout_flags specify the type of workout (e.g. duration, distance, intervals) and what (if any) zones (heartrate, strokes, etc) 
+    are active. The workout flags are updated only once a whole workout has been programmed and the user clicks 'OK' to 
+    get the program into its initialised state (i.e. flashing and ready to start rowing).
+(*) For distance workouts, the distance_flags must be consulted in order to know the units (metres or strokes) that the
+    value in the workout_work fields represents. For duration workouts, the units of the workout_work fields are always seconds.
 (*) total_distance_dec holds the centimetres part of the distance to the nearest 5cm, not "0.1m count (only counts up from 0-9)"
     as documented in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
 (*) Any effort to combine the cm value with the metres value will be complicated by the serial delivery. As the values are recieved 
@@ -150,17 +157,34 @@ Notes:
     components since last received and being confident only in values that match the last reported set.
     As the most significant components (hr and min) are least volatile, it makes sense to request them first because
     they are less likely to change over the short period of time when you are requesting and receiving the time components.
+(*) workout_total_time, _mps and _strokes are updated at the end of every work interval. Time and strokes are tallys of
+    all the work intervals, mps is the average across the work intervals
 (*) workout_limit acts as a tally of the workout phases of the intervals. For distance based intervals, the distance of 
-    each interval is subtracted from 64000. And then for distance intervals, the value 2 is added as the least significant digit.
+    each interval is subtracted from 64002.
     E.g. for distance intervals:
         Interval 1 = 1000m
-        Limit = 64000 - 1000 + 2 = 63002
+        Limit = 64002 - 1000= 63002
         Interval 2 = 2050m
         Limit = 63002 - 2050 = 60952
     The maximum distance allowed for the first interval is 62500m.
     The total maximum distance allowed for all intervals is 64000m
     When a non-interval distance is set, then the limit is 64002, regardless of the distance target so this field cannot
     be used to compute target distance for non-interval workouts.
+    For duration workouts, the time of each interval is subtracted from 18000 (though for non-interval duration workout, workout_limit = 18001)
+    For stroke workouts, the number of strokes is subtracted from 5001.
+(*) workout_workX units are either metres, strokes or seconds depending on the workout. Consult the distance flag address
+    to determine the unit of distance for distance workouts. Note that for duration workouts, it is sufficient to check
+    only the workout flags to see if a duration workout or duration intervals workout is active, in which case the units
+    of workout_workX will be in seconds. 
+(*) workout_inter is defined as "No work workout intervals". It appears to be one more than the number of components of
+    a workout. E.g:
+        workoutinter = 2:   non-interval workout
+        workoutinter = 3:   work, rest
+        workoutinter = 4:   work, rest, work
+        workoutinter = 5:   work, rest, work, rest
+    It is updated as each component is set, e.g. when the user presses OK after setting the distance of a work interval
+    or duration of a rest.
+ 
 '''
 
 # Packet identifiers as speicified in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
@@ -311,6 +335,49 @@ class WorkoutMode(IntFlag):
             ['WORKOUT_DURATION', 'ZONE_HEARTRATE']
         """
         return [mode.name for mode in WorkoutMode if mode in self]
+
+class DistanceMode(IntFlag):
+    PROJECTED_HEADER            = 1 << 0  # fdist_fg_proj
+    DISTANCE_HEADER             = 1 << 1  # fdist_fg_dist
+    UNITS_METRES                = 1 << 2  # fdist_fg_meters
+    UNITS_MILES                 = 1 << 3  # fdist_fg_miles
+    UNITS_KM                    = 1 << 4  # fdist_fg_km
+    UNITS_STROKES               = 1 << 5  # fdist_fg_stks
+    UNITS_CALORIES              = 1 << 6  # 
+    DIG_OFF                     = 1 << 7  # fdist_fg_dig_off
+
+    @classmethod
+    def decode_hex(cls, hex_str: str) -> "DistanceMode":
+        """
+        Create a DistanceMode instance from a hexadecimal string.
+        Args:
+            hex_str (str): A two-digit hex string (e.g., 'A0', '00', '1F') representing
+                           the 8-bit bitfield read from the S4 memory register.
+        Returns:
+            DistanceMode: A combined flag instance representing what is displayed in the distance section of the S4 montor.
+            The units that are displayed also affect the maths (e.g. if strokes is displayed, workout distance is in number of strokes).
+        Usage:
+            This method is typically used to convert the raw hex value returned by the S4 monitor
+            into a readable and operable set of flags represented by a DistanceMode object. E.g.
+            >>> mode = DistanceMode.decode_hex("22")
+            >>> print(mode)
+            DistanceMode.UNITS_STROKES
+            >>> if DistanceMode.UNITS_STROKES in mode print("Distance units: Strokes.")
+        """
+        return cls(int(hex_str, 16))
+
+    def describe(self) -> list[str]:
+        """
+        Get a list of human-readable flag names currently set in this DistanceMode.
+        Returns:
+            List[str]: A list of active workout mode names (e.g., ['UNITS_STROKES']).
+        Usage:
+            This method is useful for displaying or logging the current unit of distance.
+            >>> mode = DistanceMode.decode_hex("22")
+            >>> mode.describe()
+            ['UNITS_STROKES']
+        """
+        return [mode.name for mode in DistanceMode if mode in self]
     
 # CUSTOM EXCEPTIONS
 class SerialNotConnectedError(Exception):
