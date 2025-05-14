@@ -336,13 +336,13 @@ class DataLogger(object):
             # Prefer using the 500mPace from the S4 if it is being captured and not ignored.
             # Otherwise compute the 500m pace from the speed.
             if not self._500mPace:
-                pace = 50000 / speed
-                logger.debug(f"500m pace computed from speed: {pace}")
-                self.WRValues['instant_500m_pace'] = pace
+                pace_500m = 50000 / speed
+                #logger.debug(f"500m pace computed from speed: {pace_500m}")
+                self.WRValues['instant_500m_pace'] = pace_500m
 
-            C2watts = 2.80 / pow(1/(speed*100), 3)
+            C2watts = 2.80 / pow((100/speed), 3)
             self._Concept2Watts = C2watts
-            logger.debug(f"Power calculated from speed using Concept2 formula: {C2watts}")
+            logger.debug(f"Power calculated from speed using Concept2 formula: {C2watts:.2f}")
 
             if USE_CONCEPT2_POWER:
                 self.WRValues['watts'] = C2watts
@@ -374,18 +374,18 @@ class DataLogger(object):
         with self._wr_lock:
             if self._StrokeDuration and self._DriveDuration:
                 strokeratio = (self._StrokeDuration - self._DriveDuration) / (self._DriveDuration * 1.25)
-                logger.debug(f"Stroke ratio calculated as: {strokeratio}")
+                #logger.debug(f"Stroke ratio calculated as: {strokeratio}")
                 self.WRValues.update({'stroke_ratio': (self._StrokeDuration - self._DriveDuration) / self._DriveDuration})
 
     def _update_rolling_avg_watts(self,watts):
-        logger.debug(f"update_live_avg_power - Watts event reports Watts: {watts}")
+        #logger.debug(f"update_live_avg_power - Watts event reports Watts: {watts}")
         with self._wr_lock:
             if self._DrivePhase:
                 self._StrokeMaxPower = max(self._StrokeMaxPower, watts)
             else:
                 if self._StrokeMaxPower:
                     self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
-                    logger.debug(f"update_live_avg_power - Stroke Max Power captured as: {self._StrokeMaxPower}. Stroke count: {self.WRValues['stroke_count']}")
+                    #logger.debug(f"update_live_avg_power - Stroke Max Power captured as: {self._StrokeMaxPower}. Stroke count: {self.WRValues['stroke_count']}")
                     self._StrokeMaxPower = 0
                 while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_ROLLING_AVG_WATTS:
                     self._RecentStrokesMaxPower.pop(0)
@@ -394,7 +394,7 @@ class DataLogger(object):
                 if self._RecentStrokesMaxPower:
                     rolling_avg_watts = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
                     self._RollingAvgWatts = rolling_avg_watts
-                    logger.debug(f"update_live_avg_power - Live Average Power computed as: {rolling_avg_watts}")
+                    #logger.debug(f"update_live_avg_power - Live Average Power computed as: {rolling_avg_watts}")
                     if USE_CONCEPT2_POWER == False:
                         self.WRValues.update({'watts': rolling_avg_watts})
                     
