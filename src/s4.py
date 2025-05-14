@@ -69,7 +69,7 @@ IGNORE_LIST = [
     #'total_distance_dec',
     #'total_distance',
     #'watts',
-    #'total_kcal',
+    #'total_calories',
     #'tank_volume',      # Recommend ignore
     #'stroke_count',
     #'avg_time_stroke_whole',
@@ -112,6 +112,7 @@ class DataLogger(object):
         self._minutesWR = None
         self._hoursWR = None
         self._secdecWR = None
+        self._ElapsedTime = None
         self._TotalDistanceM = None     # The total distance in m, ignoring the value in the dec register
         self._TotalDistanceDec = None   # The cm component of the total distance (i.e. the component that would follow a decimal point)
         self._TotalDistanceCM = None    # The total distance in cm (i.e. _TotalDistanceM * 100 + _TotalDistanceDec)
@@ -183,6 +184,7 @@ class DataLogger(object):
             self._minutesWR = 0
             self._hoursWR = 0
             self._secdecWR = 0
+            self._ElapsedTime = 0
             self._TotalDistanceM = 0
             self._TotalDistanceDec = 0
             self._TotalDistanceCM = 0
@@ -199,15 +201,13 @@ class DataLogger(object):
                 }
             self._TempLowFreq = {}
             self.WRValues_rst = {
-                'stroke_rate': 0,
+                'stroke_rate_pm': 0,
                 'stroke_count': 0,
                 'total_distance': 0,
                 'instant_500m_pace': 0,
                 'speed_cmps': 0,
-                'watts': 0,
-                'total_kcal': 0,
-                'total_kcal_hour': 0,
-                'total_kcal_min': 0,
+                'instant_watts': 0,
+                'total_calories': 0,
                 'heart_rate': 0,
                 'elapsed_time': 0.0,
                 'stroke_ratio': 0.0,
@@ -236,7 +236,7 @@ class DataLogger(object):
             'total_distance': lambda evt: self._handle_total_distance(evt),
             'total_distance_dec': lambda evt: self._handle_total_distance_dec(evt),
             'watts': lambda evt: self._handle_watts(evt),
-            'total_kcal': lambda evt: self.WRValues.update({'total_kcal': (evt.value + 500) / 1000}),
+            'total_calories': lambda evt: self.WRValues.update({'total_calories': evt.value}),
             'tank_volume': lambda evt: setattr(self, 'TankVolume', evt.value),
             'stroke_count': lambda evt: self.WRValues.update({'stroke_count': evt.value}),
             'avg_time_stroke_whole': lambda evt: setattr(self, '_StrokeDuration', evt.value * 25),
@@ -244,7 +244,7 @@ class DataLogger(object):
             'avg_distance_cmps': lambda evt: self._handle_avg_distance_cmps(evt),
             'heart_rate': lambda evt: self.WRValues.update({'heart_rate': evt.value}),
             '500m_pace': lambda evt: self._handle_500m_pace(evt),
-            'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate': evt.value * 2}),
+            'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate_pm': evt.value * 2}),
             'display_sec': lambda evt: setattr(self, '_secondsWR', evt.value),
             'display_min': lambda evt: setattr(self, '_minutesWR', evt.value),
             'display_hr': lambda evt: setattr(self, '_hoursWR', evt.value),
@@ -327,7 +327,7 @@ class DataLogger(object):
             if speed == 0:
                 updates = {'instant_500m_pace': 0, 'speed_cmps': 0}
                 if USE_CONCEPT2_POWER:
-                    updates['watts'] = 0
+                    updates['instant_watts'] = 0
                 self.WRValues.update(updates)
                 return
             
@@ -337,13 +337,13 @@ class DataLogger(object):
             # Otherwise compute the 500m pace from the speed.
             if not self._500mPace:
                 pace_500m = 50000 / speed
-                self.WRValues['instant_500m_pace'] = pace_500m
+                self.WRValues['instant_500m_pace'] = round(pace_500m)
 
-            C2watts = 2.80 / pow((100/speed), 3)
+            C2watts = round(2.80 / pow((100/speed), 3))
             self._Concept2Watts = C2watts
             
             if USE_CONCEPT2_POWER:
-                self.WRValues['watts'] = C2watts
+                self.WRValues['instant_watts'] = C2watts
 
     def _handle_watts(self, evt: S4Event):
         with self._wr_lock:
@@ -366,13 +366,14 @@ class DataLogger(object):
             #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
             #self.elapsetime = int(self.elapsetime.total_seconds())
             elapsed_time = int(self._hoursWR * 3600 + self._minutesWR * 60 + self._secondsWR + (1 if self._secdecWR >= 5 else 0))
+            self._ElapsedTime = elapsed_time
             self.WRValues['elapsed_time'] = elapsed_time
 
     def _compute_stroke_ratio(self):
         with self._wr_lock:
             if self._StrokeDuration and self._DriveDuration:
                 # Use the documented WR formula, which has a 1.25 multiplier
-                strokeratio = (self._StrokeDuration - self._DriveDuration) / (self._DriveDuration * 1.25)
+                strokeratio = round((self._StrokeDuration - self._DriveDuration) / (self._DriveDuration * 1.25) , 2)
                 self.WRValues['stroke_ratio'] = strokeratio
 
     def _update_rolling_avg_watts(self,watts):
@@ -387,10 +388,10 @@ class DataLogger(object):
                     self._RecentStrokesMaxPower.pop(0)
                 # Start reporting power from the first received value, rather than waiting for the buffer to fill
                 if self._RecentStrokesMaxPower:
-                    rolling_avg_watts = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
+                    rolling_avg_watts = round(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
                     self._RollingAvgWatts = rolling_avg_watts
                     if USE_CONCEPT2_POWER == False:
-                        self.WRValues['watts'] = rolling_avg_watts
+                        self.WRValues['instant_watts'] = rolling_avg_watts
                     
     def _print_data(self, evt: S4Event):
         eventtype = evt.type
@@ -447,12 +448,11 @@ class DataLogger(object):
         with self._wr_lock:
             self.WRValues_standstill = deepcopy(self.WRValues)
             self.WRValues_standstill.update({
-                'stroke_rate': 0,
+                'stroke_rate_pm': 0,
                 'instant_500m_pace': 0,
                 'speed_cmps': 0,
-                'watts': 0,
+                'instant_watts': 0,
             })
-
 
 
     def get_WRValues(self):

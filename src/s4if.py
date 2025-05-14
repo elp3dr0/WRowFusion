@@ -47,7 +47,7 @@ MEMORY_MAP = {
     '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},          # distance in metres since reset
     '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
     '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},                   # instantaneous power
-    '08A': {'type': 'total_kcal', 'size': 'triple', 'base': 16, 'endian': 'big', 'frequency': 'high'},              # calories since reset
+    '08A': {'type': 'total_calories', 'size': 'triple', 'base': 16, 'endian': 'big', 'frequency': 'high'},          # calories since reset
     '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False}, # tank volume in decilitres
     # Stroke counter
     '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},            # total strokes since reset
@@ -504,7 +504,7 @@ def read_reply(cmd: str) -> Optional[S4Event]:
 
     size = memory['size']
     endian = memory.get('endian', 'big')  # Default to big if unspecified
-    
+
     # Get the appropriate function to extract the value from the command string depending on whether it's single, double, triple.
     # Default to None if size isn't found in PARSE_MAP
     value_fn = SIZE_PARSE_MAP.get(size, lambda cmd: None) 

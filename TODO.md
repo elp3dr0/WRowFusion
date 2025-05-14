@@ -32,7 +32,6 @@
 - [ ] Decide whether to inc sec_dec. In anycase decide whether to round or not and adjust the code as necessary.
 - [ ] Handle all the rest of the workout data
 - [ ] Figure out how to indicate just row or workout, and how to determine just row conditions - is it flags =0 or flags <16?
-- [ ] Check whether workout_inter is base 16 or actually base 10
 - [ ] In s4if Make get on demand command stuff thread safe. Decide how destructive it will be for existing requests in the buffer, and how
         impolite it will be with hogging the serial while waiting for its response.
 

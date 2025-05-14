@@ -158,12 +158,12 @@ FTM_SUPPORTED_FEATURES = (
     | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_POWER_MEASUREMENT_SUPPORTED
 )
 
-ROWER_SUPPORTED_FIELDS = (
+ROWER_SUPPORTED_FIELDS = (              
     RowingFieldFlags.STROKE_INFO 
-    | RowingFieldFlags.TOTAL_DISTANCE
+    | RowingFieldFlags.TOTAL_DISTANCE        
     | RowingFieldFlags.INSTANT_PACE
     | RowingFieldFlags.INSTANT_POWER
-    | RowingFieldFlags.EXPENDED_ENERGY
+    | RowingFieldFlags.EXPENDED_ENERGY  
     | RowingFieldFlags.HEART_RATE
     | RowingFieldFlags.ELAPSED_TIME
 )

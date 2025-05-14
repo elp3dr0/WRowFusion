@@ -292,26 +292,26 @@ class Field:
 
 # Map from flags to the fields in each group
 FIELD_GROUPS = [                                                                            ### CORRESPONDING Fitness Machine Feature Support bit ###
-    (RowingFieldFlags.STROKE_INFO, [                                                         # No corresponding Feature bit
+    (RowingFieldFlags.STROKE_INFO, [                                                        # No corresponding Feature bit
         Field("stroke_rate", "B", 1),    # uint8    
         Field("stroke_count", "H", 2),   # uint16
     ]),
-    (RowingFieldFlags.AVERAGE_STROKE_RATE, [Field("avg_stroke_rate", "B", 1)]),               # Cadence Supported (bit 1)
-    (RowingFieldFlags.TOTAL_DISTANCE, [Field("total_distance", "I", 3)]),  # 24-bit           # Total Distance Supported (bit 2)
-    (RowingFieldFlags.INSTANT_PACE, [Field("instant_pace", "H", 2)]),                         # Pace Supported (bit 5)
-    (RowingFieldFlags.AVERAGE_PACE, [Field("avg_pace", "H", 2)]),                             # Pace Supported (bit 5)
-    (RowingFieldFlags.INSTANT_POWER, [Field("instant_power", "h", 2, True)]),  # sint16       # Power Measurement Supported (bit 14)
-    (RowingFieldFlags.AVERAGE_POWER, [Field("avg_power", "h", 2, True)]),         # sint16    # Power Measurement Supported (bit 14)
-    (RowingFieldFlags.RESISTANCE_LEVEL, [Field("resistance", "B", 1)]),                       # Resistance Level Supported (bit 7)
-    (RowingFieldFlags.EXPENDED_ENERGY, [                                                     # Expended Energy Supported (bit 9)
+    (RowingFieldFlags.AVERAGE_STROKE_RATE, [Field("avg_stroke_rate", "B", 1)]),             # Cadence Supported (bit 1)
+    (RowingFieldFlags.TOTAL_DISTANCE, [Field("total_distance", "I", 3)]),       # 24-bit    # Total Distance Supported (bit 2)
+    (RowingFieldFlags.INSTANT_PACE, [Field("instant_pace", "H", 2)]),                       # Pace Supported (bit 5)
+    (RowingFieldFlags.AVERAGE_PACE, [Field("avg_pace", "H", 2)]),                           # Pace Supported (bit 5)
+    (RowingFieldFlags.INSTANT_POWER, [Field("instant_power", "h", 2, True)]),   # sint16    # Power Measurement Supported (bit 14)
+    (RowingFieldFlags.AVERAGE_POWER, [Field("avg_power", "h", 2, True)]),       # sint16    # Power Measurement Supported (bit 14)
+    (RowingFieldFlags.RESISTANCE_LEVEL, [Field("resistance", "B", 1)]),                     # Resistance Level Supported (bit 7)
+    (RowingFieldFlags.EXPENDED_ENERGY, [                                                    # Expended Energy Supported (bit 9)
         Field("total_energy", "H", 2),
         Field("energy_per_hour", "H", 2),
         Field("energy_per_min", "B", 1),
     ]),
-    (RowingFieldFlags.HEART_RATE, [Field("heart_rate", "B", 1)]),                             # Heart Rate Measurement Supported (bit 10)
-    (RowingFieldFlags.METABOLIC_EQUIVALENT, [Field("metabolic_equivalent", "B", 1)]),         # Metabolic Equivalent Supported (bit 11)
-    (RowingFieldFlags.ELAPSED_TIME, [Field("elapsed_time", "I", 3)]),  # 24-bit               # Elapsed Time Supported (bit 12)
-    (RowingFieldFlags.REMAINING_TIME, [Field("remaining_time", "I", 3)]),                     # Remaining Time Supported (bit 13)
+    (RowingFieldFlags.HEART_RATE, [Field("heart_rate", "B", 1)]),                           # Heart Rate Measurement Supported (bit 10)
+    (RowingFieldFlags.METABOLIC_EQUIVALENT, [Field("metabolic_equivalent", "B", 1)]),       # Metabolic Equivalent Supported (bit 11)
+    (RowingFieldFlags.ELAPSED_TIME, [Field("elapsed_time", "I", 3)]),           # 24-bit    # Elapsed Time Supported (bit 12)
+    (RowingFieldFlags.REMAINING_TIME, [Field("remaining_time", "I", 3)]),                   # Remaining Time Supported (bit 13)
 ]
 
 class RowerData(Characteristic):
