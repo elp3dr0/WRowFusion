@@ -312,7 +312,7 @@ class DataLogger(object):
                 
     def _handle_total_distance(self, evt: S4Event):
         with self._wr_lock:
-            self.WRValues.update({'total_distance': evt.value})
+            self.WRValues['total_distance'] = evt.value
             self._TotalDistanceM = evt.value
 
     def _handle_total_distance_dec(self, evt: S4Event):
@@ -337,13 +337,11 @@ class DataLogger(object):
             # Otherwise compute the 500m pace from the speed.
             if not self._500mPace:
                 pace_500m = 50000 / speed
-                #logger.debug(f"500m pace computed from speed: {pace_500m}")
                 self.WRValues['instant_500m_pace'] = pace_500m
 
             C2watts = 2.80 / pow((100/speed), 3)
             self._Concept2Watts = C2watts
-            logger.debug(f"Power calculated from speed using Concept2 formula: {C2watts:.2f}")
-
+            
             if USE_CONCEPT2_POWER:
                 self.WRValues['watts'] = C2watts
 
@@ -360,7 +358,7 @@ class DataLogger(object):
         with self._wr_lock:
             self._500mPace = evt.value
             if evt.value:
-                self.WRValues.update({'instant_500m_pace': evt.value}),
+                self.WRValues['instant_500m_pace'] = evt.value
 
 
     def _compute_elapsed_time(self):
@@ -368,35 +366,31 @@ class DataLogger(object):
             #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
             #self.elapsetime = int(self.elapsetime.total_seconds())
             elapsed_time = int(self._hoursWR * 3600 + self._minutesWR * 60 + self._secondsWR + (1 if self._secdecWR >= 5 else 0))
-            self.WRValues.update({'elapsed_time': elapsed_time})
+            self.WRValues['elapsed_time'] = elapsed_time
 
     def _compute_stroke_ratio(self):
         with self._wr_lock:
             if self._StrokeDuration and self._DriveDuration:
+                # Use the documented WR formula, which has a 1.25 multiplier
                 strokeratio = (self._StrokeDuration - self._DriveDuration) / (self._DriveDuration * 1.25)
-                #logger.debug(f"Stroke ratio calculated as: {strokeratio}")
-                self.WRValues.update({'stroke_ratio': (self._StrokeDuration - self._DriveDuration) / self._DriveDuration})
+                self.WRValues['stroke_ratio'] = strokeratio
 
     def _update_rolling_avg_watts(self,watts):
-        #logger.debug(f"update_live_avg_power - Watts event reports Watts: {watts}")
         with self._wr_lock:
             if self._DrivePhase:
                 self._StrokeMaxPower = max(self._StrokeMaxPower, watts)
             else:
                 if self._StrokeMaxPower:
                     self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
-                    #logger.debug(f"update_live_avg_power - Stroke Max Power captured as: {self._StrokeMaxPower}. Stroke count: {self.WRValues['stroke_count']}")
                     self._StrokeMaxPower = 0
                 while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_ROLLING_AVG_WATTS:
                     self._RecentStrokesMaxPower.pop(0)
                 # Start reporting power from the first received value, rather than waiting for the buffer to fill
-                #if len(self._RecentStrokesMaxPower) == NUM_STROKES_FOR_ROLLING_AVG_WATTS:
                 if self._RecentStrokesMaxPower:
                     rolling_avg_watts = int(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
                     self._RollingAvgWatts = rolling_avg_watts
-                    #logger.debug(f"update_live_avg_power - Live Average Power computed as: {rolling_avg_watts}")
                     if USE_CONCEPT2_POWER == False:
-                        self.WRValues.update({'watts': rolling_avg_watts})
+                        self.WRValues['watts'] = rolling_avg_watts
                     
     def _print_data(self, evt: S4Event):
         eventtype = evt.type
