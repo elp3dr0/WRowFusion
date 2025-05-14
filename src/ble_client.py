@@ -113,17 +113,20 @@ class HeartRateBLEScanner(threading.Thread):
                 try:
                     d, adv = await asyncio.wait_for(adv_iterator.__anext__(), timeout=1.0)
                 except (TimeoutError, StopAsyncIteration):
+                    await asyncio.sleep(0.1)    # prevent tight loop on timeout
                     continue  # No new device seen in this window so go back to the top of the while loop
 
 
                 if not self._is_heart_rate_monitor(adv):
                     logger.debug(f"BLE scan found device {d.address} is not a HRM.")
                     # Ignore this device and go back to the top of the while loop
+                    await asyncio.sleep(0.05)  # short delay so as not to hog CPU
                     continue
 
                 if d.rssi < RSSI_THRESHOLD:
                     logger.debug(f"BLE scan ignoring HRM {d.address} because signal strength {d.rssi} dB < {RSSI_THRESHOLD} dB threshold.")
                     # Ignore this device and go back to the top of the while loop
+                    await asyncio.sleep(0.05)  # short delay so as not to hog CPU
                     continue
 
                 devices[d.address] = d
