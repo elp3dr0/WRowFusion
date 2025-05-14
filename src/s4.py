@@ -202,7 +202,7 @@ class DataLogger(object):
                 'stroke_rate': 0,
                 'stroke_count': 0,
                 'total_distance': 0,
-                'instant_pace': 0,
+                'instant_500m_pace': 0,
                 'speed_cmps': 0,
                 'watts': 0,
                 'total_kcal': 0,
@@ -325,7 +325,7 @@ class DataLogger(object):
         
         with self._wr_lock:
             if speed == 0:
-                updates = {'instant_pace': 0, 'speed_cmps': 0}
+                updates = {'instant_500m_pace': 0, 'speed_cmps': 0}
                 if USE_CONCEPT2_POWER:
                     updates['watts'] = 0
                 self.WRValues.update(updates)
@@ -338,7 +338,7 @@ class DataLogger(object):
             if not self._500mPace:
                 pace = 50000 / speed
                 logger.debug(f"500m pace computed from speed: {pace}")
-                self.WRValues['instant_pace'] = pace
+                self.WRValues['instant_500m_pace'] = pace
 
             C2watts = 2.80 / pow(1/(speed*100), 3)
             self._Concept2Watts = C2watts
@@ -360,7 +360,7 @@ class DataLogger(object):
         with self._wr_lock:
             self._500mPace = evt.value
             if evt.value:
-                self.WRValues.update({'instant_pace': evt.value}),
+                self.WRValues.update({'instant_500m_pace': evt.value}),
 
 
     def _compute_elapsed_time(self):
@@ -454,7 +454,7 @@ class DataLogger(object):
             self.WRValues_standstill = deepcopy(self.WRValues)
             self.WRValues_standstill.update({
                 'stroke_rate': 0,
-                'instant_pace': 0,
+                'instant_500m_pace': 0,
                 'speed_cmps': 0,
                 'watts': 0,
             })
