@@ -89,7 +89,7 @@ IGNORE_LIST = [
     #'workout_limit',
     ]
 
-class DataLogger(object):
+class RowerState(object):
     def __init__(self, rower_interface=None):
         self._rower_interface = None
         self._stop_event = threading.Event()
@@ -147,12 +147,12 @@ class DataLogger(object):
 
     def initialise(self, rower_interface: Rower):
         with self._wr_lock:
-            """Initialise the DataLogger once a rower interface becomes available."""
+            """Initialise RowerState once a rower interface becomes available."""
             self._rower_interface = rower_interface
             self._rower_interface.register_callback(self.reset_requested)
             self._rower_interface.register_callback(self.pulse_monitor)
             self._rower_interface.register_callback(self.on_rower_event)
-        logger.info("DataLogger successfully initialised with rower_interface.")
+        logger.info("RowerState successfully initialised with rower_interface.")
 
         # Initialise the attributes, particularly the WRValues dictionaries because subsequent
         # code tries to update the values of the dictionaries and so expect the dictionary keys
@@ -166,9 +166,9 @@ class DataLogger(object):
             return self._rower_interface is not None
     
     def _reset_state(self):
-        logger.debug("DataLogger._reset_state: Attempting lock")
+        logger.debug("RowerState._reset_state: Attempting lock")
         with self._wr_lock:
-            logger.debug("DataLogger._reset_state: Lock attained, setting values")
+            logger.debug("RowerState._reset_state: Lock attained, setting values")
             self._RecentStrokesMaxPower = []
             self._StrokeMaxPower = 0
             self._DrivePhase = False
@@ -215,10 +215,10 @@ class DataLogger(object):
             self.WRValues = deepcopy(self.WRValues_rst)
             self.WRValues_standstill = deepcopy(self.WRValues_rst)
             self.TXValues = deepcopy(self.WRValues_rst)
-            logger.debug("DataLogger._reset_state: Values set")
-            logger.debug(f"DataLogger._reset_state: WRValues = {self.WRValues}")
-            logger.debug("DataLogger._reset_state: Releasing lock")
-        logger.debug("DataLogger._reset_state: Lock released.")
+            logger.debug("RowerState._reset_state: Values set")
+            logger.debug(f"RowerState._reset_state: WRValues = {self.WRValues}")
+            logger.debug("RowerState._reset_state: Releasing lock")
+        logger.debug("RowerState._reset_state: Lock released.")
 
     def on_rower_event(self, event: S4Event):
         #logger.debug(f"Received event: {event}")
@@ -436,10 +436,10 @@ class DataLogger(object):
 
     def reset_requested(self,event: S4Event):
         if event.type == 'reset':
-            logger.debug("DataLogger.reset_requested: Requesting Lock")
+            logger.debug("RowerState.reset_requested: Requesting Lock")
             with self._wr_lock:
-                logger.debug("DataLogger.reset_requested: Lock attained")
-                logger.debug("DataLogger.reset_requested: Calling _reset_state")
+                logger.debug("RowerState.reset_requested: Lock attained")
+                logger.debug("RowerState.reset_requested: Calling _reset_state")
                 self._reset_state()
                 logger.info("value reseted")
 
@@ -517,7 +517,7 @@ def s4_heart_beat_task(hrm: HeartRateMonitor):
             time.sleep(0.5)
 
 
-def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor, wr_data_logger: DataLogger):
+def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor, rower_state: RowerState):
     logger.debug("s4_data_task: Initialising Rower class")
     S4 = Rower()
     logger.debug("s4_data_task: Opening Rower class")
@@ -528,9 +528,9 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor, wr_data_logg
     # connected
     
     S4.request_reset()
-    logger.debug("s4_data_task: Initialising DataLogger")
+    logger.debug("s4_data_task: Initialising RowerState")
 
-    wr_data_logger.initialise(S4)
+    rower_state.initialise(S4)
     logger.info("Waterrower Ready and sending data to BLE and ANT Thread")
 
     while True:

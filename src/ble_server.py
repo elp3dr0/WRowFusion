@@ -38,7 +38,7 @@ from src.ble_standard_services import (
 )
 
 from src.heart_rate import HeartRateMonitor
-from src.s4 import DataLogger
+from src.s4 import RowerState
 
 logger = logging.getLogger(__name__)
 
@@ -170,18 +170,18 @@ ROWER_SUPPORTED_FIELDS = (
 
 
 class AppRowerData(RowerData):
-    def __init__(self, bus, index, service, wr_data_logger: DataLogger):
+    def __init__(self, bus, index, service, rower_state: RowerState):
         super().__init__(bus, index, service, supported_fields=ROWER_SUPPORTED_FIELDS)
         self.last_payload = None
-        self.data_logger = wr_data_logger
+        self.rower_state = rower_state
 
     def rowerdata_cb(self):
         logger.debug("Running AppRowerData.rowerdata_cb")
-        if not self.data_logger.is_initialised:
+        if not self.rower_state.is_initialised:
             logger.debug("No WaterRower values available yet.")
             return self.notifying
         
-        field_values = self.data_logger.get_WRValues()
+        field_values = self.rower_state.get_WRValues()
         if not field_values:
             logger.warning("No WaterRower values available yet.")
             return self.notifying
@@ -292,7 +292,7 @@ def Waterrower_poll():
 
     return True
 
-def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, wr_data_logger: DataLogger): #out_q
+def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, rower_state: RowerState): #out_q
     logger.debug("main: Entering main")
     global mainloop
     global out_q_reset
@@ -363,7 +363,7 @@ def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, wr_data_logger
     ftm_features = FitnessMachineFeature(bus, 0, ftm_service, supported_features=FTM_SUPPORTED_FEATURES)
 
     ftm_service.add_characteristic(ftm_features)
-    ftm_service.add_characteristic(AppRowerData(bus, 1, ftm_service, wr_data_logger))
+    ftm_service.add_characteristic(AppRowerData(bus, 1, ftm_service, rower_state))
 
     ftm_cp = FitnessMachineControlPoint(bus, 2, ftm_service)
 

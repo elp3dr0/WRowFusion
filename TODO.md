@@ -18,12 +18,12 @@
 
 
 ## 🔄 Data Handling
-- [ ] Replace deque with shared DataLogger instance
+- [ ] Replace deque with shared RowerState instance
 - [ ] Replace reset q with object
-- [ ] Make DataLogger accessible across threads
-- [ ] Evaluate thread safety of DataLogger callbacks
-- [ ] Remove TXValues from s4.py if shared access to DataLogger is working
-- [ ] Remove CueToBLEANT from s4.py if shared access to DataLogger is working
+- [ ] Make RowerState accessible across threads
+- [ ] Evaluate thread safety of RowerState callbacks
+- [ ] Remove TXValues from s4.py if shared access to RowerState is working
+- [ ] Remove CueToBLEANT from s4.py if shared access to RowerState is working
 - [ ] I want my application to be responsive to the workout mode that someone has selected on the S4. What frequency should I poll those at? Should the polling 
         be another loop in s4if, or should it be application side? Store the modes when the flags are read.
 - [ ] The workout flags are currently being converted to decimal on import, so adjust the decode_flags method to accept either int or hex string.
@@ -34,6 +34,7 @@
 - [ ] Figure out how to indicate just row or workout, and how to determine just row conditions - is it flags =0 or flags <16?
 - [ ] In s4if Make get on demand command stuff thread safe. Decide how destructive it will be for existing requests in the buffer, and how
         impolite it will be with hogging the serial while waiting for its response.
+- [ ] Remove the data_logger logger from S4 RowerState class once it's served its purpose.
 
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)
@@ -52,13 +53,13 @@
 
 ## 🖧 Comms with S4
 - [ ] Consider handling situation when S4 gets disconnected from serial port. Currently
-        the S4 Rower instance and the WRtoBLEANT DataLogger instance persist and the 
+        the S4 Rower instance and the WRtoBLEANT RowerState instance persist and the 
         main s4_data_task loop continues looping, trying to poll the data from the S4.
         That doesn't break anything, but it seems unnecesary when no s4 is connected.
         However, we'd only get into this situation if an S4 had already been detected,
         otherwise the code would loop in the S4.open method without ever entering the main
         data polling loop of s4_data_task. So if we're already in the main loop of 
-        the s4_data_task, perhaps we don't want to kill the Datalogger and Rower instances
+        the s4_data_task, perhaps we don't want to kill the RowerState and Rower instances
         even if the S4 gets disconnected because doing so could have unintended consequences
         on data flow (e.g. would it reset interval training?) And it's unknown how often
         disconnects might be detected - is it only when the plug is physically removed

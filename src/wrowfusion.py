@@ -26,7 +26,7 @@ from collections import deque
 from src.s4 import (
     s4_heart_beat_task, 
     s4_data_task,
-    DataLogger 
+    RowerState 
 )
 from src import ble_server
 from src.heart_rate import HeartRateMonitor
@@ -39,7 +39,7 @@ threads = []
 def start_threads():
     """Start all necessary background tasks."""
     hr_monitor = HeartRateMonitor()
-    wr_data_logger = DataLogger()
+    rower_state = RowerState()
     # Queues for passing data between S4 and ANT/BLE 
     q = Queue()
     ble_q = deque(maxlen=1)
@@ -58,12 +58,12 @@ def start_threads():
     threads.append(s4_heartbeat_thread)
 
     # Thread for S4 polling and collating data for transmission via BLE/ANT 
-    s4_data_thread = threading.Thread(target=s4_data_task, args=(q, ble_q, ant_q, hr_monitor, wr_data_logger), daemon=True, name="S4DataThread")
+    s4_data_thread = threading.Thread(target=s4_data_task, args=(q, ble_q, ant_q, hr_monitor, rower_state), daemon=True, name="S4DataThread")
     threads.append(s4_data_thread)
 
     # Thread for advertising and connecting the RPi to external clients and sending the data
     # to connected clients 
-    ble_server_thread = threading.Thread(target=ble_server.ble_server_task, args=(q, ble_q, hr_monitor, wr_data_logger), daemon=True, name="BLEServerThread")
+    ble_server_thread = threading.Thread(target=ble_server.ble_server_task, args=(q, ble_q, hr_monitor, rower_state), daemon=True, name="BLEServerThread")
     threads.append(ble_server_thread)
 
     logger.debug("wrfusion.start_threads: about to start threads")
