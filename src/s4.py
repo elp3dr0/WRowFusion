@@ -340,7 +340,7 @@ class DataLogger(object):
                 logger.debug(f"500m pace computed from speed: {pace}")
                 self.WRValues['instant_pace'] = pace
 
-            C2watts = 2.80 / pow(speed / 100.0, 3)
+            C2watts = 2.80 / pow(1/(speed*100), 3)
             self._Concept2Watts = C2watts
             logger.debug(f"Power calculated from speed using Concept2 formula: {C2watts}")
 
