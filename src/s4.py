@@ -221,10 +221,10 @@ class DataLogger(object):
         logger.debug("DataLogger._reset_state: Lock released.")
 
     def on_rower_event(self, event: S4Event):
-        logger.debug(f"Received event: {event}")
+        #logger.debug(f"Received event: {event}")
 
         if event.type in IGNORE_LIST:
-            logger.debug(f"Ignoring event in ignore list: {event.type}")
+            #logger.debug(f"Ignoring event in ignore list: {event.type}")
             return
 
         handlers = {
