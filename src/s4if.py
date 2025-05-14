@@ -42,7 +42,7 @@ MEMORY_MAP = {
     # Flags
     '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Describes the workout mode: extended zones and distance/duration modes.
     '042': {'type': 'distance1_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Specifies the selected unit of distance (m, miles, km, stroke, cal, etc).
-    '043': {'type': 'distance2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Specifies the selected unit of distance
+    #'043': {'type': 'distance2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Specifies the selected unit of distance
     # Fundanental data
     '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},          # distance in metres since reset
     '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
@@ -68,7 +68,7 @@ MEMORY_MAP = {
     '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': True},   # tenths of seconds 0-9
     # Workout total times/distances/limits
     '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},       # total workout time
-    '1EA': {'type': 'workout_total_mps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},        # total workout m/s
+    '1EA': {'type': 'workout_total_metres', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},     # total workout distance in metres
     '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},    # total workout strokes
     '1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low'},         # limit value for workouts
     # Intervals
@@ -97,9 +97,30 @@ MEMORY_MAP = {
 Notes:
 (*) workout_flags specify the type of workout (e.g. duration, distance, intervals) and what (if any) zones (heartrate, strokes, etc) 
     are active. The workout flags are updated only once a whole workout has been programmed and the user clicks 'OK' to 
-    get the program into its initialised state (i.e. flashing and ready to start rowing).
-(*) For distance workouts, the distance_flags must be consulted in order to know the units (metres or strokes) that the
-    value in the workout_work fields represents. For duration workouts, the units of the workout_work fields are always seconds.
+    get the program into its initialised state (i.e. flashing and ready to start rowing). At the end of the workout
+    all buttons are unresponsive except OK. The workout flags are cleared when the user presses OK at the end of a workout
+    or when they press and hold OK to reset at any time.
+(*) The distance1_flags specifies which distance unit names (m, km, etc) are shown on the screen and so it can be used
+    to deduce which unit a user has selected for a workout or a just row session.
+    - When a user has selected a unit for a workout or just row session:
+        Display behaviour: Only the selected unit name is shown and is solid (not flashing). 
+        Bit field: The bit corresponding to the selected field is true, while the other unit name bits are false.
+        Example: 01000010 (66 in decimal) -> Display is not supressed, kCal is selected, 'Distance' header is shown.
+    - When the user is selecting the unit (all unit names are displayed, unit with current focus is flashing):
+        Display behaviour: All names are shown and are solid, except the unit with the current focus, which is flashing.
+        Bit field: All the unit name bits are true except the unit with the current focus which is false.
+        Example: 01011110 (94 in decimal) -> Display is not supressed, all units solid except strokes flashing
+        (i.e. selection process active, with strokes having the current focus), 'Distance' header is shown.
+    Bits 1 and 0 (LSB) specify whether the display headers 'Projected' or 'Distance' are displayed. (True = displayed)
+    Bit 7 (MSB) specifies whether any content should be displayed in the distance section of the display (True = not displayed/supressed).
+    Even when bit 7 is set (i.e. distance display is hidden), the unit that is selected is still stored with a true in the
+    corresponding unit name bit of the bit field (e.g. 10000110 -> Distance display supressed, Metres selected, 'Distance' header true).
+(*) The distance2_flags appear to record only whether miles or km is the selected unit (or the unit with focus during 
+    selection). The field is 1000000 (or 64 in decimal) when either miles or km is selected (or has focus) and is 0 otherwise. 
+(*) For distance workouts, the distance1_flags must be consulted in order to know the units (metres or strokes) that the
+    value in the workout_work fields represents. The value stored in the workout_workX registers is in metres when any of
+    metres, miles or km are selected. A workout cannot be configured for calories. For duration workouts, the units of the
+    workout_work fields are always seconds.
 (*) total_distance_dec holds the centimetres part of the distance to the nearest 5cm, not "0.1m count (only counts up from 0-9)"
     as documented in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
 (*) Any effort to combine the cm value with the metres value will be complicated by the serial delivery. As the values are recieved 
@@ -157,8 +178,8 @@ Notes:
     components since last received and being confident only in values that match the last reported set.
     As the most significant components (hr and min) are least volatile, it makes sense to request them first because
     they are less likely to change over the short period of time when you are requesting and receiving the time components.
-(*) workout_total_time, _mps and _strokes are updated at the end of every work interval. Time and strokes are tallys of
-    all the work intervals, mps is the average across the work intervals
+(*) workout_total_time, _metres and _strokes are updated at the end of every work interval. They are tallys of
+    all the work intervals.
 (*) workout_limit acts as a tally of the workout phases of the intervals. For distance based intervals, the distance of 
     each interval is subtracted from 64002.
     E.g. for distance intervals:
@@ -172,7 +193,7 @@ Notes:
     be used to compute target distance for non-interval workouts.
     For duration workouts, the time of each interval is subtracted from 18000 (though for non-interval duration workout, workout_limit = 18001)
     For stroke workouts, the number of strokes is subtracted from 5001.
-(*) workout_workX units are either metres, strokes or seconds depending on the workout. Consult the distance flag address
+(*) workout_workX units are either metres, strokes or seconds depending on the workout. Consult the distance workout flags address
     to determine the unit of distance for distance workouts. Note that for duration workouts, it is sufficient to check
     only the workout flags to see if a duration workout or duration intervals workout is active, in which case the units
     of workout_workX will be in seconds. 
@@ -182,8 +203,8 @@ Notes:
         workoutinter = 3:   work, rest
         workoutinter = 4:   work, rest, work
         workoutinter = 5:   work, rest, work, rest
-    It is updated as each component is set, e.g. when the user presses OK after setting the distance of a work interval
-    or duration of a rest.
+    It is updated after all workout legs are are set, i.e. when the user presses OK after setting each of the distances and 
+    durations of the work and rest legs.
  
 '''
 
@@ -483,6 +504,7 @@ def read_reply(cmd: str) -> Optional[S4Event]:
 
     size = memory['size']
     endian = memory.get('endian', 'big')  # Default to big if unspecified
+    
     # Get the appropriate function to extract the value from the command string depending on whether it's single, double, triple.
     # Default to None if size isn't found in PARSE_MAP
     value_fn = SIZE_PARSE_MAP.get(size, lambda cmd: None) 
