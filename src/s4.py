@@ -10,6 +10,7 @@ import logging
 import time
 from gpiozero import DigitalOutputDevice
 from copy import deepcopy
+from typing import Any
 #from datetime import timedelta
 
 from src.s4if import (
@@ -91,41 +92,42 @@ IGNORE_LIST = [
 
 class RowerState(object):
     def __init__(self, rower_interface=None):
-        self._rower_interface = None
+        self._rower_interface: Rower | None = None
         self._stop_event = threading.Event()
         self._wr_lock = threading.RLock()
 
-        self._RecentStrokesMaxPower = None
-        self._StrokeMaxPower = None
-        self._DrivePhase = None         # Our _DrivePhase is set to True at when the S4 determines pulley accelleration
+        self._RecentStrokesMaxPower: list[int] = []
+        self._StrokeMaxPower: int | None = None
+        self._DrivePhase: bool | None = None         # Our _DrivePhase is set to True at when the S4 determines pulley accelleration
                                         # and set to False when S4 detects pulley decelleration. It is therefore True
                                         # throughout the whole Drive phase of the stroke and False during recovery phase. 
-        self._WattsEventValue = None
-        self._RollingAvgWatts = None
-        self._Concept2Watts = None
-        self._500mPace = None
-        self._LastCheckForPulse = None
-        self._PulseEventTime = None
-        self._PaddleTurning = None
-        self._RowerReset = None
-        self._secondsWR = None
-        self._minutesWR = None
-        self._hoursWR = None
-        self._secdecWR = None
-        self._ElapsedTime = None
-        self._TotalDistanceM = None     # The total distance in m, ignoring the value in the dec register
-        self._TotalDistanceDec = None   # The cm component of the total distance (i.e. the component that would follow a decimal point)
-        self._TotalDistanceCM = None    # The total distance in cm (i.e. _TotalDistanceM * 100 + _TotalDistanceDec)
-        self._StrokeDuration = None     # Units: ms
-        self._DriveDuration = None      # Units: ms
-        self.TankVolume = None
-        self.WRWorkout = None
-        self._TempLowFreq = None
-        self.WRValues_rst = None
-        self.WRValues = None
-        self.WRValues_standstill = None
-        self.TXValues = None
+        self._WattsEventValue: int | None = None
+        self._RollingAvgWatts: int | None = None
+        self._Concept2Watts: float | None = None
+        self._500mPace: int | None = None
+        self._LastCheckForPulse: int | None = None  # Timestamp in ms of last check for pulse 
+        self._PulseEventTime: int | None = None
+        self._PaddleTurning: bool | None = None
+        self._RowerReset: bool | None = None
+        self._secondsWR: int | None = None
+        self._minutesWR: int | None = None
+        self._hoursWR: int | None = None
+        self._secdecWR: int | None = None
+        self._ElapsedTime: float | None = None      # Elapsed time in seconds with 1 decimal place (note though that this is likely false accuracy due to serial communication process)
+        self._TotalDistanceM: int | None = None     # The total distance in m, ignoring the value in the dec register
+        self._TotalDistanceDec: int | None = None   # The cm component of the total distance (i.e. the component that would follow a decimal point)
+        self._TotalDistanceCM: int | None = None    # The total distance in cm (i.e. _TotalDistanceM * 100 + _TotalDistanceDec)
+        self._StrokeDuration: int | None = None     # Units: ms
+        self._DriveDuration: int | None = None      # Units: ms
+        self.TankVolume: int | None = None          # Units: Decilitres
+        self.WRWorkout: dict[str, Any] = {}
+        self.WRValues_rst: dict[str, Any] = {}
+        self.WRValues: dict[str, Any] = {}
+        self.WRValues_standstill: dict[str, Any] = {}
+        self.TXValues: dict[str, Any] = {}
 
+        #### Temporary stuff for exploring values returned by S4 ##########
+        self._TempLowFreq: dict[str, Any] = {}
 
         self.data_logger = logging.getLogger('wrowfusion.data')
         self.data_logger.setLevel(logging.INFO)
@@ -134,7 +136,7 @@ class RowerState(object):
         data_handler = logging.FileHandler('/tmp/wrowfusion_data.log')
         data_handler.setLevel(logging.INFO)
 
-        # Optional: simple format
+        # Simple format
         formatter = logging.Formatter('%(asctime)s - %(message)s')
         data_handler.setFormatter(formatter)
 
@@ -142,10 +144,12 @@ class RowerState(object):
         if not self.data_logger.handlers:
             self.data_logger.addHandler(data_handler)
 
+        ################################################################
+
         if rower_interface is not None:
             self.initialise(rower_interface)
 
-    def initialise(self, rower_interface: Rower):
+    def initialise(self, rower_interface: Rower) -> None:
         with self._wr_lock:
             """Initialise RowerState once a rower interface becomes available."""
             self._rower_interface = rower_interface
@@ -160,12 +164,12 @@ class RowerState(object):
         self._reset_state()
 
     @property
-    def is_initialised(self):
+    def is_initialised(self) -> bool:
         """Return True if the rower interface has been set."""
         with self._wr_lock:
             return self._rower_interface is not None
     
-    def _reset_state(self):
+    def _reset_state(self) -> None:
         logger.debug("RowerState._reset_state: Attempting lock")
         with self._wr_lock:
             logger.debug("RowerState._reset_state: Lock attained, setting values")
@@ -174,7 +178,7 @@ class RowerState(object):
             self._DrivePhase = False
             self._WattsEventValue = 0
             self._RollingAvgWatts = 0
-            self._Concept2Watts = 0
+            self._Concept2Watts = 0.0
             self._500mPace = 0
             self._LastCheckForPulse = 0
             self._PulseEventTime = 0
@@ -184,7 +188,7 @@ class RowerState(object):
             self._minutesWR = 0
             self._hoursWR = 0
             self._secdecWR = 0
-            self._ElapsedTime = 0
+            self._ElapsedTime = 0.0
             self._TotalDistanceM = 0
             self._TotalDistanceDec = 0
             self._TotalDistanceCM = 0
@@ -220,7 +224,7 @@ class RowerState(object):
             logger.debug("RowerState._reset_state: Releasing lock")
         logger.debug("RowerState._reset_state: Lock released.")
 
-    def on_rower_event(self, event: S4Event):
+    def on_rower_event(self, event: S4Event) -> None:
         #logger.debug(f"Received event: {event}")
 
         if event.type in IGNORE_LIST:
@@ -293,7 +297,7 @@ class RowerState(object):
             elif event.type == 'avg_time_stroke_pull':
                 self._compute_stroke_ratio()
 
-    def _handle_workout_flags(self, evt: S4Event):
+    def _handle_workout_flags(self, evt: S4Event) -> None:
 
         self._print_data(evt)
         mode = WorkoutMode(evt.value)
@@ -310,21 +314,22 @@ class RowerState(object):
 
             self.WRWorkout['intervals'] = is_interval
                 
-    def _handle_total_distance(self, evt: S4Event):
+    def _handle_total_distance(self, evt: S4Event) -> None:
         with self._wr_lock:
             self.WRValues['total_distance'] = evt.value
             self._TotalDistanceM = evt.value
 
-    def _handle_total_distance_dec(self, evt: S4Event):
+    def _handle_total_distance_dec(self, evt: S4Event) -> None:
         with self._wr_lock:
-            self._TotalDistanceDec = evt.value
-            self._TotalDistanceCM = max(self._TotalDistanceCM, self._TotalDistanceM * 100 + evt.value)
+            value = evt.value
+            self._TotalDistanceDec = value
+            self._TotalDistanceCM = max(self._TotalDistanceCM or 0, (self._TotalDistanceM or 0) * 100 + (value or 0))
 
-    def _handle_avg_distance_cmps(self, evt: S4Event):
+    def _handle_avg_distance_cmps(self, evt: S4Event) -> None:
         speed = evt.value   # cm per sec
         
         with self._wr_lock:
-            if speed == 0:
+            if not speed:
                 updates = {'instant_500m_pace': 0, 'speed_cmps': 0}
                 if USE_CONCEPT2_POWER:
                     updates['instant_watts'] = 0
@@ -345,12 +350,12 @@ class RowerState(object):
             if USE_CONCEPT2_POWER:
                 self.WRValues['instant_watts'] = C2watts
 
-    def _handle_watts(self, evt: S4Event):
+    def _handle_watts(self, evt: S4Event) -> None:
         with self._wr_lock:
             self._WattsEventValue = evt.value
             self._update_rolling_avg_watts(self._WattsEventValue)
 
-    def _handle_500m_pace(self, evt: S4Event):
+    def _handle_500m_pace(self, evt: S4Event) -> None:
         # The WR will report 500m pace only when it is the selected intensity display value
         # on the S4. If the S4 is being reporting a non-zero value, then this function will
         # prefer the value reported by the S4 over the value derived from the cm/s speed.
@@ -361,25 +366,25 @@ class RowerState(object):
                 self.WRValues['instant_500m_pace'] = evt.value
 
 
-    def _compute_elapsed_time(self):
+    def _compute_elapsed_time(self) -> None:
         with self._wr_lock:
             #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
             #self.elapsetime = int(self.elapsetime.total_seconds())
-            elapsed_time = int(self._hoursWR * 3600 + self._minutesWR * 60 + self._secondsWR + (1 if self._secdecWR >= 5 else 0))
+            elapsed_time = (self._hoursWR or 0) * 3600 + (self._minutesWR or 0) * 60 + (self._secondsWR or 0) + (self._secdecWR or 0)/10
             self._ElapsedTime = elapsed_time
-            self.WRValues['elapsed_time'] = elapsed_time
+            self.WRValues['elapsed_time'] = int(elapsed_time)
 
-    def _compute_stroke_ratio(self):
+    def _compute_stroke_ratio(self) -> None:
         with self._wr_lock:
             if self._StrokeDuration and self._DriveDuration:
                 # Use the documented WR formula, which has a 1.25 multiplier
                 strokeratio = round((self._StrokeDuration - self._DriveDuration) / (self._DriveDuration * 1.25) , 2)
                 self.WRValues['stroke_ratio'] = strokeratio
 
-    def _update_rolling_avg_watts(self,watts):
+    def _update_rolling_avg_watts(self,watts) -> None:
         with self._wr_lock:
             if self._DrivePhase:
-                self._StrokeMaxPower = max(self._StrokeMaxPower, watts)
+                self._StrokeMaxPower = max(self._StrokeMaxPower or 0, watts)
             else:
                 if self._StrokeMaxPower:
                     self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
@@ -393,7 +398,7 @@ class RowerState(object):
                     if USE_CONCEPT2_POWER == False:
                         self.WRValues['instant_watts'] = rolling_avg_watts
                     
-    def _print_data(self, evt: S4Event):
+    def _print_data(self, evt: S4Event) -> None:
         eventtype = evt.type
         value = evt.value
         oldvalue = self._TempLowFreq.get(eventtype)
@@ -405,7 +410,7 @@ class RowerState(object):
             self.data_logger.info(f"{eventtype} initialised at: {value!r}")
             self._TempLowFreq[eventtype] = value
 
-    def pulse_monitor(self,event: S4Event):
+    def pulse_monitor(self,event: S4Event) -> None:
         # As a callback, this function is called by the notifier each time any event 
         # is captured from the S4. The function detects when the paddle is stationary
         # by checking when the S4 last reported a pulse event (pulses are triggered as
@@ -434,7 +439,7 @@ class RowerState(object):
                 self._RecentStrokesMaxPower = []
                 self.WRValuesStandstill()
 
-    def reset_requested(self,event: S4Event):
+    def reset_requested(self,event: S4Event) -> None:
         if event.type == 'reset':
             logger.debug("RowerState.reset_requested: Requesting Lock")
             with self._wr_lock:
@@ -444,7 +449,7 @@ class RowerState(object):
                 logger.info("value reseted")
 
 
-    def WRValuesStandstill(self):
+    def WRValuesStandstill(self) -> None:
         with self._wr_lock:
             self.WRValues_standstill = deepcopy(self.WRValues)
             self.WRValues_standstill.update({
@@ -455,7 +460,7 @@ class RowerState(object):
             })
 
 
-    def get_WRValues(self):
+    def get_WRValues(self) -> dict[str, Any]:
         logger.debug("getWRValues starting lock")
         with self._wr_lock:
             logger.debug("getWRValues lock started")                
@@ -472,7 +477,7 @@ class RowerState(object):
         logger.debug("getWRValues lock ended")
         return values
 
-    def inject_HR(self, values, hrm: HeartRateMonitor):
+    def inject_HR(self, values, hrm: HeartRateMonitor) : 
         if not isinstance(values, dict):
             logger.warning("inject_HR recieved invalid values input: %s", values)
             return None
@@ -565,32 +570,3 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor, rower_state:
         #logger.info(WRtoBLEANT.BLEvalues)
         #ant_out_q.append(WRtoBLEANT.ANTvalues)
         time.sleep(0.1)
-
-
-# def maintest():
-#     S4 = WaterrowerInterface.Rower()
-#     S4.open()
-#     S4.reset_request()
-#     WRtoBLEANT = DataLogger(S4)
-#
-#     def MainthreadWaterrower():
-#         while True:
-#         #print(WRtoBLEANT.BLEvalues)
-#             #ant_out_q.append(WRtoBLEANT.ANTvalues)
-#             #print("Rowering_value  {0}".format(WRtoBLEANT.WRValues))
-#             #print("Rowering_value_rst  {0}".format(WRtoBLEANT.WRValues_rst))
-#             #print("Rowering_value_standstill  {0}".format(WRtoBLEANT.WRValues_standstill))
-#             print("Reset  {0}".format(WRtoBLEANT.rowerreset))
-#             #print("Paddleturning  {0}".format(WRtoBLEANT.PaddleTurning))
-#             #print("Lastcheck {0}".format(WRtoBLEANT._LastCheckForPulse))
-#             #print("last pulse {0}".format(WRtoBLEANT._PulseEventTime))
-#             #print("is connected {}".format(S4.is_connected()))
-#             time.sleep(0.1)
-#
-#
-#     t1 = threading.Thread(target=MainthreadWaterrower)
-#     t1.start()
-#
-#
-# if __name__ == '__main__':
-#     maintest()
