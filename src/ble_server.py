@@ -15,6 +15,7 @@ import dbus.mainloop.glib
 import dbus.service
 import struct
 import time
+from typing import Callable
 
 from src.bleif import (
     Advertisement,
@@ -33,7 +34,6 @@ from src.ble_standard_services import (
     FitnessMachineFeature,
     HeartRateService,
     HeartRateMeasurementCharacteristic,
-    RowingFieldFlags,
     RowerData, 
 )
 
@@ -132,7 +132,7 @@ def fmcp_reset_handler(payload):
     request_reset_ble()
     return 0x01  # Success
 
-def fmcp_command_handler(opcode, payload):
+def fmcp_command_handler(opcode, payload) -> int:
     handler = FTM_SUPPORTED_OPCODES.get(opcode)
     if handler:
         return handler(payload)
@@ -156,22 +156,33 @@ FTM_SUPPORTED_FEATURES = (
     | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_HEART_RATE_MEASUREMENT_SUPPORTED 
     | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_ELAPSED_TIME_SUPPORTED 
     | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_POWER_MEASUREMENT_SUPPORTED
+    | FitnessMachineFeature.FitnessMachineFeatureFlags.FTMF_REMAINING_TIME_SUPPORTED
 )
 
-ROWER_SUPPORTED_FIELDS = (              
-    RowingFieldFlags.STROKE_INFO 
-    | RowingFieldFlags.TOTAL_DISTANCE        
-    | RowingFieldFlags.INSTANT_PACE
-    | RowingFieldFlags.INSTANT_POWER
-    | RowingFieldFlags.EXPENDED_ENERGY  
-    | RowingFieldFlags.HEART_RATE
-    | RowingFieldFlags.ELAPSED_TIME
-)
+TransformMap = dict[str, Callable[[dict], int | None]]
 
+BLE_FIELD_MAP: TransformMap = {
+    "stroke_rate": lambda wr_values: wr_values.get("stroke_rate_pm"),   
+    "stroke_count": lambda wr_values: wr_values.get("stroke_count"),
+    "total_distance": lambda wr_values: wr_values.get("total_distance"),
+    "instant_pace": lambda wr_values: wr_values.get("instant_500m_pace"),
+    "instant_power": lambda wr_values: wr_values.get("instant_watts"),
+    "elapsed_time": lambda wr_values: wr_values.get("elapsed_time"),
+    "total_energy": lambda wr_values: wr_values.get("total_calories"),
+    "energy_per_hour": lambda wr_values: int(3600 * (wr_values.get("total_calories"), 0)/wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    "energy_per_min": lambda wr_values: int(60 * (wr_values.get("total_calories"), 0)/wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    #"heart_rate",
+    #"remaining_time",
+    #"metabolic_equivalent",
+    #"resistance",
+    "avg_stroke_rate": lambda wr_values: int(60 * (wr_values.get("stroke_count"), 0)/wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    "avg_pace": lambda wr_values: int(500 * (wr_values.get("elapsed_time"), 0)/wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    #"avg_power": lambda wr_values: int(60 * wr_values.get("total_watts")/wr_values.get("elapsed_time")),
+}
 
 class AppRowerData(RowerData):
     def __init__(self, bus, index, service, rower_state: RowerState):
-        super().__init__(bus, index, service, supported_fields=ROWER_SUPPORTED_FIELDS)
+        super().__init__(bus, index, service)
         self.last_payload = None
         self.rower_state = rower_state
 
@@ -181,13 +192,14 @@ class AppRowerData(RowerData):
             logger.debug("No WaterRower values available yet.")
             return self.notifying
         
-        field_values = self.rower_state.get_WRValues()
-        if not field_values:
+        wr_values = self.rower_state.get_WRValues()
+        if not wr_values:
             logger.warning("No WaterRower values available yet.")
             return self.notifying
         
-        logger.debug(f"Got values: {field_values}")
-        payload_bytes = self.encode(field_values)
+        logger.debug(f"Got values: {wr_values}")
+        ble_rower_data = {ble_key: func(wr_values) for ble_key, func in BLE_FIELD_MAP.items()}
+        payload_bytes = self.encode(ble_rower_data)
         logger.debug(f"Generated payload: {payload_bytes}")
         if self.last_payload != payload_bytes:
             logger.debug("Changed values in payload, so starting transmission")

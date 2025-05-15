@@ -23,7 +23,7 @@
 - [ ] Make RowerState accessible across threads
 - [ ] Evaluate thread safety of RowerState callbacks
 - [ ] Remove TXValues from s4.py if shared access to RowerState is working
-- [ ] Remove CueToBLEANT from s4.py if shared access to RowerState is working
+- [ ] Remove CueToBLEANT from s4.py if shared access to RowerState is working and remove the commented out logic from the main routine in s4.py
 - [ ] I want my application to be responsive to the workout mode that someone has selected on the S4. What frequency should I poll those at? Should the polling 
         be another loop in s4if, or should it be application side? Store the modes when the flags are read.
 - [ ] The workout flags are currently being converted to decimal on import, so adjust the decode_flags method to accept either int or hex string.
@@ -35,6 +35,7 @@
 - [ ] In s4if Make get on demand command stuff thread safe. Decide how destructive it will be for existing requests in the buffer, and how
         impolite it will be with hogging the serial while waiting for its response.
 - [ ] Remove the data_logger logger from S4 RowerState class once it's served its purpose.
+- [ ] Move inject HR logic to the ble/ant publishing part of the code, rather than inserting it in the s4 data
 
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)
@@ -50,6 +51,8 @@
 - [ ] Add Body Sensor Location Characteristic to Heart Rate service in ble_standard_service and BLE Server (see Bluetooth HRP V10 pdf)
 - [ ] Add Heart Rate Control Point Characteristic to Heart Rate Service in ble_standard_service and application logic to handle reset events and computation of total session kcals, broadcasting that value to Heart rate clients. (see Bluetooth HRP V10 pdf and HRS Spec V10 pdf)
 - [ ] IIRC, the BLE server custom exceptions are defined in ble_if and are repeated in ble_server. Instead they should just be imported (can they be made subclasses of a parent class which is then imported in one class?)
+- [ ] Add support to remaining time supported (add the flags to both FTM_SUPPORTED_FEATURES and ROWER_SUPPORTED_FIELDS). But determine if I need to change these flags dynamically. E,g 
+- [ ] Currently the payload for bluetooth does not worry about MTU size. The payload could exceed the MTN size for older devices. I could add code to try to determine the MTU and then create the payload accordingly. This would be handled in ble_standard_services RowerData encode method and prepare flags and fields method. The code could easily keep track of the number of bytes as it builds the payload and then just stop building the payload once the MTU size is reached. The trickier part is getting the MTU size.   
 
 ## 🖧 Comms with S4
 - [ ] Consider handling situation when S4 gets disconnected from serial port. Currently
@@ -63,7 +66,8 @@
         even if the S4 gets disconnected because doing so could have unintended consequences
         on data flow (e.g. would it reset interval training?) And it's unknown how often
         disconnects might be detected - is it only when the plug is physically removed
-        or does it happen momentarily from time to time? This might be a case of if it aint broke.  
+        or does it happen momentarily from time to time? This might be a case of if it aint broke.
+- [ ] Probably incorporate the s4 reset thread into the on rower event thread if all it's doing is reacting to the reset instruction.
 
 ## 🧪 Testing & Debugging
 - [ ] Add thread monitoring and auto-restart logic
@@ -72,6 +76,7 @@
 - [ ] Split out dev & testing packages from requirements into requirements-dev.txt and handle accordingly in code
 
 ## 🗂️ Organisational
+- [ ] Handle the resest instruction through a RowerState attribute rather than a queue.
 - [ ] Clean up unused imports across modules
 - [ ] Refactor `wrowfusion.py` for clarity
 - [ ] Add high-level project diagram

@@ -3,6 +3,7 @@ import logging
 import struct
 from enum import Enum, IntFlag
 from dataclasses import dataclass
+from typing import Any
 
 from src.bleif import Service, Characteristic
 
@@ -284,79 +285,123 @@ class RowingFieldFlags(IntFlag):
 
 # Metadata describing how to encode each group of fields
 @dataclass
-class Field:
+class BLEField:
     name: str
     format: str  # Format of the data (e.g. 'B', 'H', 'h', 'I') using the standard format chars of the struct module.
     size: int
     signed: bool = False
 
-# Map from flags to the fields in each group
+    def to_bytes(self, value: int) -> bytes:
+        if self.size == 3:
+            # struct doesn't support 3-byte fields, so use to_bytes directly
+            return value.to_bytes(3, byteorder='little', signed=self.signed)
+        else:
+            return struct.pack('<' + self.format, value)
+        
+# Map of BLE Rower Data flags defining the content of each BLE transmission.
+# Fields are added in the priority order defined below (highest priority first), as long as the data is available.
+# If the combined size of the flags and field data exceeds the negotiated MTU, remaining fields are omitted.
+# Currently the code in this program does not manage the truncation. Instead it assumes that the underlying
+# bluetooth stack of the OS will handle the truncation.
+# The minimum BLE MTU is 23 bytes, of which 2 bytes are used for flags and 3 for the ATT header,
+# leaving 18 bytes for data payload. MTUs below 50 bytes are increasingly rare, especially between modern devices.
+# 
+# Fields above the “minimum MTU cutoff” are likely to be included even in low-MTU scenarios.
+# Fields below that point are lower priority and might be omitted on older or constrained devices.
 FIELD_GROUPS = [                                                                            ### CORRESPONDING Fitness Machine Feature Support bit ###
     (RowingFieldFlags.STROKE_INFO, [                                                        # No corresponding Feature bit
-        Field("stroke_rate", "B", 1),    # uint8    
-        Field("stroke_count", "H", 2),   # uint16
+        BLEField("stroke_rate", "B", 1),    # uint8    
+        BLEField("stroke_count", "H", 2),   # uint16
     ]),
-    (RowingFieldFlags.AVERAGE_STROKE_RATE, [Field("avg_stroke_rate", "B", 1)]),             # Cadence Supported (bit 1)
-    (RowingFieldFlags.TOTAL_DISTANCE, [Field("total_distance", "I", 3)]),       # 24-bit    # Total Distance Supported (bit 2)
-    (RowingFieldFlags.INSTANT_PACE, [Field("instant_pace", "H", 2)]),                       # Pace Supported (bit 5)
-    (RowingFieldFlags.AVERAGE_PACE, [Field("avg_pace", "H", 2)]),                           # Pace Supported (bit 5)
-    (RowingFieldFlags.INSTANT_POWER, [Field("instant_power", "h", 2, True)]),   # sint16    # Power Measurement Supported (bit 14)
-    (RowingFieldFlags.AVERAGE_POWER, [Field("avg_power", "h", 2, True)]),       # sint16    # Power Measurement Supported (bit 14)
-    (RowingFieldFlags.RESISTANCE_LEVEL, [Field("resistance", "B", 1)]),                     # Resistance Level Supported (bit 7)
+    (RowingFieldFlags.TOTAL_DISTANCE, [BLEField("total_distance", "I", 3)]),       # 24-bit    # Total Distance Supported (bit 2)
+    (RowingFieldFlags.INSTANT_PACE, [BLEField("instant_pace", "H", 2)]),                       # Pace Supported (bit 5)
+    (RowingFieldFlags.INSTANT_POWER, [BLEField("instant_power", "h", 2, True)]),   # sint16    # Power Measurement Supported (bit 14)
+    (RowingFieldFlags.ELAPSED_TIME, [BLEField("elapsed_time", "I", 3)]),           # 24-bit    # Elapsed Time Supported (bit 12)
     (RowingFieldFlags.EXPENDED_ENERGY, [                                                    # Expended Energy Supported (bit 9)
-        Field("total_energy", "H", 2),
-        Field("energy_per_hour", "H", 2),
-        Field("energy_per_min", "B", 1),
+        BLEField("total_energy", "H", 2),
+        BLEField("energy_per_hour", "H", 2),
+        BLEField("energy_per_min", "B", 1),
     ]),
-    (RowingFieldFlags.HEART_RATE, [Field("heart_rate", "B", 1)]),                           # Heart Rate Measurement Supported (bit 10)
-    (RowingFieldFlags.METABOLIC_EQUIVALENT, [Field("metabolic_equivalent", "B", 1)]),       # Metabolic Equivalent Supported (bit 11)
-    (RowingFieldFlags.ELAPSED_TIME, [Field("elapsed_time", "I", 3)]),           # 24-bit    # Elapsed Time Supported (bit 12)
-    (RowingFieldFlags.REMAINING_TIME, [Field("remaining_time", "I", 3)]),                   # Remaining Time Supported (bit 13)
+                                        #### Minimum MTU cutoff ####
+    (RowingFieldFlags.HEART_RATE, [BLEField("heart_rate", "B", 1)]),                           # Heart Rate Measurement Supported (bit 10)
+    (RowingFieldFlags.REMAINING_TIME, [BLEField("remaining_time", "I", 3)]),                   # Remaining Time Supported (bit 13)
+    (RowingFieldFlags.METABOLIC_EQUIVALENT, [BLEField("metabolic_equivalent", "B", 1)]),       # Metabolic Equivalent Supported (bit 11)
+    (RowingFieldFlags.RESISTANCE_LEVEL, [BLEField("resistance", "B", 1)]),                     # Resistance Level Supported (bit 7)
+    (RowingFieldFlags.AVERAGE_STROKE_RATE, [BLEField("avg_stroke_rate", "B", 1)]),             # Cadence Supported (bit 1)
+    (RowingFieldFlags.AVERAGE_PACE, [BLEField("avg_pace", "H", 2)]),                           # Pace Supported (bit 5)
+    (RowingFieldFlags.AVERAGE_POWER, [BLEField("avg_power", "h", 2, True)]),       # sint16    # Power Measurement Supported (bit 14)
 ]
 
 class RowerData(Characteristic):
     UUID = '2ad1'
 
-    def __init__(self, bus, index, service, supported_fields=RowingFieldFlags(0)):
+    def __init__(self, bus, index, service):
         super().__init__(
             bus, index,
             self.UUID,
             ['notify'],
             service)
         self.notifying = False
-        self._fields = supported_fields
 
     def encode(self, field_values: dict) -> bytes:
-        """Encode the characteristic value based on supported flags and current data."""
+        """
+        Determine what flags are supported from the contents of the field_values dict and
+        encode the characteristic value accordingly."""
+        flags, fields_to_encode = self._prepare_fields_and_flags(field_values)
+        # Flip Stroke Info bit, since it has inverted meaning in spec
+        flags ^= RowingFieldFlags.STROKE_INFO
+        
         output = bytearray()
-        output += struct.pack("<H", self._fields)  # 2-byte flags field
+        output += struct.pack("<H", flags)  # 2-byte flags field
+
         logger.debug("Encode loop - starting iteration through fields groups")
 
-        # Iterate through the field groups to check whether the group should be included in the bluetooth payload.
-        # Most groups comprise single fields. 
-        # Stroke_info and Expended_Energy are exceptions and comprise more than one data field which are transmitted
-        # together or not at all
-        for flag, fields in FIELD_GROUPS:
-            include = bool(self._fields & flag)
-            logger.debug(f"Field group: {self._fields}, Include: {include}")
-            # STROKE_INFO is inverted — included when the bit is NOT set
-            if flag == RowingFieldFlags.STROKE_INFO:
-                include = not include
-
-            if include:
-                # Within the field group, iterate through each individual field and build the output byte array.
-                for field in fields:
-                    val = field_values.get(field.name, 0)
-                    logger.debug(f"Build output byte array. Append field: {field.name}")
-                    if field.size == 3:
-                        # Struct doesn't support 3-byte values, so fall back to to_bytes which requires us to 
-                        # handle signedness manually.
-                        output += val.to_bytes(3, byteorder='little', signed=field.signed)
-                    else:
-                        output += struct.pack('<' + field.format, val)
+        for field, value in fields_to_encode:
+            logger.debug(f"Build output byte array. Append field: {field.name}")
+            output += field.to_bytes(value)
 
         logger.debug(f"Bluetooth payload complete: {output}")
         return bytes(output)
+    
+    def _prepare_fields_and_flags(self, field_values: dict[str, Any]) -> tuple[RowingFieldFlags, list[tuple[BLEField, Any]]]:
+        '''Determine the RowerData characteristic flags depending on what fields are present in the data'''
+        flags = RowingFieldFlags(0)
+        fields_to_encode: list[tuple[BLEField, Any]] = []
+
+        for flag, field_group in FIELD_GROUPS:
+            group_values = []
+
+            if flag == RowingFieldFlags.STROKE_INFO:
+                present_fields = [ble_field for ble_field in field_group if ble_field.name in field_values]
+                if not present_fields:
+                    continue  # Skip group entirely if none are present
+                for ble_field in field_group:
+                    value = field_values.get(ble_field.name, 0)  # Default missing fields to 0
+                    group_values.append((ble_field, value))
+                flags |= flag
+                fields_to_encode.extend(group_values)
+
+            elif flag == RowingFieldFlags.EXPENDED_ENERGY:
+                any_present = any(ble_field.name in field_values for ble_field in field_group)
+                if not any_present:
+                    continue  # Skip group entirely
+                for ble_field in field_group:
+                    if ble_field.name in field_values:
+                        value = field_values[ble_field.name]
+                    else:
+                        value = 0xFFFF if ble_field.size == 2 else 0xFF  # Sentinel for missing values
+                    group_values.append((ble_field, value))
+                flags |= flag
+                fields_to_encode.extend(group_values)
+
+            else:
+                ble_field = field_group[0]  # Single-field group
+                if ble_field.name in field_values:
+                    group_values.append((ble_field, field_values[ble_field.name]))
+                    flags |= flag
+                    fields_to_encode.extend(group_values)
+
+        return flags, fields_to_encode
 
     def StartNotify(self):
         if self.notifying:
