@@ -118,7 +118,7 @@ class Advertisement(dbus.service.Object):
         dbus.service.Object.__init__(self, bus, self.path)
 
     def get_properties(self):
-        properties = dict()
+        properties = {}
         properties["Type"] = self.ad_type
         if self.service_uuids is not None:
             properties["ServiceUUIDs"] = dbus.Array(self.service_uuids, signature="s")
