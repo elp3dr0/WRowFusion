@@ -344,7 +344,7 @@ class WorkoutMode(IntFlag):
         """
         return cls(int(hex_str, 16))
 
-    def describe(self) -> list[str]:
+    def describe(self) -> list[str | None]:
         """
         Get a list of human-readable flag names currently set in this WorkoutMode.
         Returns:
@@ -387,7 +387,7 @@ class DistanceMode(IntFlag):
         """
         return cls(int(hex_str, 16))
 
-    def describe(self) -> list[str]:
+    def describe(self) -> list[str | None]:
         """
         Get a list of human-readable flag names currently set in this DistanceMode.
         Returns:
@@ -593,7 +593,7 @@ class Rower(object):
         #     self._demo = True
         # else:
         self._demo = False
-        self._serial: serial.Serial = serial.Serial()   # Include type hint for IntelliSense
+        self._serial = serial.Serial()
         self._serial.baudrate = 19200
         self._serial.timeout = SERIAL_READ_TIMEOUT
         self._serial_lock = threading.RLock()
@@ -617,10 +617,10 @@ class Rower(object):
 
     def is_connected(self):
         with self._serial_lock:
-            serial_open = self._serial.isOpen()
+            serial_open = self._serial.is_open
         return (
             serial_open and
-            is_live_thread(self._request_thread) and
+            is_live_thread(self._high_freq_request_thread) and
             is_live_thread(self._capture_thread)
         )
 
@@ -651,7 +651,7 @@ class Rower(object):
         # - and the serial is open without error, otherwise the code loops in _find_serial()
         
         with self._serial_lock:
-            if self._serial and self._serial.isOpen():
+            if self._serial and self._serial.is_open:
                 logger.debug("Closing existing serial connection.")
                 try:
                     self._serial.close()
@@ -674,7 +674,7 @@ class Rower(object):
         if self._stop_event:
             self._stop_event.set()
         with self._serial_lock:
-            if self._serial and self._serial.isOpen():
+            if self._serial and self._serial.is_open:
                 self.write(EXIT_REQUEST)
                 time.sleep(0.1)  # time for capture and request loops to stop running
                 self._serial.close()
@@ -690,7 +690,7 @@ class Rower(object):
 
     def _start_capturing(self):
         while not self._stop_event.is_set():
-            if self._serial.isOpen():
+            if self._serial.is_open:
                 try:
                     with self._serial_lock:
                         line = self._serial.readline()  # The self._serial.timeout ensures this read doesn't block indefinitely and prevents the lock from being held too long 
@@ -720,7 +720,7 @@ class Rower(object):
         counter = 0
         while not self._stop_event.is_set():
             with self._serial_lock:
-                is_open = self._serial.isOpen()
+                is_open = self._serial.is_open
 
             if is_open:
                 for address, meta in MEMORY_MAP.items():
@@ -763,7 +763,7 @@ class Rower(object):
         self.write(cmd + address)
 
 
-    def request_on_demand(self, request_type: str, address: Optional[str] = None) -> S4Event:
+    def request_on_demand(self, request_type: str, address: Optional[str] = None) -> Optional[S4Event]:
         """Sends a request to the S4 monitor and waits for the response.
         Constructs the request and expected response prefix using the request type and optional address.
         Sends the request via serial, clears the input buffer beforehand, and waits for the matching response.
@@ -775,6 +775,7 @@ class Rower(object):
             For events that do not expect a response, the S4Event dict will be empty other than type = 'none'.
             The caller can therefore deduce that the expected response was not received if this function returns None
             and the caller can therefore take appropriate action.
+            None: If parse_line does not recognise the command code
         Raises:
             Exception: If any error occurs during serial I/O or response handling.
         """
@@ -793,7 +794,7 @@ class Rower(object):
             raise
 
 
-    def capture_on_demand_response(self, expected_response_prefix: str, timeout=2) -> S4Event:
+    def capture_on_demand_response(self, expected_response_prefix: str, timeout=2) -> Optional[S4Event]:
         """
         Reads from the serial port until a response with the expected prefix is received, or timeout.
         Args:
@@ -801,6 +802,7 @@ class Rower(object):
             timeout (int): Maximum time to wait in seconds.
         Returns:
             S4Event: The complete parsed response if received before timeout.
+            None: If parse_line does not recognise the command code
         Raises:
             SerialNotConnectedError: If the serial port is not open.
             TimeoutError: If the expected response is not received within the timeout.
@@ -808,7 +810,7 @@ class Rower(object):
             TypeError:If a type error occurs
         """
 
-        if not self._serial or not self._serial.isOpen():
+        if not self._serial or not self._serial.is_open:
             raise SerialNotConnectedError("Serial port is not connected.")
             
         start_time = time.time()
