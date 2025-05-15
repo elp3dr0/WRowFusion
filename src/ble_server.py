@@ -169,14 +169,14 @@ BLE_FIELD_MAP: TransformMap = {
     "instant_power": lambda wr_values: wr_values.get("instant_watts"),
     "elapsed_time": lambda wr_values: wr_values.get("elapsed_time"),
     "total_energy": lambda wr_values: wr_values.get("total_calories"),
-    "energy_per_hour": lambda wr_values: int(3600 * (wr_values.get("total_calories"), 0)/wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
-    "energy_per_min": lambda wr_values: int(60 * (wr_values.get("total_calories"), 0)/wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    "energy_per_hour": lambda wr_values: int(3600 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    "energy_per_min": lambda wr_values: int(60 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
     #"heart_rate",
     #"remaining_time",
     #"metabolic_equivalent",
     #"resistance",
-    "avg_stroke_rate": lambda wr_values: int(60 * (wr_values.get("stroke_count"), 0)/wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
-    "avg_pace": lambda wr_values: int(500 * (wr_values.get("elapsed_time"), 0)/wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    "avg_stroke_rate": lambda wr_values: int(60 * wr_values.get("stroke_count", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    "avg_pace": lambda wr_values: int(500 * wr_values.get("elapsed_time", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
     #"avg_power": lambda wr_values: int(60 * wr_values.get("total_watts")/wr_values.get("elapsed_time")),
 }
 
@@ -199,6 +199,7 @@ class AppRowerData(RowerData):
         
         logger.debug(f"Got values: {wr_values}")
         ble_rower_data = {ble_key: func(wr_values) for ble_key, func in BLE_FIELD_MAP.items()}
+        logger.debug(f"Mapped rower values to ble fields: {ble_rower_data}")
         payload_bytes = self.encode(ble_rower_data)
         logger.debug(f"Generated payload: {payload_bytes}")
         if self.last_payload != payload_bytes:
