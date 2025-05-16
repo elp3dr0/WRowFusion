@@ -168,7 +168,7 @@ BLE_FIELD_MAP: TransformMap = {
     "instant_pace": lambda wr_values: wr_values.get("instant_500m_pace"),
     "instant_power": lambda wr_values: wr_values.get("instant_watts"),
     "elapsed_time": lambda wr_values: wr_values.get("elapsed_time"),
-    "total_energy": lambda wr_values: int(wr_values.get("total_calories") / 1000),
+    "total_energy": lambda wr_values: int(wr_values.get("total_calories", 0) / 1000),
     "energy_per_hour": lambda wr_values: int(3.6 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
     "energy_per_min": lambda wr_values: int(0.06 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
     #"heart_rate",
