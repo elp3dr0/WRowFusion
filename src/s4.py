@@ -54,6 +54,8 @@ Allows early returns: Each callback can quickly return if the event is not relev
 USE_CONCEPT2_POWER = False  
 
 # Smooth the displayed power and bridge gaps in reported Watts by finding the average max power output over a number of strokes 
+# It appears empirically that the Waterrower algorithms apply a form of averaging over 16 strokes.
+# An entry of 4 strokes can provide a more responsive watts reading. 
 NUM_STROKES_FOR_ROLLING_AVG_WATTS = 4
 
 # Define GPIO pin
@@ -352,8 +354,22 @@ class RowerState(object):
 
     def _handle_watts(self, evt: S4Event) -> None:
         with self._wr_lock:
-            self._WattsEventValue = evt.value
-            self._update_rolling_avg_watts(self._WattsEventValue)
+            watts = evt.value
+            self._WattsEventValue = watts
+            if self._DrivePhase:
+                self._StrokeMaxPower = max(self._StrokeMaxPower or 0, watts or 0)
+            else:
+                if self._StrokeMaxPower:
+                    self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
+                    self._StrokeMaxPower = 0
+                while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_ROLLING_AVG_WATTS:
+                    self._RecentStrokesMaxPower.pop(0)
+                # Start reporting power from the first received value, rather than waiting for the buffer to fill
+                if self._RecentStrokesMaxPower:
+                    rolling_avg_watts = round(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
+                    self._RollingAvgWatts = rolling_avg_watts
+                    if USE_CONCEPT2_POWER == False:
+                        self.WRValues['instant_watts'] = rolling_avg_watts
 
     def _handle_500m_pace(self, evt: S4Event) -> None:
         # The WR will report 500m pace only when it is the selected intensity display value
@@ -380,23 +396,6 @@ class RowerState(object):
                 # Use the documented WR formula, which has a 1.25 multiplier
                 strokeratio = round((self._StrokeDuration - self._DriveDuration) / (self._DriveDuration * 1.25) , 2)
                 self.WRValues['stroke_ratio'] = strokeratio
-
-    def _update_rolling_avg_watts(self,watts) -> None:
-        with self._wr_lock:
-            if self._DrivePhase:
-                self._StrokeMaxPower = max(self._StrokeMaxPower or 0, watts)
-            else:
-                if self._StrokeMaxPower:
-                    self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
-                    self._StrokeMaxPower = 0
-                while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_ROLLING_AVG_WATTS:
-                    self._RecentStrokesMaxPower.pop(0)
-                # Start reporting power from the first received value, rather than waiting for the buffer to fill
-                if self._RecentStrokesMaxPower:
-                    rolling_avg_watts = round(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
-                    self._RollingAvgWatts = rolling_avg_watts
-                    if USE_CONCEPT2_POWER == False:
-                        self.WRValues['instant_watts'] = rolling_avg_watts
                     
     def _print_data(self, evt: S4Event) -> None:
         eventtype = evt.type
@@ -462,16 +461,15 @@ class RowerState(object):
 
     def get_WRValues(self) -> dict[str, Any]:
         logger.debug("getWRValues starting lock")
-        with self._wr_lock:
-            logger.debug("getWRValues lock started")                
+        with self._wr_lock:               
             if self._RowerReset:
-                #logger.debug("getWRValues handling rowerreset")
+                logger.debug("getWRValues handling rowerreset")
                 values = deepcopy(self.WRValues_rst)
             elif self._PaddleTurning:
-                #logger.debug("getWRValues handling PaddleTurning")
+                logger.debug("getWRValues handling PaddleTurning")
                 values = deepcopy(self.WRValues)
             else:
-                #logger.debug("getWRValues handling standstill")
+                logger.debug("getWRValues handling standstill")
                 values = deepcopy(self.WRValues_standstill)
             #logger.debug("getWRValues ending lock")
         logger.debug("getWRValues lock ended")
