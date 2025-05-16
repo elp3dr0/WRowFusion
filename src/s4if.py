@@ -132,8 +132,15 @@ Notes:
 (*) Watts are available intermittently. The overwhelming majority of requests for Watts receive a response with value 0.
     Non-zero Watts are sometimes returned for one or two readings per stroke (typically at the same value), but often with
     no non-zero readings for one or two strokes at a time. To have availability at all times, average the watts over a number
-    of non-zero readings for a number of different strokes. Averaging readings from 4 different strokes appears to match the
-    S4 watts display closely. Or use the concept2 formula which derives power from 500m pace.
+    of non-zero readings for a number of different strokes. The S4 monitor does not display the value stored in the Watts memory
+    register directly. It appears to average the watts over something like 16 strokes, though the average starts to be calculated 
+    and displayed before the 16-stroke buffer is full. The dispalyed Watts is therefore very sluggish to reflect changes in rowing
+    intensity. For normal rowing, an average power over 4 different strokes appears to match the reading on the S4 display closely,
+    yet is more responsive. An alternative is to use the concept2 formula which derives power from 500m pace, though the results of
+    the concept2 formula are markedly different (~2x) from the Waterrower computed values.
+(*) The Cal/Hr intensity unit appears to have a linear relationship with watts of approx: Cal/Hr = 3.5865 * Watts + 290.
+    The units of Cal/Hr are kCal/Hr. Note that this is an instantaneous Cal/Hr, which is different from the total Cal/Hr of the
+    Bluetooth Fitness Machine Profile, which is the average calories per hour burned so far during the workout.  
 (*) stroke_average and stroke_pull appear to be measured in number of 25ms periods. 
 (*) The ratio can be displayed on the S4 intermittently by selecting Advanced program 5. It is not documented where in the memory
     register the display value is stored. The documenation in Water Rower S4 S5 USB Protocol Iss 1 04.pdf states:
