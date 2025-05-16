@@ -320,6 +320,10 @@ class BLEField:
 # * Determine the actual MTU that is negotiated, or try to negotiate a higher MTU, and then tailor the payload to the actual
 #   MTU.
 
+# The field sizes and units were sourced from: https://developer.huawei.com/consumer/en/doc/hmscore-guides/rd-0000001050725868
+# because the specifications could not be found in the bluetooth.com specs. 
+
+
 FIELD_GROUPS = [                                                                            ### CORRESPONDING Fitness Machine Feature Support bit ###
     (RowingFieldFlags.STROKE_INFO, [                                                        # No corresponding Feature bit
         BLEField("stroke_rate", "B", 1),    # uint8    
