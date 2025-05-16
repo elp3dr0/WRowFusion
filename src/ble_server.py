@@ -168,16 +168,16 @@ BLE_FIELD_MAP: TransformMap = {
     "instant_pace": lambda wr_values: wr_values.get("instant_500m_pace"),
     "instant_power": lambda wr_values: wr_values.get("instant_watts"),
     "elapsed_time": lambda wr_values: wr_values.get("elapsed_time"),
-    "total_energy": lambda wr_values: wr_values.get("total_calories"),
-    "energy_per_hour": lambda wr_values: int(3600 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
-    "energy_per_min": lambda wr_values: int(60 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    "total_energy": lambda wr_values: int(wr_values.get("total_calories") / 1000),
+    "energy_per_hour": lambda wr_values: int(3.6 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    "energy_per_min": lambda wr_values: int(0.06 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
     #"heart_rate",
     #"remaining_time",
     #"metabolic_equivalent",
     #"resistance",
     "avg_stroke_rate": lambda wr_values: int(60 * wr_values.get("stroke_count", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
     "avg_pace": lambda wr_values: int(500 * wr_values.get("elapsed_time", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
-    #"avg_power": lambda wr_values: int(60 * wr_values.get("total_watts")/wr_values.get("elapsed_time")),
+    #"avg_power": lambda wr_values: int(60 * wr_values.get("total_watts")/wr_values.get("elapsed_time")),   # WR does not support total power applied, only an instantaneous power. Bluetooth spec requires the average power since the beginning of the training session.
 }
 
 class AppRowerData(RowerData):
