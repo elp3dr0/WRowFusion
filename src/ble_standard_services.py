@@ -170,9 +170,14 @@ class FitnessMachineControlPoint(Characteristic):
             logger.warning("Recieved FitnessMachineControlPoint request, but no command handler has been set by your application logic so the request cannot be processed.")
             result_code, response_param = 0x01, []  # Operation failed
 
+        # BLE FitnessMachineControlPoint specs expect a response as follows:
+        # Response code 0x80 followed by the request code and the result code:
+        # 0x01 Success, 0x02 opcode not supported, 0x03 invalid parameter, 0x04 operation failed, 0x05 control not permitted
+        response = self._build_response(opcode_value, result_code, response_param)
+        logger.debug(f"Setting FMCP response: {bytes(response)}")
         self.PropertiesChanged(
             GATT_CHRC_IFACE,
-            {'Value': self._build_response(opcode_value, result_code, response_param)},
+            {'Value': response},
             []
         )
 
