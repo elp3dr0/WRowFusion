@@ -138,7 +138,7 @@ Notes:
     intensity. For normal rowing, an average power over 4 different strokes appears to match the reading on the S4 display closely,
     yet is more responsive. An alternative is to use the concept2 formula which derives power from 500m pace, though the results of
     the concept2 formula are markedly different (~2x) from the Waterrower computed values.
-(*) The Cal/Hr intensity unit appears to have a linear relationship with watts of approx: Cal/Hr = 3.5865 * Watts + 290.
+(*) The Cal/Hr intensity unit appears to have a linear relationship with watts of approx: Cal/Hr = 3.4287 * Watts + 300.47.
     The units of Cal/Hr are kCal/Hr. Note that this is an instantaneous Cal/Hr, which is different from the total Cal/Hr of the
     Bluetooth Fitness Machine Profile, which is the average calories per hour burned so far during the workout.  
 (*) stroke_average and stroke_pull appear to be measured in number of 25ms periods. 
