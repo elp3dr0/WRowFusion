@@ -298,6 +298,10 @@ class RowerState(object):
                 self._compute_elapsed_time()
             elif event.type == 'avg_time_stroke_pull':
                 self._compute_stroke_ratio()
+            elif event.type == 'avg_time_stroke_whole':
+                comp_rate = 60 / (self._StrokeDuration or 1)
+                logger.debug(f"Computed stroke rate: {comp_rate:.2f}")
+                logger.debug(f"Stored stroke rate: {self.WRValues['stroke_rate_pm']}")
 
     def _handle_workout_flags(self, evt: S4Event) -> None:
 
