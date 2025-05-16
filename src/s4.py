@@ -250,7 +250,7 @@ class RowerState(object):
             'avg_distance_cmps': lambda evt: self._handle_avg_distance_cmps(evt),
             'heart_rate': lambda evt: self.WRValues.update({'heart_rate': evt.value}),
             '500m_pace': lambda evt: self._handle_500m_pace(evt),
-            'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate_pm': evt.value * 2}),
+            'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate_pm': evt.value}),
             'display_sec': lambda evt: setattr(self, '_secondsWR', evt.value),
             'display_min': lambda evt: setattr(self, '_minutesWR', evt.value),
             'display_hr': lambda evt: setattr(self, '_hoursWR', evt.value),
@@ -329,7 +329,7 @@ class RowerState(object):
 
     def _handle_avg_distance_cmps(self, evt: S4Event) -> None:
         speed = evt.value   # cm per sec
-        
+
         with self._wr_lock:
             if not speed:
                 updates = {'instant_500m_pace': 0, 'speed_cmps': 0}
