@@ -162,12 +162,12 @@ FTM_SUPPORTED_FEATURES = (
 TransformMap = dict[str, Callable[[dict], int | None]]
 
 BLE_FIELD_MAP: TransformMap = {
-    "stroke_rate": lambda wr_values: int(wr_values.get("stroke_rate_pm", 0) * 2),   # BLE specifies units as 0.5 strokes per min.
-    "stroke_count": lambda wr_values: wr_values.get("stroke_count"),
-    "total_distance": lambda wr_values: wr_values.get("total_distance"),
-    "instant_pace": lambda wr_values: wr_values.get("instant_500m_pace"),
-    "instant_power": lambda wr_values: wr_values.get("instant_watts"),
-    "elapsed_time": lambda wr_values: wr_values.get("elapsed_time"),
+    "stroke_rate": lambda wr_values: wr_values.get("stroke_rate_pm", 0) * 2,   # BLE specifies units as 0.5 strokes per min.
+    "stroke_count": lambda wr_values: wr_values.get("stroke_count", 0),
+    "total_distance": lambda wr_values: wr_values.get("total_distance", 0),
+    "instant_pace": lambda wr_values: wr_values.get("instant_500m_pace", 0),
+    "instant_power": lambda wr_values: wr_values.get("instant_watts", 0),
+    "elapsed_time": lambda wr_values: wr_values.get("elapsed_time", 0),
     "total_energy": lambda wr_values: int(wr_values.get("total_calories", 0) / 1000),
     "energy_per_hour": lambda wr_values: int(3.6 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
     "energy_per_min": lambda wr_values: int(0.06 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
@@ -198,7 +198,10 @@ class AppRowerData(RowerData):
             return self.notifying
         
         logger.debug(f"Got values: {wr_values}")
-        ble_rower_data = {ble_key: func(wr_values) for ble_key, func in BLE_FIELD_MAP.items()}
+        ble_rower_data = {
+            ble_key: int(func(wr_values) or 0) 
+            for ble_key, func in BLE_FIELD_MAP.items()
+        }
         logger.debug(f"Mapped rower values to ble fields: {ble_rower_data}")
         payload_bytes = self.encode(ble_rower_data)
         logger.debug(f"Generated payload: {payload_bytes}")
