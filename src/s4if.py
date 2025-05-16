@@ -42,7 +42,7 @@ MEMORY_MAP = {
     # Flags
     '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Describes the workout mode: extended zones and distance/duration modes.
     '042': {'type': 'distance1_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Specifies the selected unit of distance (m, miles, km, stroke, cal, etc).
-    #'043': {'type': 'distance2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Specifies the selected unit of distance
+    '043': {'type': 'distance2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': True},  # Specifies the selected unit of distance
     # Fundanental data
     '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},          # distance in metres since reset
     '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
@@ -59,8 +59,8 @@ MEMORY_MAP = {
     #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},               # Probably the number of readings (or registers) over which the speed is averaged
     # Values stored for zone maths
     '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},              # instantaneous heart rate
-    '1A5': {'type': '500m_pace', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'exclude_from_poll_loop': False},   # instantaneious 500m Pace (secs)
-    '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},              # instantaneous strokes per min
+    '1A5': {'type': '500m_pace', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'exclude_from_poll_loop': True},   # instantaneious 500m Pace (secs)
+    '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': True},    # instantaneous strokes per min (integer only: consider using avg_time_stroke_whole instead)
     # Clock Display - Capture time components in reverse order for time elapsed accuracy  
     '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},              # hours 0-9
     '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},             # minutes 0-59
@@ -141,7 +141,7 @@ Notes:
 (*) The Cal/Hr intensity unit appears to have a linear relationship with watts of approx: Cal/Hr = 3.4287 * Watts + 300.47.
     The units of Cal/Hr are kCal/Hr. Note that this is an instantaneous Cal/Hr, which is different from the total Cal/Hr of the
     Bluetooth Fitness Machine Profile, which is the average calories per hour burned so far during the workout.  
-(*) stroke_average and stroke_pull appear to be measured in number of 25ms periods. 
+(*) stroke_average and stroke_pull appear to be measured in number of 25ms periods.
 (*) The ratio can be displayed on the S4 intermittently by selecting Advanced program 5. It is not documented where in the memory
     register the display value is stored. The documenation in Water Rower S4 S5 USB Protocol Iss 1 04.pdf states:
     "Stroke_pull is first subtracted from stroke_average then a modifier of 1.25 multiplied by the result to generate the ratio 
@@ -158,6 +158,10 @@ Notes:
 (*) 500m Pace is computed by the S4 only when units of /500m are selected on screen. If other units are being displayed, the 
     value of 0 is stored in the 500m pace memory register and 0 is returned over the serial connection. To have availability
     at all times, compute the 500m pace from the avg_distance_cmps.
+(*) The stroke_rate field is an integer representation of the stroke rate. The waterrower itself displays stroke rate to the
+    nearest 0.5. A more accurate stroke rate per min can be obtained by using the avg_time_stroke_whole field:
+        stroke rate = 60000 / (avg_time_stroke_whole * 25)
+    avg_time_stroke_whole is in number of 25 ms periods.
 (*) Because the time components are sent in separate packets, the delays between packets being recieved can result in errors
     when recombining the time elements. Consider the two scenarios below. In practice, there's a 25ms gap between each response
     even when the requests are made immediately one after the other. The tables illustrate the errors encountered when the
