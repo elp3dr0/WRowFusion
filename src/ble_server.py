@@ -176,7 +176,7 @@ BLE_FIELD_MAP: TransformMap = {
     #"metabolic_equivalent",
     #"resistance",
     "avg_stroke_rate": lambda wr_values: int(60 * wr_values.get("stroke_count", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
-    "avg_pace": lambda wr_values: int(500 * wr_values.get("elapsed_time", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
+    "avg_pace": lambda wr_values: int(500 * wr_values.get("elapsed_time", 0) / wr_values["total_distance"]) if wr_values.get("total_distance") else 0,
     #"avg_power": lambda wr_values: int(60 * wr_values.get("total_watts")/wr_values.get("elapsed_time")),   # WR does not support total power applied, only an instantaneous power. Bluetooth spec requires the average power since the beginning of the training session.
 }
 
