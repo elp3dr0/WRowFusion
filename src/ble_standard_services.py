@@ -329,22 +329,22 @@ FIELD_GROUPS = [                                                                
         BLEField("stroke_rate", "B", 1),    # uint8    
         BLEField("stroke_count", "H", 2),   # uint16
     ]),
-    (RowingFieldFlags.AVERAGE_STROKE_RATE, [BLEField("avg_stroke_rate", "B", 1)]),             # Cadence Supported (bit 1)
+#    (RowingFieldFlags.AVERAGE_STROKE_RATE, [BLEField("avg_stroke_rate", "B", 1)]),             # Cadence Supported (bit 1)
     (RowingFieldFlags.TOTAL_DISTANCE, [BLEField("total_distance", "I", 3)]),       # 24-bit    # Total Distance Supported (bit 2)
     (RowingFieldFlags.INSTANT_PACE, [BLEField("instant_pace", "H", 2)]),                       # Pace Supported (bit 5)
-    (RowingFieldFlags.AVERAGE_PACE, [BLEField("avg_pace", "H", 2)]),                           # Pace Supported (bit 5)
+#    (RowingFieldFlags.AVERAGE_PACE, [BLEField("avg_pace", "H", 2)]),                           # Pace Supported (bit 5)
     (RowingFieldFlags.INSTANT_POWER, [BLEField("instant_power", "h", 2, True)]),   # sint16    # Power Measurement Supported (bit 14)
-    (RowingFieldFlags.AVERAGE_POWER, [BLEField("avg_power", "h", 2, True)]),       # sint16    # Power Measurement Supported (bit 14)
-    (RowingFieldFlags.RESISTANCE_LEVEL, [BLEField("resistance", "h", 2, True)]),                     # Resistance Level Supported (bit 7)
+#    (RowingFieldFlags.AVERAGE_POWER, [BLEField("avg_power", "h", 2, True)]),       # sint16    # Power Measurement Supported (bit 14)
+#    (RowingFieldFlags.RESISTANCE_LEVEL, [BLEField("resistance", "h", 2, True)]),                     # Resistance Level Supported (bit 7)
     (RowingFieldFlags.EXPENDED_ENERGY, [                                                    # Expended Energy Supported (bit 9)
         BLEField("total_energy", "H", 2),
         BLEField("energy_per_hour", "H", 2),
         BLEField("energy_per_min", "B", 1),
     ]),
     (RowingFieldFlags.HEART_RATE, [BLEField("heart_rate", "B", 1)]),                           # Heart Rate Measurement Supported (bit 10)
-    (RowingFieldFlags.METABOLIC_EQUIVALENT, [BLEField("metabolic_equivalent", "B", 1)]),       # Metabolic Equivalent Supported (bit 11)
+#    (RowingFieldFlags.METABOLIC_EQUIVALENT, [BLEField("metabolic_equivalent", "B", 1)]),       # Metabolic Equivalent Supported (bit 11)
     (RowingFieldFlags.ELAPSED_TIME, [BLEField("elapsed_time", "H", 2)]),                       # Elapsed Time Supported (bit 12)
-    (RowingFieldFlags.REMAINING_TIME, [BLEField("remaining_time", "H", 2)]),                   # Remaining Time Supported (bit 13)
+#    (RowingFieldFlags.REMAINING_TIME, [BLEField("remaining_time", "H", 2)]),                   # Remaining Time Supported (bit 13)
 ]
 
 class RowerData(Characteristic):
