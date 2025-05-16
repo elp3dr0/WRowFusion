@@ -162,7 +162,7 @@ FTM_SUPPORTED_FEATURES = (
 TransformMap = dict[str, Callable[[dict], int | None]]
 
 BLE_FIELD_MAP: TransformMap = {
-    "stroke_rate": lambda wr_values: wr_values.get("stroke_rate_pm", 0) * 2,   # BLE specifies units as 0.5 strokes per min.
+    "stroke_rate": lambda wr_values: int(wr_values.get("stroke_rate_pm", 0) * 2),   # BLE specifies units as 0.5 strokes per min.
     "stroke_count": lambda wr_values: wr_values.get("stroke_count"),
     "total_distance": lambda wr_values: wr_values.get("total_distance"),
     "instant_pace": lambda wr_values: wr_values.get("instant_500m_pace"),

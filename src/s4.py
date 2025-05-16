@@ -245,12 +245,12 @@ class RowerState(object):
             'total_calories': lambda evt: self.WRValues.update({'total_calories': evt.value}),
             'tank_volume': lambda evt: setattr(self, 'TankVolume', evt.value),
             'stroke_count': lambda evt: self.WRValues.update({'stroke_count': evt.value}),
-            'avg_time_stroke_whole': lambda evt: setattr(self, '_StrokeDuration', evt.value * 25),
+            'avg_time_stroke_whole': lambda evt: self._handle_avg_time_stroke_whole(evt),
             'avg_time_stroke_pull': lambda evt: setattr(self, '_DriveDuration', evt.value * 25),
             'avg_distance_cmps': lambda evt: self._handle_avg_distance_cmps(evt),
             'heart_rate': lambda evt: self.WRValues.update({'heart_rate': evt.value}),
             '500m_pace': lambda evt: self._handle_500m_pace(evt),
-            'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate_pm': evt.value}),
+            #'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate_pm': evt.value}),
             'display_sec': lambda evt: setattr(self, '_secondsWR', evt.value),
             'display_min': lambda evt: setattr(self, '_minutesWR', evt.value),
             'display_hr': lambda evt: setattr(self, '_hoursWR', evt.value),
@@ -296,12 +296,7 @@ class RowerState(object):
             # on receipt of the hr response.
             if event.type == 'display_sec':
                 self._compute_elapsed_time()
-            elif event.type == 'avg_time_stroke_pull':
-                self._compute_stroke_ratio()
-            elif event.type == 'avg_time_stroke_whole':
-                comp_rate = 60 / (self._StrokeDuration or 1)
-                logger.debug(f"Computed stroke rate: {comp_rate:.2f}")
-                logger.debug(f"Stored stroke rate: {self.WRValues['stroke_rate_pm']}")
+                
 
     def _handle_workout_flags(self, evt: S4Event) -> None:
 
@@ -330,6 +325,13 @@ class RowerState(object):
             value = evt.value
             self._TotalDistanceDec = value
             self._TotalDistanceCM = max(self._TotalDistanceCM or 0, (self._TotalDistanceM or 0) * 100 + (value or 0))
+
+    def _handle_avg_time_stroke_whole(self, evt: S4Event) -> None:
+        with self._wr_lock:
+            duration_ms = (evt.value or 0) * 25
+            self._StrokeDuration = duration_ms
+            self.WRValues['stroke_rate_pm'] = round(60000 / duration_ms if duration_ms else 0, 2)
+            self._compute_stroke_ratio()
 
     def _handle_avg_distance_cmps(self, evt: S4Event) -> None:
         speed = evt.value   # cm per sec
@@ -390,7 +392,11 @@ class RowerState(object):
         with self._wr_lock:
             #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
             #self.elapsetime = int(self.elapsetime.total_seconds())
-            elapsed_time = (self._hoursWR or 0) * 3600 + (self._minutesWR or 0) * 60 + (self._secondsWR or 0) + (self._secdecWR or 0)/10
+            compiled_time = (self._hoursWR or 0) * 3600 + (self._minutesWR or 0) * 60 + (self._secondsWR or 0) + (self._secdecWR or 0)/10
+            # Try to mitigate the effects of the situation where the second ticks on in between getting all the components of time, which
+            # can lead to large apparent jumps backwards in time (e.g. 1:59:59:59 going to 1:00:00:00 if the second ticks on between the
+            # hour and the minute being fetched) 
+            elapsed_time = max((self._ElapsedTime or 0), compiled_time)
             self._ElapsedTime = elapsed_time
             self.WRValues['elapsed_time'] = int(elapsed_time)
 
