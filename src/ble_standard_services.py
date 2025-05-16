@@ -299,37 +299,48 @@ class BLEField:
             return struct.pack('<' + self.format, value)
         
 # Map of BLE Rower Data flags defining the content of each BLE transmission.
-# Fields are added in the priority order defined below (highest priority first), as long as the data is available.
-# If the combined size of the flags and field data exceeds the negotiated MTU, remaining fields are omitted.
-# Currently the code in this program does not manage the truncation. Instead it assumes that the underlying
-# bluetooth stack of the OS will handle the truncation.
-# The minimum BLE MTU is 23 bytes, of which 2 bytes are used for flags and 3 for the ATT header,
-# leaving 18 bytes for data payload. MTUs below 50 bytes are increasingly rare, especially between modern devices.
+# The code currently does not robustly support legacy or limited devices which utilise a small MTU (the max number of 
+# fields that can be passed in any single bluetooth payload). To be compliant with Bluetooth specs, a device must accept
+# at least an MTU of 23. To support all fields of the RowerData characteristic in one payload, an MTU of 34: (29 data 
+# fields, 2 flag fields, and 3 ATT headers). 
+# Most modern devices are understood to negotiate an MTN > 50 when the bluetooth connection is made, though it is unknown
+# if this is true for limited devices like fitness watches. 
+# If the payload exceeds the MTU of a connection, it is not known what behaviour to expect:
+# * the bluetooth stack of the sending device might truncate the payload (in which case it will likely be malformed because 
+# the flags will no longer reflect the payload, if indeed the flags are not the part that is truncated).
+# * the payload might be not be sent at all.
+# * something else might happen. 
 # 
-# Fields above the “minimum MTU cutoff” are likely to be included even in low-MTU scenarios.
-# Fields below that point are lower priority and might be omitted on older or constrained devices.
+# Some untested potential options to cater for low MTU environments (listed easy to complex):
+# * Remove (or comment out) field groups from the FIELD_GROUPS list, such that the remaining fields total five less than the MTU
+#   to allow for the flags and ATT headers. The application will then not support those commented out fields and so the 
+#   supported Fitness Machine Feature Flags of the bluetooth advertisement should be adjusted accordingly.
+# * Assume MTU = 23 and add logic to send the data in two payloads (the RowerData characteristic has a maximum of 29 fields, so
+#   will always fit in two payloads).
+# * Determine the actual MTU that is negotiated, or try to negotiate a higher MTU, and then tailor the payload to the actual
+#   MTU.
+
 FIELD_GROUPS = [                                                                            ### CORRESPONDING Fitness Machine Feature Support bit ###
     (RowingFieldFlags.STROKE_INFO, [                                                        # No corresponding Feature bit
         BLEField("stroke_rate", "B", 1),    # uint8    
         BLEField("stroke_count", "H", 2),   # uint16
     ]),
+    (RowingFieldFlags.AVERAGE_STROKE_RATE, [BLEField("avg_stroke_rate", "B", 1)]),             # Cadence Supported (bit 1)
     (RowingFieldFlags.TOTAL_DISTANCE, [BLEField("total_distance", "I", 3)]),       # 24-bit    # Total Distance Supported (bit 2)
     (RowingFieldFlags.INSTANT_PACE, [BLEField("instant_pace", "H", 2)]),                       # Pace Supported (bit 5)
+    (RowingFieldFlags.AVERAGE_PACE, [BLEField("avg_pace", "H", 2)]),                           # Pace Supported (bit 5)
     (RowingFieldFlags.INSTANT_POWER, [BLEField("instant_power", "h", 2, True)]),   # sint16    # Power Measurement Supported (bit 14)
-    (RowingFieldFlags.ELAPSED_TIME, [BLEField("elapsed_time", "I", 3)]),           # 24-bit    # Elapsed Time Supported (bit 12)
+    (RowingFieldFlags.AVERAGE_POWER, [BLEField("avg_power", "h", 2, True)]),       # sint16    # Power Measurement Supported (bit 14)
+    (RowingFieldFlags.RESISTANCE_LEVEL, [BLEField("resistance", "B", 1)]),                     # Resistance Level Supported (bit 7)
     (RowingFieldFlags.EXPENDED_ENERGY, [                                                    # Expended Energy Supported (bit 9)
         BLEField("total_energy", "H", 2),
         BLEField("energy_per_hour", "H", 2),
         BLEField("energy_per_min", "B", 1),
     ]),
-                                        #### Minimum MTU cutoff ####
     (RowingFieldFlags.HEART_RATE, [BLEField("heart_rate", "B", 1)]),                           # Heart Rate Measurement Supported (bit 10)
-    (RowingFieldFlags.REMAINING_TIME, [BLEField("remaining_time", "I", 3)]),                   # Remaining Time Supported (bit 13)
     (RowingFieldFlags.METABOLIC_EQUIVALENT, [BLEField("metabolic_equivalent", "B", 1)]),       # Metabolic Equivalent Supported (bit 11)
-    (RowingFieldFlags.RESISTANCE_LEVEL, [BLEField("resistance", "B", 1)]),                     # Resistance Level Supported (bit 7)
-    (RowingFieldFlags.AVERAGE_STROKE_RATE, [BLEField("avg_stroke_rate", "B", 1)]),             # Cadence Supported (bit 1)
-    (RowingFieldFlags.AVERAGE_PACE, [BLEField("avg_pace", "H", 2)]),                           # Pace Supported (bit 5)
-    (RowingFieldFlags.AVERAGE_POWER, [BLEField("avg_power", "h", 2, True)]),       # sint16    # Power Measurement Supported (bit 14)
+    (RowingFieldFlags.ELAPSED_TIME, [BLEField("elapsed_time", "I", 3)]),           # 24-bit    # Elapsed Time Supported (bit 12)
+    (RowingFieldFlags.REMAINING_TIME, [BLEField("remaining_time", "I", 3)]),                   # Remaining Time Supported (bit 13)
 ]
 
 class RowerData(Characteristic):
