@@ -757,8 +757,6 @@ class Rower(object):
     def request_reset(self):
         logger.debug("Sending reset request to S4 via serial connection.")
         self.write(RESET_REQUEST)
-        self.notify_callbacks(S4Event.build('reset'))
-
 
     def request_address(self, address: str):
         """

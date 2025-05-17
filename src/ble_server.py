@@ -125,19 +125,23 @@ def request_reset_ble():
     logger.debug("Entering request_reset_ble")
     out_q_reset.put("reset_ble")
 
-def fmcp_request_control_handler(payload):
+def fmcp_request_control_handler(payload: list[dbus.Byte], rower_state: RowerState) -> int:
     return 0x01  # Success
 
-def fmcp_reset_handler(payload):
-    request_reset_ble()
+def fmcp_reset_handler(payload: list[dbus.Byte], rower_state: RowerState) -> int:
+    rower_state.reset_rower()
     return 0x01  # Success
 
-def fmcp_command_handler(opcode, payload) -> int:
-    handler = FTM_SUPPORTED_OPCODES.get(opcode)
-    if handler:
-        return handler(payload)
-    logger.warning(f"Recieved valid but unsupported OpCode: {opcode}")
-    return 0x02  # Op code not supported
+# Create an enclosure to give the command handlers access to the RowerState without having to modify the generic
+# Fitness Machine Control Point class.
+def make_fmcp_command_handler(rower_state: RowerState) -> Callable[[FitnessMachineControlPoint.FTMControlOpCode, list[int]], int]:
+    def fmcp_command_handler(opcode: FitnessMachineControlPoint.FTMControlOpCode, payload: list[int]) -> int:
+        handler = FTM_SUPPORTED_OPCODES.get(opcode)
+        if handler:
+            return handler(payload, rower_state)
+        logger.warning(f"Recieved valid but unsupported OpCode: {opcode}")
+        return 0x02  # Op code not supported
+    return fmcp_command_handler
 
 
 # Specify which Fitness Machine Control Point OpCodes our application supports, 
@@ -383,7 +387,7 @@ def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, rower_state: R
 
     ftm_cp = FitnessMachineControlPoint(bus, 2, ftm_service)
 
-    ftm_cp.command_handler = fmcp_command_handler
+    ftm_cp.command_handler = make_fmcp_command_handler
     ftm_service.add_characteristic(ftm_cp)
 
     logger.debug("main: Calling add_service - FTMservice")

@@ -295,15 +295,115 @@ Similarly, if a connection parameter update is sent before the pairing procedure
 Conclusion:
 The HCI ERROR DIFF TRANSACTION COLLISION occurs when Bluetooth operations clash with each other, typically when pairing, bonding, and connection parameter updates are initiated in parallel. The solution is to carefully manage the sequence and timing of these operations, ensuring they don’t overlap in a way that causes conflicts. You may want to experiment with delaying certain actions or explicitly sequencing them to avoid triggering the error.
 
-4. Consider static passkey if Bluetooth MITM requirement is too frequent
+## 4. Consider static passkey if Bluetooth MITM requirement is too frequent
 This post suggests a static passkey
 https://devzone.nordicsemi.com/f/nordic-q-a/47273/mitm-set-when-using-justwork-option-how-is-this-possible 
 Here's some security considerations though
 https://security.stackexchange.com/questions/206333/just-works-bluetooth-low-energy-security
 
-5. JustWorks bluetooth
+## 5. JustWorks bluetooth
 There are some more further reading links for JustWorks bluetooth here:
 https://devzone.nordicsemi.com/f/nordic-q-a/17165/ble-just-works-pairing
 
-6. Apple bluetooth
+## 6. Apple bluetooth
 Consider copying over services/update-bt-cfg files from pirowflo to support Apple bluetooth. This would also require re-enabling the relevant code within install.sh.
+
+## 7. Webpage.
+Could a raspberry pi zero 2 run wrowfusion and also serve up a little website to show the data in real time? Does it have enough power? Would I also need to have a database which wrowfusion updates with the data, and from where the website would grab the data? How would the website show the data in real time? Constantly refreshing the page would not be practical. 
+
+
+ChatGPT said:
+Yes, a Raspberry Pi Zero 2 can run WRowFusion and serve a lightweight real-time web interface — but there are some architectural considerations to keep it efficient.
+
+✅ Feasibility on Pi Zero 2
+The Raspberry Pi Zero 2 W has:
+
+1GHz quad-core ARM Cortex-A53
+
+512MB RAM
+
+For headless, single-purpose tasks (e.g., WRowFusion + web server), it's capable enough, as long as you:
+
+Keep background services minimal
+
+Use efficient Python libraries
+
+Avoid heavyweight frameworks (e.g., Django, full Node.js stacks)
+
+🧠 Architecture Recommendation
+1. WRowFusion
+Continues running as a systemd service
+
+Shares live data via an in-memory structure or IPC
+
+2. Data Sharing
+You have a few viable approaches:
+
+Option A: Shared In-Memory Data (No Database)
+WRowFusion serves a local API using something like FastAPI or Flask (e.g., /metrics)
+
+The web frontend queries this API periodically (via JavaScript fetch or WebSocket)
+
+✅ Simplest and efficient for live data; no database overhead
+
+Option B: Write to a Lightweight Database
+WRowFusion periodically updates an SQLite file or Redis instance
+
+Web frontend reads from it
+
+✅ Better if you want history or logging
+⚠️ Slightly more resource intensive
+
+🖥️ Web Frontend for Real-Time Display
+Avoid refreshing the page. Use:
+
+✅ WebSockets (Recommended)
+Server pushes data to browser as soon as it changes
+
+Use a small server like:
+
+aiohttp with WebSocket support
+
+FastAPI + starlette.websockets
+
+✅ JavaScript Polling
+Use setInterval() to fetch JSON data every second or so
+
+Simpler than WebSockets but slightly less efficient
+
+Example (JS Polling):
+js
+Copy
+Edit
+setInterval(() => {
+  fetch('/metrics')
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById("strokeRate").textContent = data.stroke_rate;
+      // update other fields
+    });
+}, 1000);
+🧰 Suggested Stack
+Component	Tool / Tech
+Backend API	FastAPI or Flask
+WebSocket (if used)	websockets or starlette
+Frontend	Vanilla HTML + JS or lightweight Vue/React
+Optional DB	SQLite (for history)
+
+🔋 Performance Tips
+Minimise logging and background services
+
+Use uvicorn or gunicorn in async mode
+
+If memory is tight, offload historical logging to another device later
+
+✅ Conclusion
+Yes, the Pi Zero 2 W is capable, especially if you:
+
+Stick to lightweight frameworks
+
+Use an in-memory API or lightweight DB
+
+Use WebSockets or JS polling for live updates
+
+Would you like a minimal working example of the API and frontend setup?

@@ -28,15 +28,16 @@ This module:
 2) Captures the data from the s4 using the Rower class defined in s4if.py.
 
 In the case of 2)
-3 callback functions are registered to the s4if.Rower class. Those functions get exectuted as soon as any of the 
+Two callback functions are registered to the s4if.Rower class. Those functions get exectuted as soon as any of the 
 events for which we watch is recieved from the s4 via the Rower._start_capturing() method.
 Each of the three callback functions create a dict of WaterRower data, each with a different value set. 
 1) reset_requested: Intention is to reset the S4, so all values should be set to 0 even if old values persist in the WR memory.
    These 'reset' values are stored in the WRValues_rst dictionary.
 2) pulse_monitor: Caters for the periods of no rowing (e.g. during rest intervals). Set all instantaneous values to 0 e.g power, pace, 
    stroke rate. Other values are not set to 0 in the WR memory. These 'standstill' values are stored in the WRValues_standstill dictionary.
-3) on_rower_event: Normal rowing, so capture data from WR memory without modification. These 'normal' rowing values are stored
-   in the WRValues dictionary.
+3) on_rower_event: This callback handles the commands received from the rower. During normal rowing, it will capture data from WR memory 
+   storing rowing data in the WRValues dictionary and store values used for various computations in appropriate attributes. It also handles
+   the constructed 'reset' event which is not received from the   
 
 Depeding on thoses cases, load the appropriate values into the TXValues dictionary for transmission via BLE/ANT. 
 
@@ -67,7 +68,7 @@ heartbeat_signal = DigitalOutputDevice(HEARTBEAT_PIN, active_high=True, initial_
 NO_ROWING_PULSE_GAP = 300
 
 IGNORE_LIST = [
-    'wr', 'ok', 'ping', 'model', 'pulse', 'error', 'exit', 'reset',
+    'wr', 'ok', 'ping', 'model', 'pulse', 'error', 'exit',
     'none',
     #'total_distance_dec',
     #'total_distance',
@@ -127,6 +128,7 @@ class RowerState(object):
         self.WRValues: dict[str, Any] = {}
         self.WRValues_standstill: dict[str, Any] = {}
         self.TXValues: dict[str, Any] = {}
+        self.ResetRower: bool | None = None
 
         #### Temporary stuff for exploring values returned by S4 ##########
         self._TempLowFreq: dict[str, Any] = {}
@@ -152,18 +154,17 @@ class RowerState(object):
             self.initialise(rower_interface)
 
     def initialise(self, rower_interface: Rower) -> None:
-        with self._wr_lock:
-            """Initialise RowerState once a rower interface becomes available."""
-            self._rower_interface = rower_interface
-            self._rower_interface.register_callback(self.reset_requested)
-            self._rower_interface.register_callback(self.pulse_monitor)
-            self._rower_interface.register_callback(self.on_rower_event)
-        logger.info("RowerState successfully initialised with rower_interface.")
-
         # Initialise the attributes, particularly the WRValues dictionaries because subsequent
         # code tries to update the values of the dictionaries and so expect the dictionary keys
         # to exist already.
-        self._reset_state()
+        self._zero_state()
+
+        with self._wr_lock:
+            """Initialise RowerState once a rower interface becomes available."""
+            self._rower_interface = rower_interface
+            self._rower_interface.register_callback(self.pulse_monitor)
+            self._rower_interface.register_callback(self.on_rower_event)
+        logger.info("RowerState successfully initialised with rower_interface.")
 
     @property
     def is_initialised(self) -> bool:
@@ -171,10 +172,10 @@ class RowerState(object):
         with self._wr_lock:
             return self._rower_interface is not None
     
-    def _reset_state(self) -> None:
-        logger.debug("RowerState._reset_state: Attempting lock")
+    def _zero_state(self) -> None:
+        logger.debug("RowerState._zero_state: Attempting lock")
         with self._wr_lock:
-            logger.debug("RowerState._reset_state: Lock attained, setting values")
+            logger.debug("RowerState._zero_state: Lock attained, setting values")
             self._RecentStrokesMaxPower = []
             self._StrokeMaxPower = 0
             self._DrivePhase = False
@@ -221,10 +222,11 @@ class RowerState(object):
             self.WRValues = deepcopy(self.WRValues_rst)
             self.WRValues_standstill = deepcopy(self.WRValues_rst)
             self.TXValues = deepcopy(self.WRValues_rst)
-            logger.debug("RowerState._reset_state: Values set")
-            logger.debug(f"RowerState._reset_state: WRValues = {self.WRValues}")
-            logger.debug("RowerState._reset_state: Releasing lock")
-        logger.debug("RowerState._reset_state: Lock released.")
+            self.ResetRower = False
+            logger.debug("RowerState._zero_state: Values set")
+            logger.debug(f"RowerState._zero_state: WRValues = {self.WRValues}")
+            logger.debug("RowerState._zero_state: Releasing lock")
+        logger.debug("RowerState._zero_state: Lock released.")
 
     def on_rower_event(self, event: S4Event) -> None:
         #logger.debug(f"Received event: {event}")
@@ -448,15 +450,10 @@ class RowerState(object):
                 self._RecentStrokesMaxPower = []
                 self.WRValuesStandstill()
 
-    def reset_requested(self,event: S4Event) -> None:
-        if event.type == 'reset':
-            logger.debug("RowerState.reset_requested: Requesting Lock")
-            with self._wr_lock:
-                logger.debug("RowerState.reset_requested: Lock attained")
-                logger.debug("RowerState.reset_requested: Calling _reset_state")
-                self._reset_state()
-                logger.info("value reseted")
-
+    def reset_rower(self):
+        if self._rower_interface:
+            self._rower_interface.request_reset()
+        self._zero_state()
 
     def WRValuesStandstill(self) -> None:
         with self._wr_lock:
@@ -547,14 +544,14 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor, rower_state:
     logger.info("Waterrower Ready and sending data to BLE and ANT Thread")
 
     while True:
-        start = time.time()
-        try:
-            if not in_q.empty():
-                ResetRequest_ble = in_q.get()
-                parts = ResetRequest_ble.split()
-                cmd = parts[0]
-                if cmd == "reset_ble":
-                    S4.request_reset()
+ #       start = time.time()
+#        try:
+#            if not in_q.empty():
+#                ResetRequest_ble = in_q.get()
+#                parts = ResetRequest_ble.split()
+#                cmd = parts[0]
+#                if cmd == "reset_ble":
+#                    S4.request_reset()
                 #elif cmd == "hr":
                 #    new_hr = int(parts[1])
                 #    if new_hr != ext_hr:
@@ -566,12 +563,12 @@ def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor, rower_state:
             
             #WRtoBLEANT.CueBLEANT(ble_out_q, ant_out_q, hrm)
             #logger.debug("Returned from CueBLEANT")
-        except Exception as e:
-            logger.exception(f"Exception in s4_data_task loop: {e}")
+#        except Exception as e:
+#            logger.exception(f"Exception in s4_data_task loop: {e}")
         
-        duration = time.time() - start
-        if duration > 1:
-            logger.warning(f"CueBLEANT took too long: {duration:.2f}s")
+#        duration = time.time() - start
+#        if duration > 1:
+#            logger.warning(f"CueBLEANT took too long: {duration:.2f}s")
 
         #print(type(ant_out_q))
         #print(ant_out_q)
