@@ -15,9 +15,17 @@
 - [ ] Review FTM_SUPPORTED_FEATURES in ble_server, make the list reflect what we actually support (refer to BLE specs
       determine what each thing means). Add functionality to support other features. Check whether supporting other
       features means having to transmit the features in two packets.
-
+- [ ] Webserver and website (see note 7).
+- [ ] In the s4 data task, perhaps have a check for an attribute that asks the task to shut down and handle that gracefully,
+        rather than just looping indefinitely.
+- [ ] Do we ever issue an exit command. Why do we build an exit event in s4if? Exit would always be sent to the S4 from the 
+        PC, so any handling of that should be done by the part of the application that sent the exit command. We shouldn't
+        have to build a contrived event just to handle the application logic.
 
 ## 🔄 Data Handling
+- [ ] Remove hrm monitor argument from s4 data task. Heart rate will be injected at publish time (bluetooth/ant/etc).
+- [ ] At the start of the S4 data task either simplify the reset procedure, or don't reset. Afterall, why should we override the S4's state?
+        If we do want to reset then we can just call the reset_rower method of the RowerState class as opposed to the S4.request reset.
 - [ ] Replace deque with shared RowerState instance
 - [ ] Replace reset q with object
 - [ ] Make RowerState accessible across threads
