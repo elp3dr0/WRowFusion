@@ -301,8 +301,11 @@ def inject_heart_rate(values, hrm: HeartRateMonitor):
         logger.warning("inject_heart_rate recieved invalid values input: %s", values)
         return values
     
+    logger.debug("inject heart rate received valid dict")
     if values.get('heart_rate', 0) == 0:
+        logger.debug("heart rate in dict is 0 so getting external hr")
         ext_hr = hrm.get_heart_rate()
+        logger.debug(f"external heart rate got at: {ext_hr}")
         if ext_hr:
             values['heart_rate'] = ext_hr
     return values
