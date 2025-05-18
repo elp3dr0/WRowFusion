@@ -162,6 +162,7 @@ class FitnessMachineControlPoint(Characteristic):
 
         if self.command_handler:
             result = self.command_handler(opcode, payload)
+            logger.debug(f"Got result from command_handler {result}")
             if isinstance(result, tuple):
                 result_code, response_param = result
             else:
