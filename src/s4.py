@@ -127,7 +127,6 @@ class RowerState(object):
         self.WRValues_rst: dict[str, Any] = {}
         self.WRValues: dict[str, Any] = {}
         self.WRValues_standstill: dict[str, Any] = {}
-        self.TXValues: dict[str, Any] = {}
         self.ResetRower: bool | None = None
 
         #### Temporary stuff for exploring values returned by S4 ##########
@@ -221,7 +220,6 @@ class RowerState(object):
                 }
             self.WRValues = deepcopy(self.WRValues_rst)
             self.WRValues_standstill = deepcopy(self.WRValues_rst)
-            self.TXValues = deepcopy(self.WRValues_rst)
             self.ResetRower = False
             logger.debug("RowerState._zero_state: Values set")
             logger.debug(f"RowerState._zero_state: WRValues = {self.WRValues}")
@@ -513,7 +511,7 @@ def s4_heart_beat_task(hrm: HeartRateMonitor):
             time.sleep(0.5)
 
 
-def s4_data_task(hrm: HeartRateMonitor, rower_state: RowerState):
+def s4_data_task(rower_state: RowerState):
     logger.debug("s4_data_task: Initialising Rower class")
     S4 = Rower()
     logger.debug("s4_data_task: Opening Rower class")

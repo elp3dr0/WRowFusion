@@ -24,26 +24,25 @@
 
 ## 🔄 Data Handling
 - [ ] Remove hrm monitor argument from s4 data task. Heart rate will be injected at publish time (bluetooth/ant/etc).
-- [ ] At the start of the S4 data task either simplify the reset procedure, or don't reset. Afterall, why should we override the S4's state?
-        If we do want to reset then we can just call the reset_rower method of the RowerState class as opposed to the S4.request reset.
-- [ ] Replace deque with shared RowerState instance
-- [ ] Replace reset q with object
-- [ ] Make RowerState accessible across threads
+- [ ] At the start of the S4 data task either simplify the reset procedure, or don't reset. Afterall, why should we override the S4's state? If we do want to reset then we can just call the reset_rower method of the RowerState class as opposed to the S4.request reset.
+- [x] Replace deque with shared RowerState instance
+- [x] Replace reset q with object
+- [x] Make RowerState accessible across threads
 - [ ] Evaluate thread safety of RowerState callbacks
-- [ ] Remove TXValues from s4.py if shared access to RowerState is working
-- [ ] Remove CueToBLEANT from s4.py if shared access to RowerState is working and remove the commented out logic from the main routine in s4.py
-- [ ] I want my application to be responsive to the workout mode that someone has selected on the S4. What frequency should I poll those at? Should the polling 
-        be another loop in s4if, or should it be application side? Store the modes when the flags are read.
+- [x] Remove TXValues from s4.py if shared access to RowerState is working
+- [x] Remove CueToBLEANT from s4.py if shared access to RowerState is working and remove the commented out logic from the main routine in s4.py
+- [ ] I want my application to be responsive to the workout mode that someone has selected on the S4. What frequency should I poll those at? Should the polling be another loop in s4if, or should it be application side? Store the modes when the flags are read.
 - [ ] The workout flags are currently being converted to decimal on import, so adjust the decode_flags method to accept either int or hex string.
 - [ ] Respond to the workout mode in application side logic. E.g. store the workout limit field as a duration limit or distance limit.
 - [x] See what's in registers 144-147 and 1E4-1E7. Result - s4 returns an error response when a request to read those addresses is sent
 - [ ] Decide whether to inc sec_dec. In anycase decide whether to round or not and adjust the code as necessary.
 - [ ] Handle all the rest of the workout data
 - [ ] Figure out how to indicate just row or workout, and how to determine just row conditions - is it flags =0 or flags <16?
-- [ ] In s4if Make get on demand command stuff thread safe. Decide how destructive it will be for existing requests in the buffer, and how
-        impolite it will be with hogging the serial while waiting for its response.
+- [ ] In s4if Make get on demand command stuff thread safe. Decide how destructive it will be for existing requests in the buffer, and how impolite it will be with hogging the serial while waiting for its response.
 - [ ] Remove the data_logger logger from S4 RowerState class once it's served its purpose.
 - [ ] Move inject HR logic to the ble/ant publishing part of the code, rather than inserting it in the s4 data
+- [ ] Consider adding timestamp for each WRValues datum
+- [ ] Consider allowing None values for WRValue data, but keys should still be initialised even if their value is None because their presence will be expected by other parts of the code. I'd have to update other parts of the code to handle none values in WRValues.
 
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)
