@@ -158,8 +158,10 @@ class FitnessMachineControlPoint(Characteristic):
             opcode = self.FTMControlOpCode(opcode_value)
         except ValueError:
             logger.warning(f'FMCP OpCode not recognised: Ox{opcode_value:02X}')
-            return self._build_response(opcode_value, result_code=0x02)  # Op code not recognised so return unsupported response.
-
+            response = self._build_response(opcode_value, result_code=0x02)  # Op code not recognised so return unsupported response.
+            self.PropertiesChanged(GATT_CHRC_IFACE, {'Value': response}, [])
+            return
+        
         if self.command_handler:
             result = self.command_handler(opcode, payload)
             logger.debug(f"Got result from command_handler {result}")

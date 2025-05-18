@@ -3,8 +3,13 @@
 # https://github.com/inonoob/pirowflo
 # Extensively refactored and expanded for WRowFusion
 # ---------------------------------------------------------------------------
+from typing import TYPE_CHECKING
 
-import dbus
+if TYPE_CHECKING:
+    import dbus
+else:
+    import dbus
+    
 import logging
 
 DBUS_OM_IFACE = "org.freedesktop.DBus.ObjectManager"
