@@ -480,15 +480,6 @@ class RowerState(object):
         logger.debug("getWRValues lock ended")
         return values
 
-    def inject_HR(self, values, hrm: HeartRateMonitor) : 
-        if not isinstance(values, dict):
-            logger.warning("inject_HR recieved invalid values input: %s", values)
-            return None
-        
-        if values['heart_rate'] == 0 and (ext_hr := hrm.get_heart_rate()) != 0:
-            values['heart_rate'] = ext_hr
-        return values
-
 
 def s4_heart_beat_task(hrm: HeartRateMonitor):
     """Simulate continuous ANT+ heart rate signal to transmit to the S4 via 3.5mm jack."""
@@ -521,8 +512,8 @@ def s4_data_task(rower_state: RowerState):
     # which polls the S4 will not be executed unecessarily before an S4 is
     # connected
     
-    S4.request_reset()
-    logger.debug("s4_data_task: Initialising RowerState")
+    #S4.request_reset()
+    #logger.debug("s4_data_task: Initialising RowerState")
 
     rower_state.initialise(S4)
     logger.info("Waterrower Ready and sending data to BLE and ANT Thread")

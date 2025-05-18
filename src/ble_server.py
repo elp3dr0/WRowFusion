@@ -172,7 +172,7 @@ BLE_FIELD_MAP: TransformMap = {
     "total_energy": lambda wr_values: int(wr_values.get("total_calories", 0) / 1000),
     "energy_per_hour": lambda wr_values: int(3.6 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
     "energy_per_min": lambda wr_values: int(0.06 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
-    #"heart_rate",
+    "heart_rate": lambda wr_values: wr_values.get("heart_rate", 0),
     #"remaining_time",
     #"metabolic_equivalent",
     #"resistance",
@@ -182,10 +182,11 @@ BLE_FIELD_MAP: TransformMap = {
 }
 
 class AppRowerData(RowerData):
-    def __init__(self, bus, index, service, rower_state: RowerState):
+    def __init__(self, bus, index, service, rower_state: RowerState, hr_monitor: HeartRateMonitor):
         super().__init__(bus, index, service)
         self.last_payload = None
         self.rower_state = rower_state
+        self.hr_monitor = hr_monitor
 
     def rowerdata_cb(self):
         logger.debug("Running AppRowerData.rowerdata_cb")
@@ -199,6 +200,7 @@ class AppRowerData(RowerData):
             return self.notifying
         
         logger.debug(f"Got values: {wr_values}")
+        wr_values = inject_heart_rate(wr_values, self.hr_monitor)
         ble_rower_data = {
             ble_key: int(func(wr_values) or 0) 
             for ble_key, func in BLE_FIELD_MAP.items()
@@ -288,7 +290,22 @@ def sigint_handler(sig, frame):
         mainloop.quit()
     else:
         raise ValueError("Undefined handler for '{}' ".format(sig))
+
+def inject_heart_rate(values, hrm: HeartRateMonitor):
+    """
+    Update the 'heart_rate' key in the values dictionary using the external
+    HRM if it's currently zero and the HRM provides a non-zero value.
+    Modifies the input dictionary in-place and returns it.
+    """
+    if not isinstance(values, dict):
+        logger.warning("inject_heart_rate recieved invalid values input: %s", values)
+        return values
     
+    if values.get('heart_rate', 0) == 0:
+        ext_hr = hrm.get_heart_rate()
+        if ext_hr:
+            values['heart_rate'] = ext_hr
+    return values
 
 def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
     logger.debug("main: Entering main")
@@ -357,7 +374,7 @@ def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
     ftm_features = FitnessMachineFeature(bus, 0, ftm_service, supported_features=FTM_SUPPORTED_FEATURES)
 
     ftm_service.add_characteristic(ftm_features)
-    ftm_service.add_characteristic(AppRowerData(bus, 1, ftm_service, rower_state))
+    ftm_service.add_characteristic(AppRowerData(bus, 1, ftm_service, rower_state, hr_monitor))
 
     ftm_cp = FitnessMachineControlPoint(bus, 2, ftm_service)
 
