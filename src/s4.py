@@ -491,20 +491,6 @@ class RowerState(object):
             values['heart_rate'] = ext_hr
         return values
 
-    def CueBLEANT(self, ble_out_q, ant_out_q, hrm: HeartRateMonitor):
-        #logger.debug("CueBLEANT calling get_WRValues")
-        values = self.get_WRValues()
-        #logger.debug("CueBLEANT returning from get_WRValues")
-        if values:
-            #logger.debug("CueBLEANT calling inject_HR")
-            values = self.inject_HR(values, hrm)
-            #logger.debug("CueBLEANT returning from inject_HR")
-            with self._wr_lock:
-                self.TXValues = values
-            logger.debug(f"CueBLEANT got values to append to dqueues from S4: {values}")
-            ble_out_q.append(values)
-            ant_out_q.append(values)
-
 
 def s4_heart_beat_task(hrm: HeartRateMonitor):
     """Simulate continuous ANT+ heart rate signal to transmit to the S4 via 3.5mm jack."""
@@ -527,7 +513,7 @@ def s4_heart_beat_task(hrm: HeartRateMonitor):
             time.sleep(0.5)
 
 
-def s4_data_task(in_q, ble_out_q, ant_out_q, hrm: HeartRateMonitor, rower_state: RowerState):
+def s4_data_task(hrm: HeartRateMonitor, rower_state: RowerState):
     logger.debug("s4_data_task: Initialising Rower class")
     S4 = Rower()
     logger.debug("s4_data_task: Opening Rower class")

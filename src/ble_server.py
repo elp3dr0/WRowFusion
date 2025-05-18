@@ -119,12 +119,6 @@ def register_ad_error_cb(error):
 ## FTM Service helper functions & config ##
 ###########################################
 
-def request_reset_ble():
-    # Cues up a reset of the waterrower following an instruction recieved via the FTM Control Point. 
-    # Puts "reset_ble" into the queue (FIFO), to be handled by S4 thread.
-    logger.debug("Entering request_reset_ble")
-    out_q_reset.put("reset_ble")
-
 def fmcp_request_control_handler(payload: list[dbus.Byte], rower_state: RowerState) -> int:
     logger.debug(f"Started control handler")
     return 0x01  # Success
@@ -294,34 +288,11 @@ def sigint_handler(sig, frame):
         mainloop.quit()
     else:
         raise ValueError("Undefined handler for '{}' ".format(sig))
+    
 
-WaterrowerValuesRaw_polled = None
-
-def Waterrower_poll():
-    #logger.debug("Entering Waterrower_poll")
-    global WaterrowerValuesRaw
-    global WaterrowerValuesRaw_polled
-
-    if ble_in_q_value:
-        logger.debug("Waterrower_poll: ble_q is not none, getting values...")
-        WaterrowerValuesRaw = ble_in_q_value.pop()
-        logger.debug(f"Waterrower_poll: WaterrowerValuesRaw = {WaterrowerValuesRaw}")
-        for keys in WaterrowerValuesRaw:
-            WaterrowerValuesRaw[keys] = int(WaterrowerValuesRaw[keys])
-
-        if WaterrowerValuesRaw_polled != WaterrowerValuesRaw:
-            WaterrowerValuesRaw_polled = WaterrowerValuesRaw
-            print("rower", WaterrowerValuesRaw_polled)
-
-    return True
-
-def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, rower_state: RowerState): #out_q
+def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
     logger.debug("main: Entering main")
     global mainloop
-    global out_q_reset
-    global ble_in_q_value
-    out_q_reset = out_q
-    ble_in_q_value = ble_in_q
 
     logger.debug("main: Calling dbus.mainloop.glib.DBusGMainLoop")
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -400,9 +371,6 @@ def ble_server_task(out_q,ble_in_q, hr_monitor: HeartRateMonitor, rower_state: R
     logger.debug("main: Calling add_service - HeartRate")
     app.add_service(AppHeartRate(bus,3,hr_monitor))
 
-    # Set a callback function to poll the WaterRower data every 100ms 
-    #logger.debug("main: Set up Waterrower_poll recurring task")
-    #GLib.timeout_add(100, Waterrower_poll)
 
     logger.debug("main: associate Mainloop to mainloop")
     mainloop = MainLoop()
