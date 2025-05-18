@@ -50,7 +50,11 @@
 - [ ] Add Heart Rate Control Point Characteristic to Heart Rate Service in ble_standard_service and application logic to handle reset events and computation of total session kcals, broadcasting that value to Heart rate clients. (see Bluetooth HRP V10 pdf and HRS Spec V10 pdf)
 - [ ] IIRC, the BLE server custom exceptions are defined in ble_if and are repeated in ble_server. Instead they should just be imported (can they be made subclasses of a parent class which is then imported in one class?)
 - [ ] Add support to remaining time supported (add the flags to both FTM_SUPPORTED_FEATURES and ROWER_SUPPORTED_FIELDS). But determine if I need to change these flags dynamically. E,g 
-- [ ] Currently the payload for bluetooth does not worry about MTU size. The payload could exceed the MTN size for older devices. I could add code to try to determine the MTU and then create the payload accordingly. This would be handled in ble_standard_services RowerData encode method and prepare flags and fields method. The code could easily keep track of the number of bytes as it builds the payload and then just stop building the payload once the MTU size is reached. The trickier part is getting the MTU size.   
+- [ ] Currently the payload for bluetooth does not worry about MTU size. The payload could exceed the MTN size for older devices. I could add code to try to determine the MTU and then create the payload accordingly. This would be handled in ble_standard_services RowerData encode method and prepare flags and fields method. The code could easily keep track of the number of bytes as it builds the payload and then just stop building the payload once the MTU size is reached. The trickier part is getting the MTU size.
+- [ ] Had to add the following to /boot/firmware/config.txt when the bluetooth adapter refused to come up:
+        [all]
+        enable_uart=1
+
 
 ## 🖧 Comms with S4
 - [ ] Consider handling situation when S4 gets disconnected from serial port. Currently
