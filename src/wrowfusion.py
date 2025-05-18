@@ -21,8 +21,6 @@ logger = logging.getLogger(__name__)
 
 import threading
 import signal
-from queue import Queue
-from collections import deque
 from src.s4 import (
     s4_heart_beat_task, 
     s4_data_task,

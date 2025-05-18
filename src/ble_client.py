@@ -363,11 +363,11 @@ class HeartRateBLEScanner(threading.Thread):
             logger.warning(f"Failed to handle heart rate data: {e}")
 
 
-    async def stop(self):
+    def stop(self):
         logger.debug("Stopping BLE Heart Rate Monitor Scanner")
         self._stop_event.set()
         self.scanning = False
-        await self.stop_ble_discovery()
+        asyncio.create_task(self.stop_ble_discovery())
 
 
     async def stop_ble_discovery(self) -> None:
