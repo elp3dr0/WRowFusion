@@ -8,8 +8,9 @@ from dbus_next.aio import MessageBus
 from dbus_next import Message
 from dbus_next.constants import MessageType
 
-from bleak import BleakClient, BleakScanner, BleakError
+from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
+from bleak.backends.scanner import AdvertisementData
 
 from src.heart_rate import HeartRateMonitor
 
@@ -17,10 +18,12 @@ logger = logging.getLogger(__name__)
 
 # Settings for Heart Rate Monitor (HRM) discovery
 RSSI_THRESHOLD = -80        # Minimum signal strength of device to be considered elibible for connection
-INITIAL_SCAN_TIMEOUT = 300  # Number of seconds for which initial scan will stay alive constantly unless an eligible device is found
-BONUS_SCAN_WINDOW = 15      # Additional window to discover other HRMs after the first HRM has been discovered and before a device is selected
+INITIAL_SCAN_TIMEOUT = 30  # Number of seconds for which initial scan will stay alive constantly unless an eligible device is found
+BONUS_SCAN_WINDOW = 5      # Additional window to discover other HRMs after the first HRM has been discovered and before a device is selected
                             # based on signal strength.
-RECHECK_INTERVAL = 60       # Time between periodic scans after initial scan
+INITIAL_RECHECK_INTERVAL = 5    # Introduce an exponentially increasing delay between periodic scans after initial scan.
+MAX_RECHECK_INTERVAL = 60       # Start with a delay of INITIAL_RECHECK_INTERVAL, and grow to a cap of MAX_RECHECK_INTERVAL
+
 RECHECK_DURATION = 30       # Duration of each periodic scan
 
 LOW_FREQ_POLL_DELAY = 30    # Delay between polls of low frequency HRM data such as battery level 
@@ -44,21 +47,23 @@ CONTACT_STATUS_MEANING = {
 class HeartRateBLEScanner(threading.Thread):
     def __init__(self, hr_monitor: HeartRateMonitor):
         super().__init__()
-        self.hr_monitor = hr_monitor
+        self.hr_monitor : HeartRateMonitor = hr_monitor
         self.daemon = True
-        self._stop_event = threading.Event()
-        self.target_device = None
-        self.connected = False
-        self.scanning = None
+        self._stop_event : threading.Event = threading.Event()
+        self.target_device: BLEDevice | None = None
+        self.connected: bool = False
+        self.scanning: bool = False
 
-    def run(self):
+    def run(self) -> None:
         asyncio.run(self.monitor_loop())
 
-    async def monitor_loop(self):
+    async def monitor_loop(self) -> None:
         scan_window = INITIAL_SCAN_TIMEOUT
+        recheck_interval = INITIAL_RECHECK_INTERVAL
+
         # Stop any existing discovery process on the hci0 adapter to avoid
         # encountering an error when we start the new discovery process
-        self.stop_ble_discovery
+        await self.stop_ble_discovery()
         while not self._stop_event.is_set():
             try:
                 await self.scan_for_hrm(scan_window)
@@ -66,99 +71,116 @@ class HeartRateBLEScanner(threading.Thread):
                     try:
                         # Try to connect, and then block until disconnected
                         await self.connect_and_monitor(self.target_device)
+                        recheck_interval = INITIAL_RECHECK_INTERVAL
+                    except asyncio.CancelledError:  # inherits from BaseException (as opposed to Exception) so handle explicitly 
+                        logger.info("BLE HRM monitor loop was cancelled.")
+                        raise
                     except Exception as e:
                         logger.error(f"BLE scanner connection error: {e}")
-                    self.connected = False
-                    self.target_device = None
+                        recheck_interval = min(recheck_interval * 2, MAX_RECHECK_INTERVAL)
+                else:
+                    # No device found — increment the delay
+                    logger.info("No BLE HRM found during scan period.")
+                    recheck_interval = min(recheck_interval * 2, MAX_RECHECK_INTERVAL)
 
             except Exception as e:
-                logger.error(f"HeartRateBLEScanner Monitor loop error: {e}. Retrying in {RECHECK_INTERVAL} seconds.")
+                logger.error(f"Error incurred while scanning for bluetooth HRM: {e}.")
+                recheck_interval = min(recheck_interval * 2, MAX_RECHECK_INTERVAL)
 
+            self.connected = False
+            self.target_device = None
+
+            logger.debug(f"Retrying scan for BLE HRM in {recheck_interval} seconds.")
             scan_window = RECHECK_DURATION
-            await asyncio.sleep(RECHECK_INTERVAL)
+            await asyncio.sleep(recheck_interval)
 
-    async def scan_for_hrm(self, timeout) -> BLEDevice | None:
+    async def scan_for_hrm(self, timeout: int) -> None:
         logger.info("Starting device discovery scan for BLE Heart Rate Monitor...")
         self.scanning = True
         devices: dict[str, BLEDevice] = {}
         rssi_map: dict[str, int] = {}
 
-        async with BleakScanner() as scanner:
-            start_time = time.time()
-            found_good_device = False
-            bonus_window_start = None
+        try:
+            async with BleakScanner() as scanner:
+                start_time = time.time()
+                found_good_device = False
+                bonus_window_start = None
 
-            adv_iterator = scanner.advertisement_data()
+                adv_iterator = scanner.advertisement_data()
 
-            while self.scanning:
-                
-                now = time.time()
-                if now - start_time > timeout:
-                    logger.debug("BLE HRM discovery scan timeout reached.")
-                    self.scanning = False
-                    break
-                if bonus_window_start and (now -bonus_window_start > BONUS_SCAN_WINDOW):
-                    logger.debug("BLE HRM disovery scan bonus window expired.")
-                    self.scanning = False
-                    break
+                while self.scanning:
+                    
+                    now = time.time()
+                    if now - start_time > timeout:
+                        logger.debug("BLE HRM discovery scan timeout reached.")
+                        self.scanning = False
+                        break
+                    if bonus_window_start and (now -bonus_window_start > BONUS_SCAN_WINDOW):
+                        logger.debug("BLE HRM disovery scan bonus window expired.")
+                        self.scanning = False
+                        break
 
-                if self._stop_event.is_set():
-                    self.scanning = False
-                    break
+                    if self._stop_event.is_set():
+                        self.scanning = False
+                        break
 
-                # Ask for the next item from the iterator, but give it a timelimit
-                # to return the item, afterwhich move on even if a new device hasn't been found.
-                # This it to prevent the code from hanging here if no additional 
-                # devices ever appear. 
-                try:
-                    d, adv = await asyncio.wait_for(adv_iterator.__anext__(), timeout=1.0)
-                except (TimeoutError, StopAsyncIteration):
-                    await asyncio.sleep(0.1)    # prevent tight loop on timeout
-                    continue  # No new device seen in this window so go back to the top of the while loop
+                    # Ask for the next item from the iterator, but give it a timelimit
+                    # to return the item, afterwhich move on even if a new device hasn't been found.
+                    # This it to prevent the code from hanging here if no additional 
+                    # devices ever appear. 
+                    try:
+                        d, adv = await asyncio.wait_for(adv_iterator.__anext__(), timeout=1.0)
+                    except (TimeoutError, StopAsyncIteration):
+                        await asyncio.sleep(0.1)    # prevent tight loop on timeout
+                        continue  # No new device seen in this window so go back to the top of the while loop
 
 
-                if not self._is_heart_rate_monitor(adv):
-                    logger.debug(f"BLE scan found device {d.address} is not a HRM.")
-                    # Ignore this device and go back to the top of the while loop
-                    await asyncio.sleep(0.05)  # short delay so as not to hog CPU
-                    continue
+                    if not self._is_heart_rate_monitor(adv):
+                        logger.debug(f"BLE scan found device {d.address} is not a HRM.")
+                        # Ignore this device and go back to the top of the while loop
+                        await asyncio.sleep(0.05)  # short delay so as not to hog CPU
+                        continue
 
-                if d.rssi < RSSI_THRESHOLD:
-                    logger.debug(f"BLE scan ignoring HRM {d.address} because signal strength {d.rssi} dB < {RSSI_THRESHOLD} dB threshold.")
-                    # Ignore this device and go back to the top of the while loop
-                    await asyncio.sleep(0.05)  # short delay so as not to hog CPU
-                    continue
+                    if d.rssi < RSSI_THRESHOLD:
+                        logger.debug(f"BLE scan ignoring HRM {d.address} because signal strength {d.rssi} dB < {RSSI_THRESHOLD} dB threshold.")
+                        # Ignore this device and go back to the top of the while loop
+                        await asyncio.sleep(0.05)  # short delay so as not to hog CPU
+                        continue
 
-                devices[d.address] = d
-                rssi_map[d.address] = d.rssi
-                logger.debug(f"BLE Scanner found HRM device: {d.address} ({d.rssi} dB)")
+                    devices[d.address] = d
+                    rssi_map[d.address] = d.rssi
+                    logger.debug(f"BLE Scanner found HRM device: {d.address} ({d.rssi} dB)")
 
-                if not found_good_device:
-                    logger.info(f"Found a BLE HRM, extending search for {BONUS_SCAN_WINDOW} seconds in case there are other HRM devices.")
-                    bonus_window_start = time.time()
-                    found_good_device = True
+                    if not found_good_device:
+                        logger.info(f"Found a BLE HRM, extending search for {BONUS_SCAN_WINDOW} seconds in case there are other HRM devices.")
+                        bonus_window_start = time.time()
+                        found_good_device = True
+        finally:
+             self.scanning = False
+        
+        self.scanning = False
         
         if not devices:
             logger.info(f"No BLE Heart Rate Monitor found during scan window.")
             return None
 
         # Pick device with strongest RSSI
-        best_address = max(rssi_map, key=rssi_map.get)
+        best_address = max(rssi_map, key=lambda k: rssi_map[k])
         best_rssi = rssi_map[best_address]
         logger.info(f"HRM with the strongest signal selected: ({best_rssi}db): {best_address}")
         self.target_device = devices[best_address]
 
 
-    def _is_heart_rate_monitor(self, adv) -> bool:
+    def _is_heart_rate_monitor(self, adv: AdvertisementData) -> bool:
         # Heart Rate Service UUID is 0x180D (16-bit), represented as 0000180d-0000-1000-8000-00805f9b34fb
         return HRM_SERVICE_UUID.lower() in [uuid.lower() for uuid in adv.service_uuids]
     
 
-    async def connect_and_monitor(self, device):
+    async def connect_and_monitor(self, device: BLEDevice) -> None:
         logger.info(f"Connecting as client to ble device: {device.name} [{device.address}]...")
         try:
             async with BleakClient(device.address) as client:
-                if not await client.is_connected():
+                if not client.is_connected:
                     logger.warning("Failed to connect to BLE HRM.")
                     return
                 
@@ -179,11 +201,17 @@ class HeartRateBLEScanner(threading.Thread):
                 low_freq_task = asyncio.create_task(self.poll_low_frequency_data(client))
 
                 try:
-                    while await client.is_connected():
+                    while client.is_connected:
                         await asyncio.sleep(1)
                 except asyncio.CancelledError:
                     pass
                 finally:
+                    # Gracefully unsubscribe from heart rate notifications
+                    try:
+                        await client.stop_notify(HRM_MEASUREMENT_CHAR_UUID)
+                    except Exception as e:
+                        logger.warning(f"Failed to stop HRM notifications cleanly: {e}")
+
                     # Cleanly cancel the low-frequency polling task (HRM is handled by a notify so doesn't need to be cxld)
                     low_freq_task.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
@@ -192,18 +220,14 @@ class HeartRateBLEScanner(threading.Thread):
                 self.connected = False
                 logger.warning("Disconnected from HRM.")
 
-        except BleakError as e:
-            logger.warning(f"BLE client connection failed: {e}")
-        except asyncio.TimeoutError:
-            logger.warning("BLE connection attempt timed out.")
-        except asyncio.CancelledError:
-            logger.warning("BLE connection task was cancelled.")
+        except asyncio.CancelledError:  # inherits from BaseException (as opposed to Exception) so handle explicitly 
+            logger.warning("BLE HRM connection task was cancelled.")
             raise
         except Exception as e:
-            logger.error(f"Unexpected error during BLE HRM connection: {e}")
+            raise   # Re raise so that monitor loop can implement the backoff logic in retry intervals
             
 
-    async def log_services_and_characteristics(self, client):
+    async def log_services_and_characteristics(self, client: BleakClient) -> None:
         if not client or not client.is_connected:
             logger.warning("Cannot log services — HRM not connected.")
             return
@@ -220,7 +244,7 @@ class HeartRateBLEScanner(threading.Thread):
             logger.warning(f"Failed to log GATT services: {e}")
 
 
-    async def fetch_static_info(self, client: BleakClient):
+    async def fetch_static_info(self, client: BleakClient) -> None:
         try:
             manufacturer = await client.read_gatt_char(HRM_MANUFACTURER_CHAR_UUID)
             manufacturer_str = manufacturer.decode('utf-8').strip()
@@ -264,8 +288,8 @@ class HeartRateBLEScanner(threading.Thread):
             logger.warning(f"BLE HRM: Failed to read sensor location data: {e}")
 
 
-    async def poll_low_frequency_data(self, client: BleakClient):
-        while await client.is_connected():
+    async def poll_low_frequency_data(self, client: BleakClient) -> None:
+        while client.is_connected:
             try:
                 # Battery level
                 battery = await client.read_gatt_char(HRM_BATTERY_LEVEL_CHAR_UUID)
@@ -277,7 +301,7 @@ class HeartRateBLEScanner(threading.Thread):
             await asyncio.sleep(LOW_FREQ_POLL_DELAY)
 
 
-    def handle_heart_rate(self, sender, data: bytearray):
+    def handle_heart_rate(self, sender, data: bytearray) -> None:
         """
         Handle incoming heart rate data, including optional parameters like RR intervals
         and energy expenditure.
@@ -339,14 +363,14 @@ class HeartRateBLEScanner(threading.Thread):
             logger.warning(f"Failed to handle heart rate data: {e}")
 
 
-    def stop(self):
+    async def stop(self):
         logger.debug("Stopping BLE Heart Rate Monitor Scanner")
         self._stop_event.set()
         self.scanning = False
-        self.stop_ble_discovery
+        await self.stop_ble_discovery()
 
 
-    async def stop_ble_discovery():
+    async def stop_ble_discovery(self) -> None:
         bus = await MessageBus(system=True).connect()
 
         introspect = await bus.introspect('org.bluez', '/org/bluez/hci0')
