@@ -152,7 +152,7 @@ class FitnessMachineControlPoint(Characteristic):
             ['indicate', 'write'],
             service,
         )
-        self.command_handler: Callable[[int, Any], int | Tuple[int, Any]] | None = None  # To be assigned by project-specific code
+        self.command_handler: Callable[[FitnessMachineControlPoint.FTMControlOpCode, Any], int | Tuple[int, Any]] | None = None  # To be assigned by project-specific code
 
     def WriteValue(self, value, options):    # pyright: ignore[reportIncompatibleMethodOverride]
         self.value = value

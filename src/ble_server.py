@@ -12,10 +12,12 @@ import signal
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import dbus
-    import dbus.exceptions
-    import dbus.mainloop.glib
-    import dbus.service
+    import dbus                     # pyright: ignore[reportMissingImports]
+    import dbus.exceptions          # pyright: ignore[reportMissingImports]
+    import dbus.mainloop.glib       # pyright: ignore[reportMissingImports]
+    import dbus.service             # pyright: ignore[reportMissingImports]
+    from gi.repository import GLib  # pyright: ignore[reportMissingImports]
+    import gobject as GObject       # pyright: ignore[reportMissingImports]
 else:
     import dbus
     import dbus.exceptions
@@ -69,19 +71,19 @@ ADAPTER_IFACE = "org.bluez.Adapter1"
 AGENT_MANAGER_IFACE = "org.bluez.AgentManager1"
 AGENT_PATH = "/com/wrowfusion/agent"
 
-MainLoop = None
+MainLoop: type | None = None
 
 try:
-    from gi.repository import GLib
+    from gi.repository import GLib  # pyright: ignore[reportMissingImports]
 
     MainLoop = GLib.MainLoop
 
 except ImportError:
-    import gobject as GObject
+    import gobject as GObject       # pyright: ignore[reportMissingImports]
 
     MainLoop = GObject.MainLoop
 
-mainloop = None
+mainloop: GLib.MainLoop | GObject.MainLoop | None = None
 
 class InvalidArgsException(dbus.exceptions.DBusException):
     _dbus_error_name = "org.freedesktop.DBus.Error.InvalidArgs"
@@ -113,7 +115,8 @@ def register_app_cb():
 
 def register_app_error_cb(error):
     logger.critical("Failed to register GATT application: " + str(error))
-    mainloop.quit()
+    if mainloop:
+        mainloop.quit()
 
 
 def register_ad_cb():
@@ -122,7 +125,8 @@ def register_ad_cb():
 
 def register_ad_error_cb(error):
     logger.critical("Failed to register GATT advertisement: " + str(error))
-    mainloop.quit()
+    if mainloop:
+        mainloop.quit()
 
 
 ###########################################
@@ -297,7 +301,8 @@ class AppHeartRate(HeartRateService):
 def sigint_handler(sig, frame):
     if sig == signal.SIGINT:
         logger.info("SIGINT received. Quitting ble_server dbus mainloop.")
-        mainloop.quit()
+        if mainloop:
+            mainloop.quit()
     else:
         raise ValueError("Undefined handler for '{}' ".format(sig))
 
@@ -331,15 +336,24 @@ def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
     # get the system bus
     bus = dbus.SystemBus()
 
-    logger.debug("main: associate Mainloop to mainloop")
-    mainloop = MainLoop()
+    if MainLoop is None:
+        logger.error("MainLoop class is not set. Exiting BLE server task.")
+        return
 
+    try:
+        mainloop = MainLoop()
+    except Exception as e:
+        logger.error(f"Exception starting main loop: {e}")
+        return
+
+    assert mainloop is not None
+    
     logger.debug("main: Getting ble controller")
     # get the ble controller
     adapter = find_adapter(bus)
 
     if not adapter:
-        logger.critical("main: GattManager1 interface not found")
+        logger.error("main: GattManager1 interface not found")
         return
 
     logger.debug("main: Getting Bluez service")
