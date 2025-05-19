@@ -209,13 +209,13 @@ class RowerState(object):
             self.WRValues_rst = {
                 'stroke_rate_pm': 0.0,
                 'stroke_count': 0,
-                'total_distance': 0,
-                'instant_500m_pace': 0,
+                'total_distance_m': 0,
+                'instant_500m_pace_secs': 0,
                 'speed_cmps': 0,
                 'instant_watts': 0,
                 'total_calories': 0,
-                'heart_rate': 0,
-                'elapsed_time': 0.0,
+                'heart_rate_bpm': 0,
+                'elapsed_time_secs': 0,
                 'stroke_ratio': 0.0,
                 }
             self.WRValues = deepcopy(self.WRValues_rst)
@@ -248,7 +248,7 @@ class RowerState(object):
             'avg_time_stroke_whole': lambda evt: self._handle_avg_time_stroke_whole(evt),       # used to calculate the stroke rate more accurately than the stroke rate event
             'avg_time_stroke_pull': lambda evt: setattr(self, '_DriveDuration', evt.value * 25),
             'avg_distance_cmps': lambda evt: self._handle_avg_distance_cmps(evt),
-            'heart_rate': lambda evt: self.WRValues.update({'heart_rate': evt.value}),
+            'heart_rate': lambda evt: self.WRValues.update({'heart_rate_bpm': evt.value}),
             '500m_pace': lambda evt: self._handle_500m_pace(evt),
             #'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate_pm': evt.value}),    # use avg_time_stroke_whole instead 
             'display_sec': lambda evt: setattr(self, '_secondsWR', evt.value),
@@ -317,7 +317,7 @@ class RowerState(object):
                 
     def _handle_total_distance(self, evt: S4Event) -> None:
         with self._wr_lock:
-            self.WRValues['total_distance'] = evt.value
+            self.WRValues['total_distance_m'] = evt.value
             self._TotalDistanceM = evt.value
 
     def _handle_total_distance_dec(self, evt: S4Event) -> None:
@@ -338,7 +338,7 @@ class RowerState(object):
 
         with self._wr_lock:
             if not speed:
-                updates = {'instant_500m_pace': 0, 'speed_cmps': 0}
+                updates = {'instant_500m_pace_secs': 0, 'speed_cmps': 0}
                 if USE_CONCEPT2_POWER:
                     updates['instant_watts'] = 0
                 self.WRValues.update(updates)
@@ -350,7 +350,7 @@ class RowerState(object):
             # Otherwise compute the 500m pace from the speed.
             if not self._500mPace:
                 pace_500m = 50000 / speed
-                self.WRValues['instant_500m_pace'] = round(pace_500m)
+                self.WRValues['instant_500m_pace_secs'] = round(pace_500m)
 
             C2watts = round(2.80 / pow((100/speed), 3))
             self._Concept2Watts = C2watts
@@ -385,7 +385,7 @@ class RowerState(object):
         with self._wr_lock:
             self._500mPace = evt.value
             if evt.value:
-                self.WRValues['instant_500m_pace'] = evt.value
+                self.WRValues['instant_500m_pace_secs'] = evt.value
 
 
     def _compute_elapsed_time(self) -> None:
@@ -398,7 +398,7 @@ class RowerState(object):
             # hour and the minute being fetched) 
             elapsed_time = max((self._ElapsedTime or 0), compiled_time)
             self._ElapsedTime = elapsed_time
-            self.WRValues['elapsed_time'] = int(elapsed_time)
+            self.WRValues['elapsed_time_secs'] = int(elapsed_time)
 
     def _compute_stroke_ratio(self) -> None:
         with self._wr_lock:
@@ -458,7 +458,7 @@ class RowerState(object):
             self.WRValues_standstill = deepcopy(self.WRValues)
             self.WRValues_standstill.update({
                 'stroke_rate_pm': 0.0,
-                'instant_500m_pace': 0,
+                'instant_500m_pace_secs': 0,
                 'speed_cmps': 0,
                 'instant_watts': 0,
             })

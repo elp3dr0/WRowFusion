@@ -144,20 +144,20 @@ TransformMap = dict[str, Callable[[dict], int | None]]
 BLE_FIELD_MAP: TransformMap = {
     "stroke_rate": lambda wr_values: wr_values.get("stroke_rate_pm", 0) * 2,   # BLE specifies units as 0.5 strokes per min.
     "stroke_count": lambda wr_values: wr_values.get("stroke_count", 0),
-    "total_distance": lambda wr_values: wr_values.get("total_distance", 0),
-    "instant_pace": lambda wr_values: wr_values.get("instant_500m_pace", 0),
+    "total_distance": lambda wr_values: wr_values.get("total_distance_m", 0),
+    "instant_pace": lambda wr_values: wr_values.get("instant_500m_pace_secs", 0),
     "instant_power": lambda wr_values: wr_values.get("instant_watts", 0),
-    "elapsed_time": lambda wr_values: wr_values.get("elapsed_time", 0),
+    "elapsed_time": lambda wr_values: wr_values.get("elapsed_time_secs", 0),
     "total_energy": lambda wr_values: int(wr_values.get("total_calories", 0) / 1000),
-    "energy_per_hour": lambda wr_values: int(3.6 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
-    "energy_per_min": lambda wr_values: int(0.06 * wr_values.get("total_calories", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
-    "heart_rate": lambda wr_values: wr_values.get("heart_rate", 0),
+    "energy_per_hour": lambda wr_values: int(3.6 * wr_values.get("total_calories", 0) / wr_values["elapsed_time_secs"]) if wr_values.get("elapsed_time_secs") else 0,
+    "energy_per_min": lambda wr_values: int(0.06 * wr_values.get("total_calories", 0) / wr_values["elapsed_time_secs"]) if wr_values.get("elapsed_time_secs") else 0,
+    "heart_rate": lambda wr_values: wr_values.get("heart_rate_bpm", 0),
     #"remaining_time",
     #"metabolic_equivalent",
     #"resistance",
-    "avg_stroke_rate": lambda wr_values: int(60 * wr_values.get("stroke_count", 0) / wr_values["elapsed_time"]) if wr_values.get("elapsed_time") else 0,
-    "avg_pace": lambda wr_values: int(500 * wr_values.get("elapsed_time", 0) / wr_values["total_distance"]) if wr_values.get("total_distance") else 0,
-    #"avg_power": lambda wr_values: int(60 * wr_values.get("total_watts")/wr_values.get("elapsed_time")),   # WR does not support total power applied, only an instantaneous power. Bluetooth spec requires the average power since the beginning of the training session.
+    "avg_stroke_rate": lambda wr_values: int(60 * wr_values.get("stroke_count", 0) / wr_values["elapsed_time_secs"]) if wr_values.get("elapsed_time_secs") else 0,
+    "avg_pace": lambda wr_values: int(500 * wr_values.get("elapsed_time_secs", 0) / wr_values["total_distance_m"]) if wr_values.get("total_distance_m") else 0,
+    #"avg_power": lambda wr_values: int(60 * wr_values.get("total_watts")/wr_values.get("elapsed_time_secs")),   # WR does not support total power applied, only an instantaneous power. Bluetooth spec requires the average power since the beginning of the training session.
 }
 
 ######################################################################
@@ -277,7 +277,7 @@ def sigint_handler(sig, frame):
 
 def inject_heart_rate(values, hrm: HeartRateMonitor):
     """
-    Update the 'heart_rate' key in the values dictionary using the external
+    Update the 'heart_rate_bpm' key in the values dictionary using the external
     HRM if it's currently zero and the HRM provides a non-zero value.
     Modifies the input dictionary in-place and returns it.
     """
@@ -286,12 +286,12 @@ def inject_heart_rate(values, hrm: HeartRateMonitor):
         return values
     
     logger.debug("inject heart rate received valid dict")
-    if values.get('heart_rate', 0) == 0:
+    if values.get('heart_rate_bpm', 0) == 0:
         logger.debug("heart rate in dict is 0 so getting external hr")
         ext_hr = hrm.get_heart_rate()
         logger.debug(f"external heart rate got at: {ext_hr}")
         if ext_hr:
-            values['heart_rate'] = ext_hr
+            values['heart_rate_bpm'] = ext_hr
     return values
 
 def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
