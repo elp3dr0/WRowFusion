@@ -108,6 +108,25 @@ class HeartRateMonitor:
         
         return hr
 
+    def inject_heart_rate(self, values):
+        """
+        Update the 'heart_rate_bpm' key in the values dictionary using the external
+        HRM if it's currently zero and the HRM provides a non-zero value.
+        Modifies the input dictionary in-place and returns it.
+        """
+        if not isinstance(values, dict):
+            logger.warning("inject_heart_rate recieved invalid values input: %s", values)
+            return values
+        
+        logger.debug("inject heart rate received valid dict")
+        if values.get('heart_rate_bpm', 0) == 0:
+            logger.debug("heart rate in dict is 0 so getting external hr")
+            ext_hr = self.get_heart_rate()
+            logger.debug(f"external heart rate got at: {ext_hr}")
+            if ext_hr:
+                values['heart_rate_bpm'] = ext_hr
+        return values
+    
     def __repr__(self):
         """Return a string representation of the current state of heart rate data."""
         with self._lock:

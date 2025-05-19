@@ -13,15 +13,22 @@ clients = set()
 # Example simulated metric data
 def compile_metrics():
     wr_values = rower_state.get_WRValues()
-        
+    wr_values = hr_monitor.inject_heart_rate(wr_values)
+    
+    # Still to add:
+    #'stroke_count': 0,
+    #'speed_cmps': 0,
+    #'total_calories': 0,
+    #'stroke_ratio': 0.0,
+
     return {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "stroke_rate": random.randint(18, 32),
-        "heart_rate": random.randint(120, 160),
-        "pace": round(random.uniform(1.8, 2.5), 2),
-        "distance": random.randint(1000, 2000),
-        "elapsed_time": int(time.time()) % 3600,
-        "power": random.randint(180, 280)
+        "stroke_rate": wr_values.get('stroke_rate_pm', 0),
+        "heart_rate": wr_values.get('heart_rate_bpm', 0),
+        "pace": wr_values.get('instant_500m_pace_secs', 0),
+        "distance": wr_values.get('total_distance_m', 0),
+        "elapsed_time": wr_values.get('elapsed_time_secs', 0),
+        "power": wr_values.get('instant_watts', 0),
     }
 
 async def broadcast():
