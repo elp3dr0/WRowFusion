@@ -14,6 +14,8 @@
 - [ ] In the s4 data task, perhaps have a check for an attribute that asks the task to shut down and handle that gracefully, rather than just looping indefinitely.
 - [ ] Do we ever issue an exit command. Why do we build an exit event in s4if? Exit would always be sent to the S4 from the PC, so any handling of that should be done by the part of the application that sent the exit command. We shouldn't have to build a contrived event just to handle the application logic.
 - [ ] Store the data in a database and transmit to fitness apps or email at the end
+- [ ] Give the API live data (e.g. like in websocket server)
+- [ ] Create a thread to start the API
 
 ## 🔄 Data Handling
 - [ ] At the start of the S4 data task either simplify the reset procedure, or don't reset. Afterall, why should we override the S4's state? If we do want to reset then we can just call the reset_rower method of the RowerState class as opposed to the S4.request reset.
