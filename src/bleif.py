@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     import dbus
 else:
     import dbus
-    
+
 import logging
 
 DBUS_OM_IFACE = "org.freedesktop.DBus.ObjectManager"
@@ -225,9 +225,12 @@ class Rejected(dbus.DBusException):
 class Agent(dbus.service.Object):
     exit_on_release = True
 
-    def __init__(self, bus, path):
+    # Pass mainloop.quit as the on_release argument in order to allow the Release method to clean up
+    # resources when the agent is no longer needed
+    def __init__(self, bus, path, on_release=None):
         super().__init__(bus, path)
         self.bus = bus  # Store the bus for later use
+        self._on_release = on_release
 
     def set_exit_on_release(self, exit_on_release):
         self.exit_on_release = exit_on_release
@@ -235,8 +238,8 @@ class Agent(dbus.service.Object):
     @dbus.service.method(AGENT_INTERFACE, in_signature="", out_signature="")
     def Release(self):
         logger.info("Release")
-        if self.exit_on_release:
-            mainloop.quit()
+        if self.exit_on_release and self._on_release:
+            self._on_release()
 
     @dbus.service.method(AGENT_INTERFACE, in_signature="os", out_signature="")
     def AuthorizeService(self, device, uuid):

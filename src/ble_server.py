@@ -9,10 +9,20 @@
 import logging
 from queue import Empty
 import signal
-import dbus
-import dbus.exceptions
-import dbus.mainloop.glib
-import dbus.service
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import dbus
+    import dbus.exceptions
+    import dbus.mainloop.glib
+    import dbus.service
+else:
+    import dbus
+    import dbus.exceptions
+    import dbus.mainloop.glib
+    import dbus.service
+
+
 import struct
 import time
 from typing import Callable
@@ -321,6 +331,9 @@ def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
     # get the system bus
     bus = dbus.SystemBus()
 
+    logger.debug("main: associate Mainloop to mainloop")
+    mainloop = MainLoop()
+
     logger.debug("main: Getting ble controller")
     # get the ble controller
     adapter = find_adapter(bus)
@@ -356,7 +369,7 @@ def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
     # on the D-Bus, implementing org.bluez.Agent1. This is essential, even though
     # the agent variable is not referred to later on.
     logger.debug("main: Get Agent")
-    agent = Agent(bus, AGENT_PATH)
+    agent = Agent(bus, AGENT_PATH, on_release=mainloop.quit)
 
     logger.debug("main: Set app object")
     app = Application(bus)
@@ -390,10 +403,6 @@ def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
     
     logger.debug("main: Calling add_service - HeartRate")
     app.add_service(AppHeartRate(bus,3,hr_monitor))
-
-
-    logger.debug("main: associate Mainloop to mainloop")
-    mainloop = MainLoop()
 
     logger.debug("main: Set agent manager")
     agent_manager = dbus.Interface(obj, AGENT_MANAGER_IFACE)

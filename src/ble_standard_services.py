@@ -1,4 +1,10 @@
-import dbus
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import dbus
+else:
+    import dbus
+
 import logging
 import struct
 from enum import Enum, IntFlag
