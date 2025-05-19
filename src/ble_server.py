@@ -7,7 +7,6 @@
 # ---------------------------------------------------------------------------
 
 import logging
-from queue import Empty
 import signal
 from typing import TYPE_CHECKING
 
@@ -15,7 +14,6 @@ if TYPE_CHECKING:
     import dbus                     # pyright: ignore[reportMissingImports]
     import dbus.exceptions          # pyright: ignore[reportMissingImports]
     import dbus.mainloop.glib       # pyright: ignore[reportMissingImports]
-    import dbus.service             # pyright: ignore[reportMissingImports]
     from gi.repository import GLib  # pyright: ignore[reportMissingImports]
     import gobject as GObject       # pyright: ignore[reportMissingImports]
 else:
@@ -24,19 +22,14 @@ else:
     import dbus.mainloop.glib
     import dbus.service
 
-
-import struct
 import time
 from typing import Callable
 
 from src.bleif import (
     Advertisement,
-    Characteristic,
-    Service,
     Application,
-    find_adapter,
-    Descriptor,
     Agent,
+    find_adapter,
 )
 
 from src.ble_standard_services import (
