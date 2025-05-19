@@ -25,11 +25,14 @@ else:
 import time
 from typing import Callable
 
+import src.ble_constants as blec
+
 from src.bleif import (
     Advertisement,
     Application,
     Agent,
     find_adapter,
+    clear_existing_advertisements,
 )
 
 from src.ble_standard_services import (
@@ -47,21 +50,6 @@ from src.s4 import RowerState
 
 logger = logging.getLogger(__name__)
 
-
-DBUS_OM_IFACE = "org.freedesktop.DBus.ObjectManager"
-DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
-
-GATT_SERVICE_IFACE = "org.bluez.GattService1"
-GATT_CHRC_IFACE = "org.bluez.GattCharacteristic1"
-GATT_DESC_IFACE = "org.bluez.GattDescriptor1"
-
-LE_ADVERTISING_MANAGER_IFACE = "org.bluez.LEAdvertisingManager1"
-LE_ADVERTISEMENT_IFACE = "org.bluez.LEAdvertisement1"
-
-BLUEZ_SERVICE_NAME = "org.bluez"
-GATT_MANAGER_IFACE = "org.bluez.GattManager1"
-ADAPTER_IFACE = "org.bluez.Adapter1"
-AGENT_MANAGER_IFACE = "org.bluez.AgentManager1"
 AGENT_PATH = "/com/wrowfusion/agent"
 
 MainLoop: type | None = None
@@ -77,26 +65,6 @@ except ImportError:
     MainLoop = GObject.MainLoop
 
 mainloop: GLib.MainLoop | GObject.MainLoop | None = None
-
-class InvalidArgsException(dbus.exceptions.DBusException):
-    _dbus_error_name = "org.freedesktop.DBus.Error.InvalidArgs"
-
-
-class NotSupportedException(dbus.exceptions.DBusException):
-    _dbus_error_name = "org.bluez.Error.NotSupported"
-
-
-class NotPermittedException(dbus.exceptions.DBusException):
-    _dbus_error_name = "org.bluez.Error.NotPermitted"
-
-
-class InvalidValueLengthException(dbus.exceptions.DBusException):
-    _dbus_error_name = "org.bluez.Error.InvalidValueLength"
-
-
-class FailedException(dbus.exceptions.DBusException):
-    _dbus_error_name = "org.bluez.Error.Failed"
-
 
 ###########################
 ## GATT helper functions ##
@@ -188,6 +156,10 @@ BLE_FIELD_MAP: TransformMap = {
     #"avg_power": lambda wr_values: int(60 * wr_values.get("total_watts")/wr_values.get("elapsed_time")),   # WR does not support total power applied, only an instantaneous power. Bluetooth spec requires the average power since the beginning of the training session.
 }
 
+######################################################################
+### Application-specific instances of standard BLE Characteristics ###
+######################################################################
+
 class AppRowerData(RowerData):
     def __init__(self, bus, index, service, rower_state: RowerState, hr_monitor: HeartRateMonitor):
         super().__init__(bus, index, service)
@@ -219,7 +191,7 @@ class AppRowerData(RowerData):
             logger.debug("Changed values in payload, so starting transmission")
             self.last_payload = payload_bytes
             value = [dbus.Byte(b) for b in payload_bytes]
-            self.PropertiesChanged(GATT_CHRC_IFACE, {'Value': value}, [])
+            self.PropertiesChanged(blec.GATT_CHRC_IFACE, {'Value': value}, [])
 
         logger.debug("Exiting rowerdata_cb")
         return self.notifying
@@ -227,11 +199,6 @@ class AppRowerData(RowerData):
     def _update(self):
         logger.debug("Entering AppRowerData _update to schedule rowerdata_cb")
         GLib.timeout_add(200, self.rowerdata_cb)
-            
-###### todo: function needed to get all the date from waterrower
-# 20 byte is max data send
-# example : 0x 2C-0B-00-00-00-00-FF-FF-00-00-00-00-00-00-00-00-00-00-00-00
-# first 2 bytes: are for rowing machine details: 0B
 
 
 class FTMPAdvertisement(Advertisement):
@@ -280,7 +247,7 @@ class AppHeartRateMeasurement(HeartRateMeasurementCharacteristic):
         if hr and hr > 0 and self.last_hr != hr:
             self.last_hr = hr
             value = [dbus.Byte(0), dbus.Byte(hr & 0xff)]
-            self.PropertiesChanged(GATT_CHRC_IFACE, { 'Value': value }, [])
+            self.PropertiesChanged(blec.GATT_CHRC_IFACE, { 'Value': value }, [])
         return self.notifying
 
 
@@ -290,6 +257,9 @@ class AppHeartRate(HeartRateService):
         super().__init__(bus, index)
         self.add_characteristic(AppHeartRateMeasurement(bus, 0, self, hr_monitor))
 
+##############################################
+### Principal routine and helper functions ###
+##############################################
 
 def sigint_handler(sig, frame):
     if sig == signal.SIGINT:
@@ -340,7 +310,7 @@ def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
         return
 
     assert mainloop is not None
-    
+        
     logger.debug("main: Getting ble controller")
     # get the ble controller
     adapter = find_adapter(bus)
@@ -350,27 +320,30 @@ def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
         return
 
     logger.debug("main: Getting Bluez service")
-    adapter_obj = bus.get_object(BLUEZ_SERVICE_NAME, adapter)
+    adapter_obj = bus.get_object(blec.BLUEZ_SERVICE_NAME, adapter)
 
     logger.debug("main: Getting Bluez properties")
-    adapter_props = dbus.Interface(adapter_obj, DBUS_PROP_IFACE)
+    adapter_props = dbus.Interface(adapter_obj, blec.DBUS_PROP_IFACE)
 
     # powered property on the controller to on
     logger.debug("main: Set bluez powered property to on")
-    adapter_props.Set(ADAPTER_IFACE, "Powered", dbus.Boolean(1))
+    adapter_props.Set(blec.BT_ADAPTER_IFACE, "Powered", dbus.Boolean(1))
     time.sleep(1.0)
 
     # Get manager objs
     logger.debug("main: Getting Bluez GATT MANAGER IFACE")
-    service_manager = dbus.Interface(adapter_obj, GATT_MANAGER_IFACE)
+    service_manager = dbus.Interface(adapter_obj, blec.GATT_MANAGER_IFACE)
     logger.debug("main: Getting Bluez ADVERTISING MANAGER IFACE")
-    ad_manager = dbus.Interface(adapter_obj, LE_ADVERTISING_MANAGER_IFACE)
+    ad_manager = dbus.Interface(adapter_obj, blec.LE_ADVERTISING_MANAGER_IFACE)
+
+    logger.debug("main: Clear existing Advertisements")
+    clear_existing_advertisements(bus)
 
     logger.debug("main: Calling FTMPAdvertisement")
     advertisement = FTMPAdvertisement(bus, 0)
 
     logger.debug("main: Get bus object for bluez service")
-    obj = bus.get_object(BLUEZ_SERVICE_NAME, "/org/bluez")
+    obj = bus.get_object(blec.BLUEZ_SERVICE_NAME, "/org/bluez")
 
     # Instantiates the Agent class. It creates the actual agent service object 
     # on the D-Bus, implementing org.bluez.Agent1. This is essential, even though
@@ -412,7 +385,7 @@ def ble_server_task(hr_monitor: HeartRateMonitor, rower_state: RowerState):
     app.add_service(AppHeartRate(bus,3,hr_monitor))
 
     logger.debug("main: Set agent manager")
-    agent_manager = dbus.Interface(obj, AGENT_MANAGER_IFACE)
+    agent_manager = dbus.Interface(obj, blec.BT_AGENT_MANAGER_IFACE)
     logger.debug("main: Register bluetooth agent with noinputnooutput")
     agent_manager.RegisterAgent(AGENT_PATH, "NoInputNoOutput") # register the bluetooth agent with no input and output which should avoid asking for pairing 
 

@@ -11,11 +11,10 @@ from enum import IntEnum, IntFlag
 from dataclasses import dataclass
 from typing import Any, Callable, Tuple
 
+import src.ble_constants as blec
 from src.bleif import Service, Characteristic
 
 logger = logging.getLogger(__name__)
-
-GATT_CHRC_IFACE = "org.bluez.GattCharacteristic1"
 
 class DeviceInformation(Service):
     UUID = '180A'
@@ -165,7 +164,7 @@ class FitnessMachineControlPoint(Characteristic):
         except ValueError:
             logger.warning(f'FMCP OpCode not recognised: Ox{opcode_value:02X}')
             response = self._build_response(opcode_value, result_code=0x02)  # Op code not recognised so return unsupported response.
-            self.PropertiesChanged(GATT_CHRC_IFACE, {'Value': response}, [])
+            self.PropertiesChanged(blec.GATT_CHRC_IFACE, {'Value': response}, [])
             return
         
         if self.command_handler:
@@ -185,7 +184,7 @@ class FitnessMachineControlPoint(Characteristic):
         response = self._build_response(opcode_value, result_code, response_param)
         logger.debug(f"Setting FMCP response: {bytes(response)}")
         self.PropertiesChanged(
-            GATT_CHRC_IFACE,
+            blec.GATT_CHRC_IFACE,
             {'Value': response},
             []
         )
