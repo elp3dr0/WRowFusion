@@ -377,7 +377,10 @@ class HeartRateBLEScanner(threading.Thread):
 
 
     async def stop_ble_discovery(self) -> None:
-        """Ensure Bluetooth discovery is not active."""
+        """
+        Ensure Bluetooth discovery is not active.
+        This cannot stop existing discovery owned by other processes.
+        """
         logger.debug(f"Attempting to stop any existing bluetooth discovery processes...")
         bus = MessageBus(bus_type=BusType.SYSTEM)
         await bus.connect()

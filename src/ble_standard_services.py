@@ -1,15 +1,15 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import dbus
+    import dbus     # pyright: ignore[reportMissingImports]
 else:
     import dbus
 
 import logging
 import struct
-from enum import Enum, IntFlag
+from enum import IntEnum, IntFlag
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable, Tuple
 
 from src.bleif import Service, Characteristic
 
@@ -118,7 +118,7 @@ class FTMService(Service):
 class FitnessMachineControlPoint(Characteristic):
     UUID = '2ad9'
 
-    class FTMControlOpCode(Enum):
+    class FTMControlOpCode(IntEnum):
         """
         Enum class representing Fitness Machine Control Point (FTM) Op Codes specified in Bluetooth_FTMS_v1.0.1.pdf.
         """
@@ -152,9 +152,9 @@ class FitnessMachineControlPoint(Characteristic):
             ['indicate', 'write'],
             service,
         )
-        self.command_handler = None  # To be assigned by project-specific code
+        self.command_handler: Callable[[int, Any], int | Tuple[int, Any]] | None = None  # To be assigned by project-specific code
 
-    def WriteValue(self, value, options):
+    def WriteValue(self, value, options):    # pyright: ignore[reportIncompatibleMethodOverride]
         self.value = value
         opcode_value = int(value[0])
         payload = value[1:]
@@ -244,7 +244,7 @@ class FitnessMachineFeature(Characteristic):
     def set_features(self, features: FitnessMachineFeatureFlags):
         self._features = features
 
-    def ReadValue(self, options):
+    def ReadValue(self, options):   # pyright: ignore[reportIncompatibleMethodOverride]
         bitfield = self._features.value.to_bytes(8, byteorder='little')  # 8 bytes required by spec
         value = [dbus.Byte(b) for b in bitfield]
         logger.debug(f'FTMS Feature Flags: {self._features} ({value})')
@@ -268,13 +268,13 @@ class HeartRateMeasurementCharacteristic(Characteristic):
             service)
         self.notifying = False
 
-    def StartNotify(self):
+    def StartNotify(self):    # pyright: ignore[reportIncompatibleMethodOverride]
         if self.notifying:
             return
         self.notifying = True
         self._update()
 
-    def StopNotify(self):
+    def StopNotify(self):    # pyright: ignore[reportIncompatibleMethodOverride]
         self.notifying = False
 
     def _update(self):
@@ -432,13 +432,13 @@ class RowerData(Characteristic):
 
         return flags, fields_to_encode
 
-    def StartNotify(self):
+    def StartNotify(self):      # pyright: ignore[reportIncompatibleMethodOverride]
         if self.notifying:
             return
         self.notifying = True
         self._update()
 
-    def StopNotify(self):
+    def StopNotify(self):      # pyright: ignore[reportIncompatibleMethodOverride]
         self.notifying = False
 
     def _update(self):
