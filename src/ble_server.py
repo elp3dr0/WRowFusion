@@ -14,8 +14,6 @@ if TYPE_CHECKING:
     import dbus                     # pyright: ignore[reportMissingImports]
     import dbus.exceptions          # pyright: ignore[reportMissingImports]
     import dbus.mainloop.glib       # pyright: ignore[reportMissingImports]
-    from gi.repository import GLib  # pyright: ignore[reportMissingImports]
-    import gobject as GObject       # pyright: ignore[reportMissingImports]
 else:
     import dbus
     import dbus.exceptions
@@ -52,19 +50,25 @@ logger = logging.getLogger(__name__)
 
 AGENT_PATH = "/com/wrowfusion/agent"
 
-MainLoop: type | None = None
+MainLoop = None  # Runtime default
+GLib = None
+GObject = None
+
+if TYPE_CHECKING:
+    from gi.repository import GLib as TypeGLib  # pyright: ignore[reportMissingImports]
+    import gobject as TypeGObject       # pyright: ignore[reportMissingImports]
+    MainLoopType = TypeGLib.MainLoop | TypeGObject.MainLoop | None
+else:
+    MainLoopType = object  # Dummy type at runtime
 
 try:
     from gi.repository import GLib  # pyright: ignore[reportMissingImports]
-
     MainLoop = GLib.MainLoop
-
 except ImportError:
     import gobject as GObject       # pyright: ignore[reportMissingImports]
-
     MainLoop = GObject.MainLoop
 
-mainloop: GLib.MainLoop | GObject.MainLoop | None = None
+mainloop: MainLoopType = None
 
 ###########################
 ## GATT helper functions ##
@@ -198,7 +202,8 @@ class AppRowerData(RowerData):
 
     def _update(self):
         logger.debug("Entering AppRowerData _update to schedule rowerdata_cb")
-        GLib.timeout_add(200, self.rowerdata_cb)
+        if GLib is not None:
+            GLib.timeout_add(200, self.rowerdata_cb)
 
 
 class FTMPAdvertisement(Advertisement):
@@ -240,7 +245,8 @@ class AppHeartRateMeasurement(HeartRateMeasurementCharacteristic):
         self.last_hr = 0
 
     def _update(self):
-        GLib.timeout_add(1000, self._hrm_cb)
+        if GLib is not None:
+            GLib.timeout_add(1000, self._hrm_cb)
 
     def _hrm_cb(self):
         hr = self.hr_monitor.get_heart_rate()
