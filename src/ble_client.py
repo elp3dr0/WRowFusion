@@ -4,9 +4,10 @@ import logging
 import time
 import contextlib
 
-from dbus_next.aio import MessageBus
-from dbus_next import Message
-from dbus_next.constants import MessageType
+from typing import TYPE_CHECKING
+
+from dbus_fast.aio import MessageBus
+from dbus_fast import BusType
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
@@ -15,6 +16,11 @@ from bleak.backends.scanner import AdvertisementData
 from src.heart_rate import HeartRateMonitor
 
 logger = logging.getLogger(__name__)
+
+# DBus constants
+ADAPTER_PATH = '/org/bluez/hci0'
+ADAPTER_INTERFACE = 'org.bluez.Adapter1'
+PROPERTIES_INTERFACE = 'org.freedesktop.DBus.Properties'
 
 # Settings for Heart Rate Monitor (HRM) discovery
 RSSI_THRESHOLD = -80        # Minimum signal strength of device to be considered elibible for connection
@@ -371,16 +377,26 @@ class HeartRateBLEScanner(threading.Thread):
 
 
     async def stop_ble_discovery(self) -> None:
-        bus = await MessageBus(system=True).connect()
+        """Ensure Bluetooth discovery is not active."""
+        logger.debug(f"Attempting to stop any existing bluetooth discovery processes...")
+        bus = MessageBus(bus_type=BusType.SYSTEM)
+        await bus.connect()
+        introspect = await bus.introspect('org.bluez', ADAPTER_PATH)
+        obj = bus.get_proxy_object('org.bluez', ADAPTER_PATH, introspect)
 
-        introspect = await bus.introspect('org.bluez', '/org/bluez/hci0')
-        obj = bus.get_proxy_object('org.bluez', '/org/bluez/hci0', introspect)
-        adapter = obj.get_interface('org.bluez.Adapter1')
+        adapter = obj.get_interface(ADAPTER_INTERFACE)
+        props = obj.get_interface(PROPERTIES_INTERFACE)
 
-        try:
-            await adapter.call_stop_discovery()
-        except Exception as e:
-            if "org.bluez.Error.NotReady" in str(e) or "org.bluez.Error.Failed" in str(e):
-                pass  # Likely already stopped or inactive adapter
-            else:
-                raise
+        discovering = await props.call_get(ADAPTER_INTERFACE, 'Discovering')
+        if discovering.value:
+            try:
+                logger.debug(f"Existing discovery process found. Attmepting to stop it.")
+                await adapter.call_stop_discovery()
+                logger.debug(f"Stop command successfully sent")
+            except Exception as e:
+                if "org.bluez.Error.NotReady" in str(e) or "org.bluez.Error.Failed" in str(e):
+                    logger.debug(f"Adapter not ready or already stopped")
+                    pass  # Adapter not ready or already stopped
+                else:
+                    logger.debug("error occurred while trying to stop discovery process")
+                    raise

@@ -1,7 +1,6 @@
 # ✅ TODO List for WRowFusion
 
 ## 📌 Current Focus
-- [ ] Inject heart rate to BLE data
 - [ ] Debug bluetooth server
 
 ## 🧱 Infrastructure
@@ -10,21 +9,16 @@
 
 ## New functionality
 - [ ] Turn USB ports off after 10mins of no rowing. Add a button that turns the USB ports back on.
-- [ ] Review FTM_SUPPORTED_FEATURES in ble_server, make the list reflect what we actually support (refer to BLE specs
-      determine what each thing means). Add functionality to support other features. Check whether supporting other
-      features means having to transmit the features in two packets.
 - [ ] Webserver and website (see note 7). Remember to include stats that aren't part of bluetooth like stroke ratio.
-- [ ] In the s4 data task, perhaps have a check for an attribute that asks the task to shut down and handle that gracefully,
-        rather than just looping indefinitely.
-- [ ] Do we ever issue an exit command. Why do we build an exit event in s4if? Exit would always be sent to the S4 from the 
-        PC, so any handling of that should be done by the part of the application that sent the exit command. We shouldn't
-        have to build a contrived event just to handle the application logic.
+- [ ] In the s4 data task, perhaps have a check for an attribute that asks the task to shut down and handle that gracefully, rather than just looping indefinitely.
+- [ ] Do we ever issue an exit command. Why do we build an exit event in s4if? Exit would always be sent to the S4 from the PC, so any handling of that should be done by the part of the application that sent the exit command. We shouldn't have to build a contrived event just to handle the application logic.
 - [ ] Store the data in a database and transmit to fitness apps or email at the end
 
 ## 🔄 Data Handling
 - [ ] At the start of the S4 data task either simplify the reset procedure, or don't reset. Afterall, why should we override the S4's state? If we do want to reset then we can just call the reset_rower method of the RowerState class as opposed to the S4.request reset.
 - [ ] Evaluate thread safety of RowerState callbacks
 - [ ] I want my application to be responsive to the workout mode that someone has selected on the S4. What frequency should I poll those at? Should the polling be another loop in s4if, or should it be application side? Store the modes when the flags are read.
+- [ ] uncomment remaining time in FIELD GROUPS and handle it in the transform map in ble_server
 - [ ] The workout flags are currently being converted to decimal on import, so adjust the decode_flags method to accept either int or hex string.
 - [ ] Respond to the workout mode in application side logic. E.g. store the workout limit field as a duration limit or distance limit.
 - [ ] Decide whether to inc sec_dec. In anycase decide whether to round or not and adjust the code as necessary.
@@ -91,6 +85,8 @@
 
 ## ✅ Done
 ### Data Handling
+- [x] Inject heart rate to BLE data
+- [x] Review FTM_SUPPORTED_FEATURES in ble_server, make the list reflect what we actually support (refer to BLE specs determine what each thing means). Add functionality to support other features. Check whether supporting other features means having to transmit the features in two packets.
 - [x] Remove TXValues from s4.py if shared access to RowerState is working
 - [x] Remove CueToBLEANT from s4.py if shared access to RowerState is working and remove the commented out logic from the main routine in s4.py
 - [x] Replace reset q with object
