@@ -30,7 +30,7 @@ BONUS_SCAN_WINDOW = 5      # Additional window to discover other HRMs after the 
 INITIAL_RECHECK_INTERVAL = 5    # Introduce an exponentially increasing delay between periodic scans after initial scan.
 MAX_RECHECK_INTERVAL = 60       # Start with a delay of INITIAL_RECHECK_INTERVAL, and grow to a cap of MAX_RECHECK_INTERVAL
 
-RECHECK_DURATION = 30       # Duration of each periodic scan
+RECHECK_DURATION = 15       # Duration of each periodic scan
 
 LOW_FREQ_POLL_DELAY = 30    # Delay between polls of low frequency HRM data such as battery level 
 
@@ -387,16 +387,19 @@ class HeartRateBLEScanner(threading.Thread):
         adapter = obj.get_interface(ADAPTER_INTERFACE)
         props = obj.get_interface(PROPERTIES_INTERFACE)
 
-        discovering = await props.call_get(ADAPTER_INTERFACE, 'Discovering')
+        discovering = await props.call_get(ADAPTER_INTERFACE, 'Discovering')    # pyright: ignore[reportAttributeAccessIssue]
         if discovering.value:
             try:
-                logger.debug(f"Existing discovery process found. Attmepting to stop it.")
-                await adapter.call_stop_discovery()
-                logger.debug(f"Stop command successfully sent")
+                logger.debug(f"Existing bluetooth discovery process found. Attmepting to stop it.")
+                await adapter.call_stop_discovery()         # pyright: ignore[reportAttributeAccessIssue]
+                logger.debug(f"Successfully stopped existing bluetooth discovery process.")
             except Exception as e:
                 if "org.bluez.Error.NotReady" in str(e) or "org.bluez.Error.Failed" in str(e):
-                    logger.debug(f"Adapter not ready or already stopped")
+                    logger.debug(f"Adapter not ready or existing bluetooth discover already stopped")
                     pass  # Adapter not ready or already stopped
+                elif "No discovery started" in str(e):
+                    logger.debug("Existing bluetooth discovery was stopped by another process before we could stop it.")
                 else:
-                    logger.debug("error occurred while trying to stop discovery process")
-                    raise
+                    logger.warning(f"Failed to stop existing bluetooth discovery process due to error: {e}")
+        else:
+            logger.debug("No bluetooth discovery currently active — nothing to stop.")
