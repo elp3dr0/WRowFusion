@@ -407,3 +407,178 @@ Use an in-memory API or lightweight DB
 Use WebSockets or JS polling for live updates
 
 Would you like a minimal working example of the API and frontend setup?
+
+
+
+## 8. ANT vs Bluetooth selection
+ Suggested Strategy
+1. Scan Both Interfaces Concurrently
+Start scanning Bluetooth HRMs as usual.
+
+Begin listening on the ANT+ HRM channel (using wildcard device ID 0, which means “accept any”).
+
+2. Collect Signal Metadata
+Bluetooth: When scanning, record each device's RSSI, name, and last_seen_time.
+
+ANT+: Record the first device_number and timestamp when HR data is received.
+
+3. Decision Logic
+Use something like the following priority rules:
+
+sql
+Copy
+Edit
+If Bluetooth HRM is connected and stable (e.g. consistent signal over 5–10s):
+    Use Bluetooth HRM
+Else if ANT+ HRM is broadcasting valid data (e.g. ≥2 HR packets over 5–10s):
+    Use ANT+ HRM
+Else:
+    Wait for either source
+Optionally:
+
+If both are strong: Prefer Bluetooth, since it’s more deterministic and allows “pairing”.
+
+If Bluetooth drops, automatically fall back to ANT+.
+
+Optionally cache the last used ANT+ device number for use in future sessions (to simulate pairing).
+
+🧩 Technical Notes
+Bluetooth HRMs:
+RSSI gives an estimate of proximity.
+
+You can actively connect and subscribe to a specific device.
+
+ANT+ HRMs:
+All packets contain the Device Number (16-bit ID).
+
+You can choose to:
+
+Accept any device (device_number = 0)
+
+OR match a specific device number for soft-pairing.
+
+Example ANT+ broadcast packet might contain:
+
+json
+Copy
+Edit
+{
+  "device_number": 12345,
+  "heart_rate": 74,
+  "timestamp": "12:01:35.013"
+}
+⚙️ Optional Enhancements
+Add a “device lock” mechanism: After deciding to use a given source (e.g. ANT+ dev# 12345), continue with it for that session unless it fails.
+
+Log the HRM source (Bluetooth MAC or ANT+ dev#) to help with support/debugging.
+
+Add a config option or override (e.g. "Prefer ANT+" or "Use specific ANT+ dev#").
+
+✅ Summary Table
+Aspect	Bluetooth LE	ANT+
+Supports pairing	✅ Yes	❌ No (but device ID)
+Signal strength info	✅ RSSI	❌ Not available
+Multiple devices	✅ Scan, choose	❌ Receives first broadcaster
+Device filtering	✅ By MAC	✅ By Device Number (optional)
+Preferred for	Precision, filtering	Fallback, simplicity
+
+
+
+How to choose which ANT device?
+You're right: once you've seen a valid device number, you can filter future packets and treat that as a “soft pair”. But deciding which device to soft pair with, when multiple ANT+ HRMs are present and indistinguishable at first, requires a bit of cleverness.
+
+🧭 How to Choose Between Multiple ANT+ HRMs
+Because ANT+ devices do not advertise signal strength (like RSSI in Bluetooth), and don’t provide metadata like name or battery level in standard HR data pages, you’re limited to:
+
+Device Number (a unique 16-bit identifier, stable per device)
+
+Timing / Packet Arrival (when data is first received)
+
+Heart Rate Value (which you can monitor for plausibility or stability)
+
+🧠 Sensible Strategies
+✅ First Seen Wins (Simple)
+Start with wildcard search (device number 0)
+
+The first valid HR data you receive is from Device A
+
+Lock onto Device A's number for the rest of the session
+
+✔️ Simple
+✖️ May pick an arbitrary device if several users are present
+
+✅ Stability Window (Better)
+Accept packets from any device initially
+
+Over a short window (e.g. 5–10 seconds), track how many packets are received per device
+
+Choose the one with the most consistent packet stream
+
+python
+Copy
+Edit
+
+Pseudocode
+hrm_devices = {
+    12345: [hr1, hr2, hr3],
+    54321: [hr1]
+}
+
+choose 12345 as it has more data points in the sample window
+✔️ More robust
+✖️ Still arbitrary if multiple devices have equal quality
+
+✅ Known Device Preference (Optional)
+Maintain a cache or config of previously seen device IDs
+
+Prefer a known ID if it appears in the stream
+
+This creates a stable user-device relationship
+
+python
+Copy
+Edit
+preferred_ids = [12345]
+
+* if seen in stream, prefer it
+✔️ Reliable pairing
+✖️ Not automatic for first-time users
+
+✅ User Configuration Fallback
+Since WRowFusion is meant to be appliance-like, you may offer:
+
+An optional config file (~/.wrowfusion.conf)
+
+Or auto-discovery mode with manual override if needed
+
+🛠 Example Data Structure (Python)
+python
+Copy
+Edit
+from collections import defaultdict, deque
+import time
+
+* Track last few heart rate packets per device
+hrm_candidates = defaultdict(lambda: deque(maxlen=5))
+
+def handle_ant_hr_packet(device_id, heart_rate):
+    hrm_candidates[device_id].append((time.time(), heart_rate))
+
+* *After timeout window:
+chosen_id = max(hrm_candidates, key=lambda dev: len(hrm_candidates[dev]))
+✅ Best Practice Recommendation for WRowFusion
+Listen to all ANT+ HRM broadcasts for a few seconds
+
+Group by device number and count samples per device
+
+Choose the device with the most stable or frequent data
+
+Filter future messages by that device ID
+
+Optionally:
+
+Cache device IDs to persist preference
+
+Fall back to ANT+ only if no BLE HRM is active
+
+## 9.

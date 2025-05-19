@@ -5,6 +5,8 @@ pytest>=7.0
 pytest-asyncio>=0.20.0
 PyGObject==3.50.0
 dbus-python==1.4.0
-dbus_next>=0.2.3
+dbus_fast
 pyserial>=3.5        # For interacting with serial devices
 async-timeout>=4.0   # Good practice for async tasks
+flask           # Used to create an API
+websockets      # To support the WRowFusion dashboard (sister project)

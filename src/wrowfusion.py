@@ -31,6 +31,12 @@ from src.heart_rate import HeartRateMonitor
 from src.ble_client import HeartRateBLEScanner
 
 
+def start_ws_server(hr_monitor: HeartRateMonitor, rower_state: RowerState):
+    import asyncio
+    import src.wrf_server_ws  # Your websocket server module
+
+    asyncio.run(src.wrf_server_ws.ws_task(hr_monitor, rower_state))  # This runs your async server forever
+
 # List to keep track of running threads
 threads = []
 
@@ -39,9 +45,9 @@ def start_threads():
     hr_monitor = HeartRateMonitor()
     rower_state = RowerState()
 
-    # Thread to connect as a client to BLE heart rate monitor
+    # Thread to connect as a client to a bluetooth low energy (BLE) heart rate monitor
     # This is an object that manages its own lifecycle with asyncio so can be started using a different
-    # syntax to the other threads    
+    # syntax to the other threads
     ble_hrm_scanner = HeartRateBLEScanner(hr_monitor)
     ble_hrm_scanner.name = "BLEHRMScannerThread"
     threads.append(ble_hrm_scanner)
@@ -51,14 +57,18 @@ def start_threads():
     s4_heartbeat_thread = threading.Thread(target=s4_heart_beat_task, args=(hr_monitor,), daemon=True, name="S4HeatbeatThread")
     threads.append(s4_heartbeat_thread)
 
-    # Thread for S4 polling and collating data for transmission via BLE/ANT 
+    # Thread for S4 polling and collating data from the S4 
     s4_data_thread = threading.Thread(target=s4_data_task, args=(rower_state,), daemon=True, name="S4DataThread")
     threads.append(s4_data_thread)
 
-    # Thread for advertising and connecting the RPi to external clients and sending the data
+    # Thread for advertising and connecting the RPi to external Bluetooth Low Energy (BLE) clients and sending the data
     # to connected clients 
     ble_server_thread = threading.Thread(target=ble_server.ble_server_task, args=(hr_monitor, rower_state), daemon=True, name="BLEServerThread")
     threads.append(ble_server_thread)
+
+    # Websockets server to push data to the wrowfusion dashboard (separate project)
+    ws_thread = threading.Thread(target=start_ws_server, args=(hr_monitor, rower_state), daemon=True, name="WSServerThread")
+    threads.append(ws_thread)
 
     logger.debug("wrfusion.start_threads: about to start threads")
     for thread in threads:
