@@ -20,20 +20,19 @@ def compile_metrics(rower_state: RowerState, hr_monitor: HeartRateMonitor) -> di
     wr_values = rower_state.get_WRValues()
     wr_values = hr_monitor.inject_heart_rate(wr_values)
     
-    # Still to add:
-    #'stroke_count': 0,
-    #'speed_cmps': 0,
-    #'total_calories': 0,
-    #'stroke_ratio': 0.0,
 
     return {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "stroke_rate": wr_values.get('stroke_rate_pm', 0),
-        "heart_rate": wr_values.get('heart_rate_bpm', 0),
-        "pace": wr_values.get('instant_500m_pace_secs', 0),
-        "distance": wr_values.get('total_distance_m', 0),
+        "stroke_rate_pm": wr_values.get('stroke_rate_pm', 0),
+        "stroke_count": wr_values.get('stroke_count', 0),
+        "heart_rate_bpm": wr_values.get('heart_rate_bpm', 0),
+        "pace_mmss": f"{(s := wr_values.get('instant_500m_pace_secs', 0)) // 60}:{s % 60:02}",
+        "speed_mps": round(wr_values.get('speed_cmps', 0)/100, 2),
+        "total_distance_m": wr_values.get('total_distance_m', 0),
         "elapsed_time": wr_values.get('elapsed_time_secs', 0),
-        "power": wr_values.get('instant_watts', 0),
+        "instant_watts": wr_values.get('instant_watts', 0),
+        "total_calories": round(wr_values.get('total_calories', 0)/1000,1),
+        "stroke_ratio": round(wr_values.get('stroke_ratio', 0),2)
     }
 
 async def broadcast(rower_state: RowerState, hr_monitor: HeartRateMonitor) -> None:

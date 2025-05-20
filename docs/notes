@@ -707,4 +707,261 @@ Archiving	Move old raw data off DB, keep summaries
 Processing	Buffer RR intervals, compute HRV on flush
 Impact on Pi Zero	Minimise writes, keep data lightweight
 
-## 10.
+## 10. Database High level MoSCoW and phased implementation plan 
+Here are some top level unorganised thoughts:
+* designed to run on a Raspberry Pi Zero 2
+* must record data of completed workouts
+* should record data from incomplete workouts, but be able to recognise them as incomplete
+* could record all rowing sessions - even if it is not a workout. Would need to be able to infer the start and end of a 'just row' session.
+* Must associate rowing data with the user (if the user has logged in), otherwise keep the rowing data with a 'guest' profile.
+* Should allow a user to retrospectively claim a workout and transfer the data from the 'guest' account to their user profile.
+* Must support exports to recognised formats for upload to popular platforms such as strava or others. 
+* Could support data backup
+* Should not slow WRowFusion down. E.g. might need a way of managing database size preferably as automatically as possible - archiving old data into a zip?
+* Should store sufficiently granular data for detailed fitness analysis, but not unnecessarily granular so that it clogs up the database.
+* Should support wrowfusion-dashboard to show summary data for the user (e.g. diary of workout history, best times/distance/etc for a particular type of workout (e.g. 2k) or the average over the last say 5 workouts of that type.
+
+🔧 Overall Strategy & Architecture
+🎯 Goals Summary
+WRowFusion should:
+
+Persist rowing session data efficiently and reliably.
+
+Associate session data with users (including "guest" users).
+
+Support exporting, retrospective claiming, and summarisation.
+
+Be low-overhead and Pi-friendly.
+
+🧱 Architectural Components
+Session Tracker
+
+Detects start and end of a rowing session (based on S4 data patterns).
+
+Handles active workout sessions (real-time buffer).
+
+Marks a session complete/incomplete based on heuristics (e.g. time since last stroke).
+
+Session Store
+
+Local database using SQLite (lightweight, durable, fast enough).
+
+Stores:
+
+Metadata (start/end timestamps, duration, user ID, completeness flag).
+
+Time-series data (aggregated per second or stroke).
+
+Export status and sync flags.
+
+User Profiles
+
+Simple user table with ID, name, optional avatar, preferences.
+
+Default “Guest” account always present.
+
+API to associate a user at session start or claim one afterwards.
+
+Exporter
+
+Converts session data to formats like GPX, TCX, or CSV.
+
+Optional auto-export to Strava via their API.
+
+Archiver
+
+Moves old session data into compressed storage (e.g. .zip or .sqlite.gz).
+
+Optionally runs periodically or by size threshold.
+
+Web Dashboard Integration
+
+Shows session history summaries, stats, and personal bests.
+
+Authenticated per-user (basic auth or cookie/token-based).
+
+🚦 Phased Implementation Plan
+✅ Phase 1: MVP Storage
+ Create a sessions.db using SQLite.
+
+ Define schema: users, sessions, and session_data.
+
+ Build a simple in-memory buffer to capture metrics per second.
+
+ Add a timer-based heuristic to detect session end (e.g. no strokes for 30s).
+
+ On session end:
+
+Write metadata + buffered data to DB.
+
+Mark as completed = True.
+
+🛠 Goal: Log all workouts automatically, even if no user is logged in.
+
+✅ Phase 2: User Support
+ Add support for multiple users.
+
+ Add 'guest' user fallback.
+
+ Allow selecting user at session start.
+
+ Build mechanism to reassign past guest sessions to a user.
+
+🛠 Goal: Track user-specific workouts and stats.
+
+✅ Phase 3: Exporting
+ Export individual sessions to:
+
+ CSV (easy)
+
+ GPX/TCX (optional)
+
+ Add manual export feature via CLI or dashboard.
+
+ Optional: Hook up Strava API token to enable push.
+
+🛠 Goal: Let users take their data with them or upload it elsewhere.
+
+✅ Phase 4: Summary and History
+ Add query functions to compute:
+
+Recent workouts
+
+Best 2k/5k times
+
+Weekly distance/time stats
+
+ Update wrowfusion-dashboard to show:
+
+Workout diary
+
+Personal bests
+
+Rolling averages
+
+🛠 Goal: Give users visual motivation and insight into progress.
+
+✅ Phase 5: Archival and Maintenance
+ Auto-archive old session data after threshold (e.g. 6 months).
+
+ Compress and move to external USB or archive folder.
+
+ Optional: Backup/export all sessions to .zip.
+
+🛠 Goal: Prevent DB bloat and maintain long-term health on Pi.
+
+## 11. Database writer implementation plan:
+There are two areas we need to sort out:
+1) logic that creates the signal for the start and end of a workout/interval/just row session.
+2) The task that updates the database at the start/during/end of a workout/interval/just row session.
+
+For 1) There are a number of signals that can be used from the s4:
+* When the rower is reset (either because the user pressed the reset button, or because the BLE FitnessMachineControlPoint reset the rower), that can indicate a 'primed' state. As soon as any rowing data is recieved once the primed state is active, then that can be considered the start of the session.
+* Maybe a just row session will continue for as long as the clock continues to run on the S4. However, in that case we can stop recording database entries while the PaddleTurning attribute of the RowerState is false. But if rowing data is subsequently received then perhaps we can continue recording the data and associating it with the same just row session (afterall, the S4 clock would still be ticking)
+* For actual workouts that are set on the S4 or via the BLE ControlPoint, we can take cues from the workout flags. I still need to implement the full handling of the flags in the s4 logic, but it's on the roadmap, so when a workout is programmed, the s4 module should know. Again, here there's a 'primed' state when the program has been set in the S4, but before any rowing occurs. During this window, we know the workout type and intervals etc, but there's no point recording the rowing metrics from the S4 until the rowing starts.
+* I assume we'll be able to pick up the end of a programmed workout from the flags etc.
+* I think we should by default record a rest period after the end of a workout to capture the heart rate data so that the user can see recovery rates.  
+
+
+Excellent breakdown — and yes, dividing this into two clear responsibilities makes sense:
+
+Session/interval lifecycle detection (signals from the S4 and BLE events)
+
+Persistence (writing workout, interval, and sample data to the database)
+
+Let’s tackle these one at a time, starting with a clean signal-driven approach.
+
+1️⃣ Session Lifecycle Logic
+You can encapsulate this logic in a SessionTracker class (or similar), likely in src/s4/session_tracker.py, which listens to signals/events from the S4 module and BLE Control Point. This tracker will:
+
+➕ Primed State
+A state machine-like internal flag can help distinguish these modes:
+
+State	Trigger
+Idle	Rower powered up / no activity
+Primed	Detected reset (manual or BLE-triggered) or workout programmed
+Active	First rowing stroke detected (i.e., PaddleTurning = True)
+Paused	PaddleTurning = False but clock still ticking
+Ended	S4 reports workout complete or prolonged inactivity
+Recovery	Post-end cooldown period to track HR
+
+⚙️ Implementation Approach
+python
+Copy
+Edit
+class SessionTracker:
+    def __init__(self, database_writer: DBWriter):
+        self.state = "idle"
+        self.db_writer = database_writer
+        self.current_session_id = None
+        self.current_interval_id = None
+        self.last_paddle_time = None
+        ...
+
+    def on_reset(self):
+        self.state = "primed"
+        ...
+
+    def on_rowing_started(self, s4_state):
+        if self.state in ["primed", "paused"]:
+            self.start_new_session_if_needed(s4_state)
+            self.state = "active"
+
+    def on_paddle_stopped(self):
+        if self.state == "active":
+            self.state = "paused"
+            self.db_writer.flush_interval()
+            # Optionally, start inactivity timeout here
+
+    def on_rowing_resumed(self):
+        if self.state == "paused":
+            self.state = "active"
+            self.db_writer.start_interval(...)
+
+    def on_workout_completed(self):
+        self.state = "ended"
+        self.db_writer.end_session()
+
+    def on_recovery_complete(self):
+        self.state = "idle"
+This class gets fed data from your S4 polling logic (RowerState) and BLE events.
+
+2️⃣ Database Writing
+This can live in a DBWriter class (e.g., src/db/db_writer.py) and is responsible for inserting:
+
+Session (start row, user ID, type etc.)
+
+Intervals (work/rest, with timestamps)
+
+Session Data (stroke rate, heart rate, etc.)
+
+Optional HRV data post-workout
+
+Key design ideas:
+Only write full rows when something meaningful changes or on a timer (e.g., every 2s)
+
+Use a buffer and flush to DB periodically (especially if you're sampling rapidly)
+
+Make DBWriter aware of the current session/interval IDs
+
+Encapsulate logic like: start_session, start_interval, record_data_point, end_interval, end_session
+
+🧠 Additional Considerations
+The session type (just row, distance, time) and interval info could be stored in the sessions/intervals tables, even before any rowing starts (i.e., at priming).
+
+You might want a configurable timeout (e.g. 10 mins of inactivity = session end).
+
+Include a source field in your sessions/intervals to note whether the session was initiated from the S4 directly or via BLE.
+
+✅ To-Do Summary
+Create SessionTracker to model state transitions based on S4 + BLE inputs.
+
+Create DBWriter to encapsulate writing logic.
+
+Ensure the S4 module calls the appropriate methods in SessionTracker.
+
+When the full S4 workout flag logic is added, make it update the tracker accordingly.
+
+Would you like me to sketch out rough code for SessionTracker and DBWriter next?
+
+## 

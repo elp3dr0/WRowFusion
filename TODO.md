@@ -84,6 +84,7 @@
 - [ ] Make necessary adjustments to /etc/bluetooth/main.conf during install script (see ble_notes.md)
 - [ ] Populate README and add references to PiRowFlo.
 
+
 ---
 
 ## ✅ Done
