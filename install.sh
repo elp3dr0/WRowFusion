@@ -233,6 +233,15 @@ sudo -u "$app_user" sed -i 's@#REPO_DIR#@'"$app_dir"'@g' "$app_dir"/config/loggi
 echo " Done."
 echo " "
 echo "----------------------------------------------"
+echo " Initialising WRowFusion database..."
+echo "----------------------------------------------"
+echo " "
+
+sudo -u "$app_user" "$app_dir"/venv/bin/python3 "$app_dir"/src/db/db_init.py
+
+echo " Done."
+echo " "
+echo "----------------------------------------------"
 echo " Start WRowFusion when system boots"
 echo "----------------------------------------------"
 echo " "

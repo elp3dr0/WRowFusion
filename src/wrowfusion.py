@@ -4,6 +4,8 @@ import pathlib
 import os
 import sys
 
+from src.db.db_init import initialise_database, DB_PATH
+
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent.absolute()
 
 log_dir = PROJECT_ROOT / 'logs'
@@ -99,12 +101,19 @@ def stop_threads(signal_received, frame):
     print("\nStopping WRowFusion...")
     sys.exit(0)
 
+
+def ensure_database_exists():
+    if not os.path.exists(DB_PATH) or os.path.getsize(DB_PATH) == 0:
+        logger.warning("Workout database not found or empty. Initialising...")
+        initialise_database()
+
 if __name__ == "__main__":
     print("Starting WRowFusion...")
     
     # Handle Ctrl+C to stop gracefully
     signal.signal(signal.SIGINT, stop_threads)
     
+    ensure_database_exists()
     start_threads()
     
     # Keep main thread running

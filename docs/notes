@@ -581,4 +581,130 @@ Cache device IDs to persist preference
 
 Fall back to ANT+ only if no BLE HRM is active
 
-## 9.
+## 9. RR and HRV
+
+Storing RR intervals (the time between successive heartbeats) in your database can be very useful—but whether it’s necessary depends on your goals and constraints.
+
+What’s RR data good for in workout/fitness analysis?
+Heart Rate Variability (HRV) Analysis
+RR intervals are the raw data needed for HRV metrics, which reflect the variation in time between heartbeats. HRV is a powerful indicator of:
+
+Autonomic nervous system balance (stress, recovery, fatigue)
+
+Fitness level and cardiovascular health
+
+Readiness for training and overtraining detection
+So if you want to provide users with insights beyond just heart rate—like stress or recovery state—storing RR data is essential.
+
+Detailed Heart Rate Dynamics
+Instead of just average heart rate per minute, RR data allows for beat-to-beat analysis, spotting arrhythmias or irregularities, and better detecting true physiological changes during workouts.
+
+Post-Workout Analysis
+Having RR data enables retrospective detailed analysis, including advanced metrics and patterns that average HR values alone can’t reveal.
+
+Downsides / Considerations
+Data Volume: RR intervals can generate a lot of data very quickly (usually 500–1000 samples per minute). This can bloat your database and affect performance unless you compress or selectively store data.
+
+Storage and Processing: You’ll need appropriate storage strategies (e.g., time-series databases, compression) and efficient analysis tools.
+
+Use Case Fit: If your main focus is just basic fitness metrics (e.g., average HR, stroke rate, power), storing RR intervals might be overkill.
+
+Possible compromises
+Store RR data only for certain sessions or durations (e.g., workouts flagged by the user, or sample only part of the session).
+
+Aggregate or summarise RR data on the fly and store summary HRV metrics instead of raw intervals.
+
+Archive older detailed RR data externally or compress it to balance granularity vs space.
+
+In summary
+If WRowFusion aims to offer advanced physiological insights and detailed fitness analytics, storing RR intervals is highly valuable. If your priority is lightweight, responsive operation on a Pi Zero 2 and basic fitness tracking, it may be better to store only heart rate summaries or HRV metrics derived from RR data and discard the raw RR after processing.
+
+
+
+Here’s a practical approach to efficiently store and process RR interval data in WRowFusion, balancing detail with performance and storage on a Raspberry Pi Zero 2.
+
+1. Data Storage Strategy
+a) Raw RR Intervals Table (Optional / Partial)
+Table schema idea:
+
+Column	Type	Notes
+id	INTEGER PRIMARY KEY AUTOINCREMENT	Unique row id
+session_id	INTEGER	Foreign key to workout session
+timestamp	INTEGER	Unix timestamp or ms since session start
+rr_interval_ms	INTEGER	RR interval in milliseconds
+
+Store only for specific workout sessions flagged for detailed analysis (e.g., user requests, certain workout types).
+
+Consider batch insert or buffering RR data in memory and writing in chunks to reduce I/O overhead.
+
+Use INTEGER (ms) instead of FLOAT for space and indexing efficiency.
+
+b) Summary HRV Metrics Table
+Store derived HRV metrics (e.g., SDNN, RMSSD, pNN50) per session or per minute block.
+
+This table could look like:
+
+Column	Type	Notes
+id	INTEGER PRIMARY KEY AUTOINCREMENT	
+session_id	INTEGER	FK to session
+time_block	INTEGER	Timestamp or minute number
+sdnn	REAL	Standard deviation of NN intervals
+rmssd	REAL	Root mean square of successive differences
+pnn50	REAL	% of intervals > 50ms
+
+2. Data Processing Pipeline
+Collect RR intervals in real-time during workout.
+
+Buffer RR intervals (e.g., accumulate 30 seconds to 1 minute worth).
+
+On buffer flush or session end:
+
+Write raw RR intervals to DB (if enabled for the session).
+
+Compute HRV summary metrics from buffered RR intervals.
+
+Store the summary metrics in the summary table.
+
+For sessions not flagged for full RR storage, only keep the summaries.
+
+3. Data Retention & Archiving
+To prevent DB bloating:
+
+Implement an archiving process that compresses and moves old RR raw data to external storage (e.g., zipped JSON or binary files).
+
+Keep only summary HRV metrics in the DB for long-term analysis.
+
+Provide users with an option to purge old data or export full RR data if desired.
+
+4. API and Dashboard Integration
+Expose HRV summary metrics through the API for fast access and display.
+
+Allow detailed RR interval downloads/export for advanced users or external analysis.
+
+5. Example Python snippet for HRV computation
+Using numpy (or hrv-analysis library if you want more sophisticated metrics):
+
+python
+Copy
+Edit
+import numpy as np
+
+def compute_hrv_metrics(rr_intervals_ms):
+    rr_intervals_s = np.array(rr_intervals_ms) / 1000.0
+    diff_rr = np.diff(rr_intervals_s)
+    
+    sdnn = np.std(rr_intervals_s)
+    rmssd = np.sqrt(np.mean(diff_rr ** 2))
+    pnn50 = np.sum(np.abs(diff_rr) > 0.05) / len(diff_rr) * 100
+    
+    return {"sdnn": sdnn, "rmssd": rmssd, "pnn50": pnn50}
+Summary
+Aspect	Recommendation
+Store raw RR?	Only for flagged sessions or partial buffering
+Storage format	INTEGER ms for RR; batch inserts
+Store summary?	Yes, per session or time block
+Archiving	Move old raw data off DB, keep summaries
+Processing	Buffer RR intervals, compute HRV on flush
+Impact on Pi Zero	Minimise writes, keep data lightweight
+
+## 10.
