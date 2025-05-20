@@ -23,7 +23,7 @@ qualname=src.wrowfusion
 propagate=0
 
 [logger_src.ble_client]
-level=DEBUG
+level=INFO
 handlers=consoleHandler, rotatingFileHandler
 qualname=src.ble_client
 propagate=0
@@ -62,6 +62,18 @@ propagate=0
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
 qualname=src.s4if
+propagate=0
+
+[logger_src.wrf_server_api]
+level=INFO
+handlers=consoleHandler, rotatingFileHandler
+qualname=src.wrf_server_api
+propagate=0
+
+[logger_src.wrf_server_ws]
+level=DEBUG
+handlers=consoleHandler, rotatingFileHandler
+qualname=src.wrf_server_ws
 propagate=0
 
 [logger_bleak]

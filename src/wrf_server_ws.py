@@ -1,17 +1,22 @@
+import logging
 import asyncio
 import json
-import random
 import time
 
-import websockets
-
+from websockets.legacy.server import (
+    serve,
+    WebSocketServerProtocol,
+    )
 from src.heart_rate import HeartRateMonitor
 from src.s4 import RowerState
 
-clients = set()
+logger = logging.getLogger(__name__)
+
+clients: set[WebSocketServerProtocol] = set()
 
 # Example simulated metric data
-def compile_metrics():
+def compile_metrics(rower_state: RowerState, hr_monitor: HeartRateMonitor) -> dict[str, int | float | str]:
+    logger.debug("Compiling metrics")
     wr_values = rower_state.get_WRValues()
     wr_values = hr_monitor.inject_heart_rate(wr_values)
     
@@ -31,26 +36,27 @@ def compile_metrics():
         "power": wr_values.get('instant_watts', 0),
     }
 
-async def broadcast():
+async def broadcast(rower_state: RowerState, hr_monitor: HeartRateMonitor) -> None:
+    logger.debug("Preparing broadcast loop")
     while True:
         if clients:
-            message = json.dumps(compile_metrics())
+            message = json.dumps(compile_metrics(rower_state, hr_monitor))
             await asyncio.gather(*[client.send(message) for client in clients])
         await asyncio.sleep(1)
 
-async def handler(websocket):
+async def handler(websocket: WebSocketServerProtocol) -> None:
+    logger.debug("Handling new client connection")
     clients.add(websocket)
     try:
         await websocket.wait_closed()
     finally:
         clients.remove(websocket)
 
-async def ws_task(ws_hr_monitor: HeartRateMonitor, ws_rower_state: RowerState):
-    global rower_state
-    global hr_monitor
-
-    rower_state = ws_rower_state
-    hr_monitor = ws_hr_monitor
-
-    async with websockets.serve(handler, "0.0.0.0", 8765):
-        await asyncio.Future()
+async def ws_task(rower_state: RowerState, hr_monitor: HeartRateMonitor) -> None:
+    logger.debug("Starting websocket server")
+    async with serve(handler, "0.0.0.0", 8765):
+        await asyncio.gather(
+            broadcast(rower_state, hr_monitor),
+            asyncio.Future()
+        )
+        

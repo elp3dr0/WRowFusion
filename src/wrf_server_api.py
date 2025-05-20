@@ -1,11 +1,11 @@
 # Lightweight API server for WRowFusion
-
-from typing import TYPE_CHECKING
+import logging
+import time
+import threading
 
 from flask import Flask, jsonify
 
-import time
-import threading
+logger = logging.getLogger(__name__)
 
 # Simulated shared data structure (replace with actual shared data in production)
 data_lock = threading.Lock()
