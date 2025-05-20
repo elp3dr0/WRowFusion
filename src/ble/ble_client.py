@@ -13,7 +13,7 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
-from src.heart_rate import HeartRateMonitor
+from src.hr.heart_rate import HeartRateMonitor
 
 logger = logging.getLogger(__name__)
 

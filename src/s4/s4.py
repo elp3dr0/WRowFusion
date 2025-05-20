@@ -13,12 +13,12 @@ from copy import deepcopy
 from typing import Any
 #from datetime import timedelta
 
-from src.s4if import (
+from src.s4.s4if import (
     Rower,
     S4Event,
     WorkoutMode, 
 )
-from src.heart_rate import HeartRateMonitor
+from src.hr.heart_rate import HeartRateMonitor
 
 logger = logging.getLogger(__name__)
 

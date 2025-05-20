@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
-from src.ble_client import HeartRateBLEScanner
-from src.heart_rate import HeartRateMonitor
+from src.ble.ble_client import HeartRateBLEScanner
+from src.hr.heart_rate import HeartRateMonitor
 
 
 @pytest.mark.asyncio

@@ -11,7 +11,7 @@ else:
     import dbus
 
 import logging
-import src.ble_constants as blec
+import src.ble.ble_constants as blec
 
 logger = logging.getLogger(__name__)
 

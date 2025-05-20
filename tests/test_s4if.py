@@ -1,7 +1,7 @@
 import pytest
 from collections import Counter
 
-from src.s4if import MEMORY_MAP, SIZE_MAP, SIZE_PARSE_MAP  # adjust import path as needed
+from src.s4.s4if import MEMORY_MAP, SIZE_MAP, SIZE_PARSE_MAP  # adjust import path as needed
 
 def test_memory_map_has_unique_addresses():
     """Ensure all addresses in MEMORY_MAP are unique."""

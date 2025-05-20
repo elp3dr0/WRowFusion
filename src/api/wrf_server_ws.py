@@ -7,8 +7,8 @@ from websockets.legacy.server import (
     serve,
     WebSocketServerProtocol,
     )
-from src.heart_rate import HeartRateMonitor
-from src.s4 import RowerState
+from src.hr.heart_rate import HeartRateMonitor
+from src.s4.s4 import RowerState
 
 logger = logging.getLogger(__name__)
 

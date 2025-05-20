@@ -21,21 +21,21 @@ logger = logging.getLogger(__name__)
 
 import threading
 import signal
-from src.s4 import (
+from src.s4.s4 import (
     s4_heart_beat_task, 
     s4_data_task,
     RowerState 
 )
-from src import ble_server
-from src.heart_rate import HeartRateMonitor
-from src.ble_client import HeartRateBLEScanner
+from src.ble import ble_server
+from src.hr.heart_rate import HeartRateMonitor
+from src.ble.ble_client import HeartRateBLEScanner
 
 
 def start_ws_server(hr_monitor: HeartRateMonitor, rower_state: RowerState):
     import asyncio
-    import src.wrf_server_ws  # Your websocket server module
+    import src.api.wrf_server_ws  # Your websocket server module
 
-    asyncio.run(src.wrf_server_ws.ws_task(rower_state, hr_monitor))  # This runs your async server forever
+    asyncio.run(src.api.wrf_server_ws.ws_task(rower_state, hr_monitor))  # This runs your async server forever
 
 # List to keep track of running threads
 threads = []

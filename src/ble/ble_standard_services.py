@@ -11,8 +11,8 @@ from enum import IntEnum, IntFlag
 from dataclasses import dataclass
 from typing import Any, Callable, Tuple
 
-import src.ble_constants as blec
-from src.bleif import Service, Characteristic
+import src.ble.ble_constants as blec
+from src.ble.bleif import Service, Characteristic
 
 logger = logging.getLogger(__name__)
 

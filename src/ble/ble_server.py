@@ -23,9 +23,9 @@ else:
 import time
 from typing import Callable
 
-import src.ble_constants as blec
+import src.ble.ble_constants as blec
 
-from src.bleif import (
+from src.ble.bleif import (
     Advertisement,
     Application,
     Agent,
@@ -33,7 +33,7 @@ from src.bleif import (
     clear_existing_advertisements,
 )
 
-from src.ble_standard_services import (
+from src.ble.ble_standard_services import (
     DeviceInformation, 
     FTMService, 
     FitnessMachineControlPoint,
@@ -43,8 +43,8 @@ from src.ble_standard_services import (
     RowerData, 
 )
 
-from src.heart_rate import HeartRateMonitor
-from src.s4 import RowerState
+from src.hr.heart_rate import HeartRateMonitor
+from src.s4.s4 import RowerState
 
 logger = logging.getLogger(__name__)
 
