@@ -4,7 +4,19 @@
 # The root logger is currently configured to write info logs to stdout and debug logs
 # to a local file named "wrowfusion.log"
 [loggers]
-keys=root, src.wrowfusion, src.ble_client, src.ble_server, src.ble_standard_services, src.bleif, src.heart_rate, src.s4, src.s4if, bleak
+keys=root, \
+    src.wrowfusion, \
+    src.api.api_http, \
+    src.api.api_ws, \
+    src.ble.ble_client, \ 
+    src.ble.ble_server, \
+    src.ble.ble_standard_services, \
+    src.ble.bleif, \
+    src.db.db_init, \
+    src.hr.heart_rate, \
+    src.s4.s4, \
+    src.s4.s4if, \
+    bleak
 
 [handlers]
 keys=consoleHandler,rotatingFileHandler
@@ -22,58 +34,64 @@ handlers=consoleHandler, rotatingFileHandler
 qualname=src.wrowfusion
 propagate=0
 
-[logger_src.ble_client]
+[logger_src.api.api_http]
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
-qualname=src.ble_client
+qualname=src.api.api_http
 propagate=0
 
-[logger_src.ble_server]
+[logger_src.api.api_ws]
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
-qualname=src.ble_server
+qualname=src.api.api_ws
 propagate=0
 
-[logger_src.ble_standard_services]
+[logger_src.ble.ble_server]
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
-qualname=src.ble_standard_services
+qualname=src.ble.ble_server
 propagate=0
 
-[logger_src.bleif]
+[logger_src.ble.ble_server]
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
-qualname=src.bleif
+qualname=src.ble.ble_server
 propagate=0
 
-[logger_src.heart_rate]
+[logger_src.ble.ble_standard_services]
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
-qualname=src.heart_rate
+qualname=src.ble.ble_standard_services
 propagate=0
 
-[logger_src.s4]
+[logger_src.ble.bleif]
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
-qualname=src.s4
+qualname=src.ble.bleif
 propagate=0
 
-[logger_src.s4if]
+[logger_src.db.db_init]
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
-qualname=src.s4if
+qualname=src.db.db_init
 propagate=0
 
-[logger_src.wrf_server_api]
+[logger_src.hr.heart_rate]
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
-qualname=src.wrf_server_api
+qualname=src.hr.heart_rate
 propagate=0
 
-[logger_src.wrf_server_ws]
-level=DEBUG
+[logger_src.s4.s4]
+level=INFO
 handlers=consoleHandler, rotatingFileHandler
-qualname=src.wrf_server_ws
+qualname=src.s4.s4
+propagate=0
+
+[logger_src.s4.s4if]
+level=INFO
+handlers=consoleHandler, rotatingFileHandler
+qualname=src.s4.s4if
 propagate=0
 
 [logger_bleak]
