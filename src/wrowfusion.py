@@ -33,9 +33,9 @@ from src.ble.ble_client import HeartRateBLEScanner
 
 def start_ws_server(hr_monitor: HeartRateMonitor, rower_state: RowerState):
     import asyncio
-    import src.api.wrf_server_ws  # Your websocket server module
+    import src.api.api_ws  # Your websocket server module
 
-    asyncio.run(src.api.wrf_server_ws.ws_task(rower_state, hr_monitor))  # This runs your async server forever
+    asyncio.run(src.api.api_ws.ws_task(rower_state, hr_monitor))  # This runs your async server forever
 
 # List to keep track of running threads
 threads = []
