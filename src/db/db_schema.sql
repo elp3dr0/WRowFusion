@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS intervals (
     interval_type TEXT CHECK (interval_type IN ('work', 'rest')) NOT NULL, 
     completed INTEGER DEFAULT 0,     -- 0 interval was not completed, 1 interval was completed
     FOREIGN KEY(workout_id) REFERENCES workouts(id)
-)
+);
 
 CREATE TABLE IF NOT EXISTS interval_data (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,6 +59,6 @@ CREATE TABLE IF NOT EXISTS hrv_metrics (
     rmsq_sd REAL,               -- Root mean square of successive differences (Reflects the short-term HRV, focusing on beat-to-beat variance).
     pct_over_50ms REAL,            -- % of normal-to-normal intervals > 50ms (Another indicator of short-term HRV)
     FOREIGN KEY(interval_id) REFERENCES intervals(id)
-)
+);
 
 INSERT OR IGNORE INTO users (id, username) VALUES (0, 'Guest');
