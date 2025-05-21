@@ -65,12 +65,12 @@ MEMORY_MAP = {
     '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},              # hours 0-9
     '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},             # minutes 0-59
     '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},             # seconds 0-59
-    '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': True},   # tenths of seconds 0-9
+    '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': False},   # tenths of seconds 0-9
     # Workout total times/distances/limits
     '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},       # total workout time
     '1EA': {'type': 'workout_total_metres', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},     # total workout distance in metres
     '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},    # total workout strokes
-    '1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low'},         # limit value for workouts
+    '1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'exclude_from_poll_loop': True},         # limit value for workouts
     # Intervals
     '1B0': {'type': 'workout_work1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
     '1B2': {'type': 'workout_rest1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
