@@ -8,15 +8,19 @@
 import threading
 import logging
 import time
+import re
 from gpiozero import DigitalOutputDevice
 from copy import deepcopy
 from typing import Any
-#from datetime import timedelta
 
 from src.s4.s4if import (
     Rower,
     S4Event,
     WorkoutMode, 
+)
+from src.s4.s4_workouts import (
+    Workout,
+    Zone,
 )
 from src.hr.heart_rate import HeartRateMonitor
 
@@ -70,18 +74,36 @@ NO_ROWING_PULSE_GAP = 300
 IGNORE_LIST = [
     'wr', 'ok', 'ping', 'model', 'pulse', 'error', 'exit',
     'none',
+    #'workout_flags',
+    #'intensity2_flags', 
+    #'distance1_flags',
+    #'distance2_flags',
+    #'program_flags',
     #'total_distance_dec',
     #'total_distance',
     #'watts',
     #'total_calories',
-    #'tank_volume',      # Recommend ignore
+    #'zone_hr_upper',
+    #'zone_hr_lower', 
+    #'zone_int_mps_upper',
+    #'zone_int_mps_lower',
+    #'zone_int_mph_upper',
+    #'zone_int_mph_lower',
+    #'zone_int_500m_upper',
+    #'zone_int_500m_lower',
+    #'zone_int_2km_upper',
+    #'zone_int_2km_lower',
+    #'zone_sr_upper',
+    #'zone_sr_lower',
+    #'tank_volume',
     #'stroke_count',
     #'avg_time_stroke_whole',
     #'avg_time_stroke_pull',
-    #'total_speed_cmps',
+    'total_speed_cmps',     # Recommend ignore
     #'avg_distance_cmps',
+    'ms_stored'             # Recommend ignore
     #'heart_rate',
-    '500m_pace',           # Recommend ignore
+    '500m_pace',            # Recommend ignore
     #'stroke_rate', 
     #'display_hr', 
     #'display_min', 
@@ -90,7 +112,25 @@ IGNORE_LIST = [
     #'workout_total_time',
     #'workout_total_metres',
     #'workout_total_strokes',
-    #'workout_limit',
+    'workout_limit',        # Recommend ignore
+    #'workout_work1',
+    #'workout_rest1',
+    #'workout_work2',
+    #'workout_rest2',
+    #'workout_work3',
+    #'workout_rest3',
+    #'workout_work4',
+    #'workout_rest4',
+    #'workout_work5',
+    #'workout_rest5',
+    #'workout_work6',
+    #'workout_rest6',
+    #'workout_work7',
+    #'workout_rest7',
+    #'workout_work8',
+    #'workout_rest8',
+    #'workout_work9',
+    #'workout_intervals',
     ]
 
 class RowerState(object):
@@ -122,8 +162,15 @@ class RowerState(object):
         self._TotalDistanceCM: int | None = None    # The total distance in cm (i.e. _TotalDistanceM * 100 + _TotalDistanceDec)
         self._StrokeDuration: int | None = None     # Units: ms
         self._DriveDuration: int | None = None      # Units: ms
+        self._WorkoutFlags: int | None = None       # Hold the workout flags to allow the code to detect a change in the flags
+        self._IntervalsSet: bool | None = None  
+        self._capture_work_targets: dict[int, int] = {} # Temporary dictionaries to capture the workout program as the intervals are recieved via the serial connection
+        self._capture_rest_durations: dict[int, int] = {} # Temporary dictionaries to capture the workout program as the intervals are recieved via the serial connection
+        self._workout_builder: Workout = Workout()
+        self.workout: Workout | None = None
+        self._zone_builder: Zone = Zone()
+        self.zone: Zone | None = None
         self.TankVolume: int | None = None          # Units: Decilitres
-        self.WRWorkout: dict[str, Any] = {}
         self.WRValues_rst: dict[str, Any] = {}
         self.WRValues: dict[str, Any] = {}
         self.WRValues_standstill: dict[str, Any] = {}
@@ -196,15 +243,11 @@ class RowerState(object):
             self._TotalDistanceCM = 0
             self._StrokeDuration = 0
             self._DriveDuration = 0
+            self._workout_builder.reset()
+            self.workout = None
+            self._zone_builder.reset()
+            self.zone = None
             self.TankVolume = 0
-            self.WRWorkout = {
-                'type': None,
-                'intervals': False,
-                'total_time': 0,
-                'total_metres': 0,
-                'total_strokes': 0,
-                'limit': 0,
-                }
             self._TempLowFreq = {}
             self.WRValues_rst = {
                 'stroke_rate_pm': 0.0,
@@ -236,13 +279,27 @@ class RowerState(object):
         handlers = {
             'stroke_start': lambda evt: setattr(self, '_DrivePhase', True),
             'stroke_end': lambda evt: setattr(self, '_DrivePhase', False),
-            'workout_flags': lambda evt: self._handle_workout_flags(evt),
-            'distance1_flags': lambda evt: self._print_data(evt),
+            'workout_flags': lambda evt: self._print_data(evt),
+            'intensity2_flags': lambda evt: self._handle_zone_program(evt), 
+            'distance1_flags': lambda evt: self._handle_workout_program(evt),
             'distance2_flags': lambda evt: self._print_data(evt),
+            'program_flags': lambda evt: self._print_data(evt),
             'total_distance': lambda evt: self._handle_total_distance(evt),
             'total_distance_dec': lambda evt: self._handle_total_distance_dec(evt),
             'watts': lambda evt: self._handle_watts(evt),
             'total_calories': lambda evt: self.WRValues.update({'total_calories': evt.value}),
+            'zone_hr_upper': lambda evt: self._handle_zone_program(evt),
+            'zone_hr_lower': lambda evt: self._handle_zone_program(evt), 
+            'zone_int_mps_upper': lambda evt: self._handle_zone_program(evt),
+            'zone_int_mps_lower': lambda evt: self._handle_zone_program(evt),
+            'zone_int_mph_upper': lambda evt: self._handle_zone_program(evt),
+            'zone_int_mph_lower': lambda evt: self._handle_zone_program(evt),
+            'zone_int_500m_upper': lambda evt: self._handle_zone_program(evt),
+            'zone_int_500m_lower': lambda evt: self._handle_zone_program(evt),
+            'zone_int_2km_upper': lambda evt: self._handle_zone_program(evt),
+            'zone_int_2km_lower': lambda evt: self._handle_zone_program(evt),
+            'zone_sr_upper': lambda evt: self._handle_zone_program(evt),
+            'zone_sr_lower': lambda evt: self._handle_zone_program(evt),
             'tank_volume': lambda evt: setattr(self, 'TankVolume', evt.value),
             'stroke_count': lambda evt: self.WRValues.update({'stroke_count': evt.value}),
             'avg_time_stroke_whole': lambda evt: self._handle_avg_time_stroke_whole(evt),       # used to calculate the stroke rate more accurately than the stroke rate event
@@ -262,26 +319,24 @@ class RowerState(object):
             'workout_total_time': lambda evt: self._print_data (evt),
             'workout_total_metres': lambda evt: self._print_data (evt),
             'workout_total_strokes': lambda evt: self._print_data (evt),
-            'workout_limit': lambda evt: self._print_data (evt),
-            'workout_total_time': lambda evt: self._print_data(evt),
-            'workout_work1': lambda evt: self._print_data(evt),
-            'workout_rest1': lambda evt: self._print_data(evt),
-            'workout_work2': lambda evt: self._print_data(evt),
-            'workout_rest2': lambda evt: self._print_data(evt),
-            'workout_work3': lambda evt: self._print_data(evt),
-            'workout_rest3': lambda evt: self._print_data(evt),
-            'workout_work4': lambda evt: self._print_data(evt),
-            'workout_rest4': lambda evt: self._print_data(evt),
-            'workout_work5': lambda evt: self._print_data(evt),
-            'workout_rest5': lambda evt: self._print_data(evt),
-            'workout_work6': lambda evt: self._print_data(evt),
-            'workout_rest6': lambda evt: self._print_data(evt),
-            'workout_work7': lambda evt: self._print_data(evt),
-            'workout_rest7': lambda evt: self._print_data(evt),
-            'workout_work8': lambda evt: self._print_data(evt),
-            'workout_rest8': lambda evt: self._print_data(evt),
-            'workout_work9': lambda evt: self._print_data(evt),
-            'workout_inter': lambda evt: self._print_data(evt),
+            'workout_work1': lambda evt: self._handle_workout_program(evt),
+            'workout_rest1': lambda evt: self._handle_workout_program(evt),
+            'workout_work2': lambda evt: self._handle_workout_program(evt),
+            'workout_rest2': lambda evt: self._handle_workout_program(evt),
+            'workout_work3': lambda evt: self._handle_workout_program(evt),
+            'workout_rest3': lambda evt: self._handle_workout_program(evt),
+            'workout_work4': lambda evt: self._handle_workout_program(evt),
+            'workout_rest4': lambda evt: self._handle_workout_program(evt),
+            'workout_work5': lambda evt: self._handle_workout_program(evt),
+            'workout_rest5': lambda evt: self._handle_workout_program(evt),
+            'workout_work6': lambda evt: self._handle_workout_program(evt),
+            'workout_rest6': lambda evt: self._handle_workout_program(evt),
+            'workout_work7': lambda evt: self._handle_workout_program(evt),
+            'workout_rest7': lambda evt: self._handle_workout_program(evt),
+            'workout_work8': lambda evt: self._handle_workout_program(evt),
+            'workout_rest8': lambda evt: self._handle_workout_program(evt),
+            'workout_work9': lambda evt: self._handle_workout_program(evt),
+            'workout_intervals': lambda evt: self._handle_workout_program(evt),
         }
 
         with self._wr_lock:
@@ -301,20 +356,41 @@ class RowerState(object):
     def _handle_workout_flags(self, evt: S4Event) -> None:
 
         self._print_data(evt)
-        mode = WorkoutMode(evt.value)
 
-        is_duration = WorkoutMode.WORKOUT_DURATION in mode or WorkoutMode.WORKOUT_DURATION_INTERVAL in mode
-        is_distance = WorkoutMode.WORKOUT_DISTANCE in mode or WorkoutMode.WORKOUT_DISTANCE_INTERVAL in mode
-        is_interval = WorkoutMode.WORKOUT_DURATION_INTERVAL in mode or WorkoutMode.WORKOUT_DISTANCE_INTERVAL in mode
+        if evt.value is None:
+            return # No bit field recieved. Cannot assume no flags are set and so discard this event.
+        
+        with self._wr_lock:
+            if self._workout_builder.update_if_flags_changed(evt.value):
+                self.workout = None
+                if self._rower_interface: 
+                    self._rower_interface.request_workouts = True
+
+            if self._zone_builder.update_if_flags_changed(evt.value):
+                self.zone = None
+                if self._rower_interface:
+                    self._rower_interface.request_zones = True
+
+    def _handle_workout_program(self, evt: S4Event) -> None:
+        self._print_data(evt)
 
         with self._wr_lock:
-            if is_duration:
-                self.WRWorkout['type'] = "duration"
-            elif is_distance:
-                self.WRWorkout['type'] = "distance"
+            self._workout_builder.update_from_event(evt)
+            if self._workout_builder.is_valid():
+                if self._rower_interface:
+                    self._rower_interface.request_workouts = False
+                self.workout = deepcopy(self._workout_builder)
 
-            self.WRWorkout['intervals'] = is_interval
-                
+    def _handle_zone_program(self, evt: S4Event) -> None:
+        self._print_data(evt)
+        
+        with self._wr_lock:
+            self._zone_builder.update_from_event(evt)
+            if self._zone_builder.is_valid():
+                if self._rower_interface:
+                    self._rower_interface.request_workouts = False
+                self.zone = deepcopy(self._zone_builder)
+        
     def _handle_total_distance(self, evt: S4Event) -> None:
         with self._wr_lock:
             self.WRValues['total_distance_m'] = evt.value

@@ -41,22 +41,38 @@ It appears, however, that it is exactly the opposite.
 MEMORY_MAP = {
     # Flags
     '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Describes the workout mode: extended zones and distance/duration modes.
-    '042': {'type': 'distance1_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Specifies the selected unit of distance (m, miles, km, stroke, cal, etc).
-    '043': {'type': 'distance2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': True},  # Specifies the selected unit of distance
+    '041': {'type': 'intensity2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout', 'exclude_from_poll_loop': False},  # Can be used to deduce the selected unit of intensity (m/s, mph, 500m pace, etc).
+    '042': {'type': 'distance1_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Can be used to deduce selected unit of distance (m, miles, km, stroke, cal, etc).
+    '043': {'type': 'distance2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': True},  # Can be used to deduce selected unit of distance
+    '044': {'type': 'program_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Specifies the elements displayed in the program window of the S4
     # Fundanental data
     '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},          # distance in metres since reset
     '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
     '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},                   # instantaneous power
     '08A': {'type': 'total_calories', 'size': 'triple', 'base': 16, 'endian': 'big', 'frequency': 'high'},          # calories since reset
-    '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False}, # tank volume in decilitres
+    # Zone boundary values
+    '090': {'type': 'zone_hr_upper', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the heartrate zone
+    '091': {'type': 'zone_hr_lower', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound of the heartrate zone
+    '092': {'type': 'zone_int_mps_upper', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the mps speed zone
+    '094': {'type': 'zone_int_mps_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the mps speed zone
+    '096': {'type': 'zone_int_mph_upper', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the mph speed zone
+    '098': {'type': 'zone_int_mph_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the mph speed zone
+    '09A': {'type': 'zone_int_500m_upper', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the 500m pace zone
+    '09C': {'type': 'zone_int_500m_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the 500m pace zone
+    '09E': {'type': 'zone_int_2km_upper', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the 2km pace zone
+    '0A0': {'type': 'zone_int_2km_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the 2km pace zone
+    '0A2': {'type': 'zone_sr_upper', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the strokerate zone
+    '0A3': {'type': 'zone_sr_lower', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the strokerate zone
+    # Tank volume
+    '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': False}, # tank volume in decilitres
     # Stroke counter
     '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},            # total strokes since reset
     '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},   # average time for a whole stroke measured in number of 25ms periods
     '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},    # average time for a pull (acc to dec) measured in number of 25ms periods
     # Speed
-    #'148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},        # total distance per second in cm
+    #'148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': True},        # total distance per second in cm
     '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},       # instantaneous average distance in cm
-    #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},               # Probably the number of readings (or registers) over which the speed is averaged
+    #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': True},               # Probably the number of readings (or registers) over which the speed is averaged
     # Values stored for zone maths
     '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},              # instantaneous heart rate
     '1A5': {'type': '500m_pace', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'exclude_from_poll_loop': True},   # instantaneious 500m Pace (secs)
@@ -70,27 +86,27 @@ MEMORY_MAP = {
     '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},       # total workout time
     '1EA': {'type': 'workout_total_metres', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},     # total workout distance in metres
     '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},    # total workout strokes
-    '1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'exclude_from_poll_loop': True},         # limit value for workouts
+    #'1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'exclude_from_poll_loop': True},         # limit value for workouts
     # Intervals
-    '1B0': {'type': 'workout_work1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1B2': {'type': 'workout_rest1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1B4': {'type': 'workout_work2', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1B6': {'type': 'workout_rest2', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1B8': {'type': 'workout_work3', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1BA': {'type': 'workout_rest3', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1BC': {'type': 'workout_work4', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1BE': {'type': 'workout_rest4', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1C0': {'type': 'workout_work5', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1C2': {'type': 'workout_rest5', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1C4': {'type': 'workout_work6', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1C6': {'type': 'workout_rest6', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1C8': {'type': 'workout_work7', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1CA': {'type': 'workout_rest7', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1CC': {'type': 'workout_work8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1CE': {'type': 'workout_rest8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    '1D0': {'type': 'workout_work9', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},
-    # No workout interval
-    '1D9': {'type': 'workout_inter', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low'},    # the total number of work and rest periods plus 1
+    '1B0': {'type': 'workout_work1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1B2': {'type': 'workout_rest1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1B4': {'type': 'workout_work2', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1B6': {'type': 'workout_rest2', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1B8': {'type': 'workout_work3', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1BA': {'type': 'workout_rest3', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1BC': {'type': 'workout_work4', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1BE': {'type': 'workout_rest4', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1C0': {'type': 'workout_work5', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1C2': {'type': 'workout_rest5', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1C4': {'type': 'workout_work6', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1C6': {'type': 'workout_rest6', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1C8': {'type': 'workout_work7', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1CA': {'type': 'workout_rest7', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1CC': {'type': 'workout_work8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1CE': {'type': 'workout_rest8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    '1D0': {'type': 'workout_work9', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
+    # No. workout intervals
+    '1D9': {'type': 'workout_intervals', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low'},    # the total number of work and rest periods plus 1
     }
 
 '''
@@ -99,7 +115,7 @@ Notes:
     are active. The workout flags are updated only once a whole workout has been programmed and the user clicks 'OK' to 
     get the program into its initialised state (i.e. flashing and ready to start rowing). At the end of the workout
     all buttons are unresponsive except OK. The workout flags are cleared when the user presses OK at the end of a workout
-    or when they press and hold OK to reset at any time.
+    or when the users presses and holds OK to reset at any time.
 (*) The distance1_flags specifies which distance unit names (m, km, etc) are shown on the screen and so it can be used
     to deduce which unit a user has selected for a workout or a just row session.
     - When a user has selected a unit for a workout or just row session:
@@ -336,6 +352,19 @@ class WorkoutMode(IntFlag):
     WORKOUT_DISTANCE_INTERVAL   = 1 << 6  # fworkout_dis_i
     WORKOUT_DURATION_INTERVAL   = 1 << 7  # fworkout_dur_i
 
+    WORKOUT_MASK = (
+        WORKOUT_DISTANCE
+        | WORKOUT_DURATION
+        | WORKOUT_DISTANCE_INTERVAL
+        | WORKOUT_DURATION_INTERVAL
+    )
+
+    ZONE_MASK = (
+        ZONE_HEARTRATE |
+        ZONE_INTENSITY |
+        ZONE_STROKERATE
+    )
+
     @classmethod
     def decode_hex(cls, hex_str: str) -> "WorkoutMode":
         """
@@ -355,6 +384,39 @@ class WorkoutMode(IntFlag):
         """
         return cls(int(hex_str, 16))
 
+    @classmethod
+    def changed_workout_bits(cls, old: int, new: int) -> bool:
+        return bool((old ^ new) & cls.WORKOUT_MASK)
+
+    @classmethod
+    def changed_zone_bits(cls, old: int, new: int) -> bool:
+        return bool((old ^ new) & cls.ZONE_MASK)
+
+    def has_workout_set(self) -> bool:
+        return bool(self & self.WORKOUT_MASK)
+    
+    def has_zone_set(self) -> bool:
+        return bool(self & self.ZONE_MASK)
+    
+    def is_duration(self) -> bool:
+        return bool(self & (WorkoutMode.WORKOUT_DURATION | WorkoutMode.WORKOUT_DURATION_INTERVAL))
+
+    def is_distance(self) -> bool:
+        return bool(self & (WorkoutMode.WORKOUT_DISTANCE | WorkoutMode.WORKOUT_DISTANCE_INTERVAL))
+
+    def is_interval(self) -> bool:
+        return bool(self & (WorkoutMode.WORKOUT_DURATION_INTERVAL | WorkoutMode.WORKOUT_DISTANCE_INTERVAL))
+
+    def get_zone_type(self) -> str:
+        ''' Returns the name of the zone that is set, or an empty string if none of the zone bits are set'''
+        if self & WorkoutMode.ZONE_INTENSITY:
+            return "intensity"
+        elif self & WorkoutMode.ZONE_HEARTRATE:
+            return "heart_rate"
+        elif self & WorkoutMode.ZONE_STROKERATE:
+            return "stroke_rate"
+        return ""
+    
     def describe(self) -> list[str | None]:
         """
         Get a list of human-readable flag names currently set in this WorkoutMode.
@@ -378,6 +440,14 @@ class DistanceMode(IntFlag):
     UNITS_CALORIES              = 1 << 6  # 
     DIG_OFF                     = 1 << 7  # fdist_fg_dig_off
 
+    UNIT_MASK = (
+        UNITS_METRES |
+        UNITS_MILES |
+        UNITS_KM |
+        UNITS_STROKES |
+        UNITS_CALORIES
+    )
+
     @classmethod
     def decode_hex(cls, hex_str: str) -> "DistanceMode":
         """
@@ -398,6 +468,13 @@ class DistanceMode(IntFlag):
         """
         return cls(int(hex_str, 16))
 
+    @classmethod
+    def get_single_unit_mode(cls, mode: 'DistanceMode') -> 'DistanceMode | None':
+        unit_bits = mode & cls.UNIT_MASK
+        if unit_bits and (unit_bits.value & (unit_bits.value - 1)) == 0:
+            return unit_bits
+        return None
+
     def describe(self) -> list[str | None]:
         """
         Get a list of human-readable flag names currently set in this DistanceMode.
@@ -410,6 +487,65 @@ class DistanceMode(IntFlag):
             ['UNITS_STROKES']
         """
         return [mode.name for mode in DistanceMode if mode in self]
+    
+class IntensityMode(IntFlag):
+    UNITS_MPS               = 1 << 0  # fint_fg_m_s
+    UNITS_MPH               = 1 << 1  # fint_fg_mph
+    UNITS_SECS_500m         = 1 << 2  # fint_fg_500m
+    UNITS_SECS_2KM          = 1 << 3  # fint_fg_2km
+    UNITS_WATTS             = 1 << 4  # fint_fg_watts
+    UNITS_CAL_HR            = 1 << 5  # fint_fg_cal_hr
+    LITRES_LABEL            = 1 << 6  # fint_fg_litres
+    AVERAGE_HEADER          = 1 << 7  # fint_fg_avg
+
+    UNIT_MASK = (
+        UNITS_MPS |
+        UNITS_MPH |
+        UNITS_SECS_500m |
+        UNITS_SECS_2KM |
+        UNITS_WATTS |
+        UNITS_CAL_HR
+    )
+
+    @classmethod
+    def decode_hex(cls, hex_str: str) -> "IntensityMode":
+        """
+        Create a IntensityMode instance from a hexadecimal string.
+        Args:
+            hex_str (str): A two-digit hex string (e.g., 'A0', '00', '1F') representing
+                           the 8-bit bitfield read from the S4 memory register.
+        Returns:
+            IntensityMode: A combined flag instance representing what is displayed in the intensity section of the S4 montor.
+            The units that are displayed also affect the maths (e.g. if  is displayed, intensity zone is in number of ).
+        Usage:
+            This method is typically used to convert the raw hex value returned by the S4 monitor
+            into a readable and operable set of flags represented by a IntensityMode object. E.g.
+            >>> mode = IntensityMode.decode_hex("22")
+            >>> print(mode)
+            INTENSITY MODE.UNITS_MPS
+            >>> if IntensityMode.UNITS_MPS in mode print("Intensity units: Metres per sec.")
+        """
+        return cls(int(hex_str, 16))
+
+    @classmethod
+    def get_single_unit_mode(cls, mode: 'IntensityMode') -> 'IntensityMode | None':
+        unit_bits = mode & cls.UNIT_MASK
+        if unit_bits and (unit_bits.value & (unit_bits.value - 1)) == 0:
+            return unit_bits
+        return None
+
+    def describe(self) -> list[str | None]:
+        """
+        Get a list of human-readable flag names currently set in this IntensityMode.
+        Returns:
+            List[str]: A list of active workout mode names (e.g., ['UNITS_MPS']).
+        Usage:
+            This method is useful for displaying or logging the current unit of distance.
+            >>> mode = IntensityMode.decode_hex("22")
+            >>> mode.describe()
+            ['UNITS_MPS']
+        """
+        return [mode.name for mode in IntensityMode if mode in self]
     
 # CUSTOM EXCEPTIONS
 class SerialNotConnectedError(Exception):
@@ -613,6 +749,9 @@ class Rower(object):
         self._capture_thread = None
         self._response_event = threading.Event()  # For on-demand responses
         self._current_response = None
+        self.request_workouts = False
+        self.request_zones = False
+        self.request_miscellaneous = False
 
         self._start_threads()
 
@@ -739,7 +878,13 @@ class Rower(object):
                         continue    # This address doesn't match the frequency we're looking for, so skip to the next address in the loop
                     if meta.get("exclude_from_poll_loop", False):
                         continue    # The Memory Map specifies that this address should be excluded from the polling loop, so skip to the next address in the loop
-                    
+                    if meta.get("category", "default") == "workout" and self.request_workouts is False:
+                        continue
+                    if meta.get("category", "default") == "zone" and self.request_zones is False:
+                        continue
+                    if meta.get("category", "default") == "miscellaneous" and self.request_miscellaneous is False:
+                        continue
+
                     self.request_address(address)
                     self._stop_event.wait(SERIAL_REQUEST_DELAY)
 

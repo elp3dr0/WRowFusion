@@ -28,11 +28,12 @@
 - [ ] Handle all the rest of the workout data
 - [ ] Figure out how to indicate just row or workout, and how to determine just row conditions - is it flags =0 or flags <16?
 - [ ] In s4if Make get on demand command stuff thread safe. Decide how destructive it will be for existing requests in the buffer, and how impolite it will be with hogging the serial while waiting for its response.
-- [ ] Remove the data_logger logger from S4 RowerState class once it's served its purpose.
+- [ ] Remove the data_logger logger from S4 RowerState class once it's served its purpose. And the _TempLowFreq dictionary and the print_data function (or refactor it to be more generally useful)
 - [ ] Move inject HR logic to the ble/ant publishing part of the code, rather than inserting it in the s4 data
 - [ ] Consider adding timestamp for each WRValues datum
 - [ ] Consider allowing None values for WRValue data, but keys should still be initialised even if their value is None because their presence will be expected by other parts of the code. I'd have to update other parts of the code to handle none values in WRValues.
 - [ ] Check what the rower replies with when an Exit and reset commands are sent 
+- [ ] Build the class to handle the workout progress including total strokes etc, and which records what interval we're on?
 
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)
