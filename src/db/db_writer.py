@@ -1,6 +1,9 @@
+import logging
 import sqlite3
 import time
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 class SessionManager:
     def __init__(self, db_path: str):

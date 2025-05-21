@@ -13,6 +13,7 @@ keys=root, \
     src.ble.ble_standard_services, \
     src.ble.bleif, \
     src.db.db_init, \
+    src.db.db_writer, \
     src.hr.heart_rate, \
     src.s4.s4_workouts, \
     src.s4.s4, \
@@ -47,10 +48,10 @@ handlers=consoleHandler, rotatingFileHandler
 qualname=src.api.api_ws
 propagate=0
 
-[logger_src.ble.ble_server]
+[logger_src.ble.ble_client]
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
-qualname=src.ble.ble_server
+qualname=src.ble.ble_client
 propagate=0
 
 [logger_src.ble.ble_server]
@@ -75,6 +76,12 @@ propagate=0
 level=INFO
 handlers=consoleHandler, rotatingFileHandler
 qualname=src.db.db_init
+propagate=0
+
+[logger_src.db.db_writer]
+level=INFO
+handlers=consoleHandler, rotatingFileHandler
+qualname=src.db.db_writer
 propagate=0
 
 [logger_src.hr.heart_rate]
