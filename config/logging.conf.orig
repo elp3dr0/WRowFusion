@@ -110,7 +110,7 @@ qualname=src.s4.s4if
 propagate=0
 
 [logger_s4data]
-level=INFO
+level=DEBUG
 handlers=dataFileHandler
 qualname=s4data
 propagate=0

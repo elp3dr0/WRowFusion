@@ -484,18 +484,25 @@ class RowerState(object):
             self._log_s4data(evt, logging.DEBUG)  # Logged only if DEBUG is enabled
             self._log_s4data(evt, logging.INFO)   # Logged only if INFO is enabled
         '''
+        logger.debug("Entering log s4 data for event: {evt} with debug level {level}")
         if not self._data_logger.isEnabledFor(level):
+            logger.debug("Debug level {level} is not enabled, so not logging {evt}")
             return
         
+
         eventtype = evt.type
         value = evt.value
         oldvalue = self._logger_cache.get(eventtype)
         
         if oldvalue is not None:
             if oldvalue != value:
+                logger.debug(f"Value has changed, so updating data logger for {evt}")
                 self._data_logger.info(f"{eventtype} updated to: {value!r} from {oldvalue!r}")
                 self._logger_cache[eventtype] = value
+            else:
+                logger.debug(f"No change in value for {evt}")
         else:
+            logger.debug(f"No value has previously been recorded so updating the data logger for {evt}")
             self._data_logger.info(f"{eventtype} initialised at: {value!r}")
             self._logger_cache[eventtype] = value
 
