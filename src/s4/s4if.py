@@ -41,7 +41,7 @@ It appears, however, that it is exactly the opposite.
 MEMORY_MAP = {
     # Screen
     '00D': {'type': 'screen_mode', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Describes which screen is displayed on the S4 monitor
-    #'00E': {'type': 'screen_sub_mode', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'display', 'exclude_from_poll_loop': True},  # Describes sub menu screen selections displayed on the S4 monitor
+    '00E': {'type': 'screen_sub_mode', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Describes sub menu screen selections displayed on the S4 monitor
     '00F': {'type': 'intervals_remaining', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Number of intervals remaining
     # Flags
     #'03D': {'type': 'display_cycle_control_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': True},  # S4 internal settings for the cycling of data fields that are displayed.

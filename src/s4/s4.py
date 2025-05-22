@@ -260,7 +260,7 @@ class RowerState(object):
             return
 
         handlers: dict[str, tuple[Callable[[S4Event], None] | None, int | None]] = {
-            'error': (None, logging.INFO),
+            'error': (lambda evt: self._handle_error(evt), logging.INFO),
             'screen_mode': (None, logging.INFO),
             'intervals_remaining': (None, logging.INFO),
             'function_flags': (None, logging.INFO),
@@ -344,7 +344,9 @@ class RowerState(object):
             if event.type == 'display_sec_dec':
                 self._compute_elapsed_time()
                 
-
+    def _handle_error(self, evt: S4Event) -> None:
+        logger.warning(f"Recieved error packet from S4: {evt}")
+        
     def _handle_workout_flags(self, evt: S4Event) -> None:
 
         if evt.value is None:
