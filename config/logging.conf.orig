@@ -4,20 +4,21 @@
 # The root logger is currently configured to write info logs to stdout and debug logs
 # to a local file named "wrowfusion.log"
 [loggers]
-keys=root, \
-    src.wrowfusion, \
-    src.api.api_http, \
-    src.api.api_ws, \
-    src.ble.ble_client, \ 
-    src.ble.ble_server, \
-    src.ble.ble_standard_services, \
-    src.ble.bleif, \
-    src.db.db_init, \
-    src.db.db_writer, \
-    src.hr.heart_rate, \
-    src.s4.s4_workouts, \
-    src.s4.s4, \
-    src.s4.s4if, \
+keys=root,
+    src.wrowfusion,
+    src.api.api_http,
+    src.api.api_ws,
+    src.ble.ble_client,
+    src.ble.ble_server,
+    src.ble.ble_standard_services,
+    src.ble.bleif,
+    src.db.db_init,
+    src.db.db_writer,
+    src.hr.heart_rate,
+    src.s4.s4_workouts,
+    src.s4.s4,
+    src.s4.s4if,
+    s4data,
     bleak
 
 [handlers]
@@ -108,6 +109,12 @@ handlers=consoleHandler, rotatingFileHandler
 qualname=src.s4.s4if
 propagate=0
 
+[logger_s4data]
+level=INFO
+handlers=dataFileHandler
+qualname=s4data
+propagate=0
+
 [logger_bleak]
 level=WARNING
 handlers=consoleHandler, rotatingFileHandler
@@ -126,6 +133,13 @@ level=DEBUG
 formatter=simpleFormatter
 # args = (filename, mode, maxBytes, backupCount)
 args=("#REPO_DIR#/logs/wrowfusion.log", 'a', 1*1024*1024, 9)
+
+[handler_dataFileHandler]
+class=FileHandler
+level=DEBUG
+formatter=simpleFormatter
+# args = (filename, mode, maxBytes, backupCount)
+args=("#REPO_DIR#/logs/wrowfusion_s4_data.log", 'a')
 
 [formatter_simpleFormatter]
 format=%(asctime)s [%(levelname)s] %(name)s: %(message)s

@@ -11,7 +11,7 @@ import time
 import re
 from gpiozero import DigitalOutputDevice
 from copy import deepcopy
-from typing import Any
+from typing import Any, Callable
 
 from src.s4.s4if import (
     Rower,
@@ -99,12 +99,12 @@ IGNORE_LIST = [
     #'stroke_count',
     #'avg_time_stroke_whole',
     #'avg_time_stroke_pull',
-    'total_speed_cmps',     # Recommend ignore
+    'total_speed_cmps',     # Recommend ignore (useful only for s4 monitor's internal logic)
     #'avg_distance_cmps',
-    'ms_stored'             # Recommend ignore
+    'ms_stored'             # Recommend ignore (useful only for s4 monitor's internal logic)
     #'heart_rate',
-    '500m_pace',            # Recommend ignore
-    #'stroke_rate', 
+    '500m_pace',            # Recommend ignore (derive from avg_time_stroke_whole instead)
+    'stroke_rate',          # Recommend ignore (derive from avg_time_stroke_whole instead)
     #'display_hr', 
     #'display_min', 
     #'display_sec',
@@ -112,7 +112,7 @@ IGNORE_LIST = [
     #'workout_total_time',
     #'workout_total_metres',
     #'workout_total_strokes',
-    'workout_limit',        # Recommend ignore
+    'workout_limit',        # Recommend ignore (useful only for s4 monitor's internal logic)
     #'workout_work1',
     #'workout_rest1',
     #'workout_work2',
@@ -176,25 +176,8 @@ class RowerState(object):
         self.WRValues_standstill: dict[str, Any] = {}
         self.ResetRower: bool | None = None
 
-        #### Temporary stuff for exploring values returned by S4 ##########
-        self._TempLowFreq: dict[str, Any] = {}
-
-        self.data_logger = logging.getLogger('wrowfusion.data')
-        self.data_logger.setLevel(logging.INFO)
-
-        # Create file handler
-        data_handler = logging.FileHandler('/tmp/wrowfusion_data.log')
-        data_handler.setLevel(logging.INFO)
-
-        # Simple format
-        formatter = logging.Formatter('%(asctime)s - %(message)s')
-        data_handler.setFormatter(formatter)
-
-        # Avoid adding multiple handlers if already configured
-        if not self.data_logger.handlers:
-            self.data_logger.addHandler(data_handler)
-
-        ################################################################
+        self._logger_cache: dict[str, Any] = {}
+        self._data_logger = logging.getLogger('s4data')
 
         if rower_interface is not None:
             self.initialise(rower_interface)
@@ -248,7 +231,7 @@ class RowerState(object):
             self._zone_builder.reset()
             self.zone = None
             self.TankVolume = 0
-            self._TempLowFreq = {}
+            self._logger_cache = {}
             self.WRValues_rst = {
                 'stroke_rate_pm': 0.0,
                 'stroke_count': 0,
@@ -276,67 +259,67 @@ class RowerState(object):
             #logger.debug(f"Ignoring event in ignore list: {event.type}")
             return
 
-        handlers = {
-            'stroke_start': lambda evt: setattr(self, '_DrivePhase', True),
-            'stroke_end': lambda evt: setattr(self, '_DrivePhase', False),
-            'workout_flags': lambda evt: self._print_data(evt),
-            'intensity2_flags': lambda evt: self._handle_zone_program(evt), 
-            'distance1_flags': lambda evt: self._handle_workout_program(evt),
-            'distance2_flags': lambda evt: self._print_data(evt),
-            'program_flags': lambda evt: self._print_data(evt),
-            'total_distance': lambda evt: self._handle_total_distance(evt),
-            'total_distance_dec': lambda evt: self._handle_total_distance_dec(evt),
-            'watts': lambda evt: self._handle_watts(evt),
-            'total_calories': lambda evt: self.WRValues.update({'total_calories': evt.value}),
-            'zone_hr_upper': lambda evt: self._handle_zone_program(evt),
-            'zone_hr_lower': lambda evt: self._handle_zone_program(evt), 
-            'zone_int_mps_upper': lambda evt: self._handle_zone_program(evt),
-            'zone_int_mps_lower': lambda evt: self._handle_zone_program(evt),
-            'zone_int_mph_upper': lambda evt: self._handle_zone_program(evt),
-            'zone_int_mph_lower': lambda evt: self._handle_zone_program(evt),
-            'zone_int_500m_upper': lambda evt: self._handle_zone_program(evt),
-            'zone_int_500m_lower': lambda evt: self._handle_zone_program(evt),
-            'zone_int_2km_upper': lambda evt: self._handle_zone_program(evt),
-            'zone_int_2km_lower': lambda evt: self._handle_zone_program(evt),
-            'zone_sr_upper': lambda evt: self._handle_zone_program(evt),
-            'zone_sr_lower': lambda evt: self._handle_zone_program(evt),
-            'tank_volume': lambda evt: setattr(self, 'TankVolume', evt.value),
-            'stroke_count': lambda evt: self.WRValues.update({'stroke_count': evt.value}),
-            'avg_time_stroke_whole': lambda evt: self._handle_avg_time_stroke_whole(evt),       # used to calculate the stroke rate more accurately than the stroke rate event
-            'avg_time_stroke_pull': lambda evt: setattr(self, '_DriveDuration', evt.value * 25),
-            'avg_distance_cmps': lambda evt: self._handle_avg_distance_cmps(evt),
-            'heart_rate': lambda evt: self.WRValues.update({'heart_rate_bpm': evt.value}),
-            '500m_pace': lambda evt: self._handle_500m_pace(evt),
-            #'stroke_rate': lambda evt: self.WRValues.update({'stroke_rate_pm': evt.value}),    # use avg_time_stroke_whole instead 
-            'display_sec': lambda evt: setattr(self, '_secondsWR', evt.value),
-            'display_min': lambda evt: setattr(self, '_minutesWR', evt.value),
-            'display_hr': lambda evt: setattr(self, '_hoursWR', evt.value),
-            'display_sec_dec': lambda evt: setattr(self, '_secdecWR', evt.value),
-            #'workout_total_time': lambda evt: self.WRWorkout.update({'total_time': evt.value}),
-            #'workout_total_metres': lambda evt: self.WRWorkout.update({'total_metres': evt.value}),
-            #'workout_total_strokes': lambda evt: self.WRWorkout.update({'total_strokes': evt.value}),
-            #'workout_limit': lambda evt: self.WRWorkout.update({'limit': evt.value}),
-            'workout_total_time': lambda evt: self._print_data (evt),
-            'workout_total_metres': lambda evt: self._print_data (evt),
-            'workout_total_strokes': lambda evt: self._print_data (evt),
-            'workout_work1': lambda evt: self._handle_workout_program(evt),
-            'workout_rest1': lambda evt: self._handle_workout_program(evt),
-            'workout_work2': lambda evt: self._handle_workout_program(evt),
-            'workout_rest2': lambda evt: self._handle_workout_program(evt),
-            'workout_work3': lambda evt: self._handle_workout_program(evt),
-            'workout_rest3': lambda evt: self._handle_workout_program(evt),
-            'workout_work4': lambda evt: self._handle_workout_program(evt),
-            'workout_rest4': lambda evt: self._handle_workout_program(evt),
-            'workout_work5': lambda evt: self._handle_workout_program(evt),
-            'workout_rest5': lambda evt: self._handle_workout_program(evt),
-            'workout_work6': lambda evt: self._handle_workout_program(evt),
-            'workout_rest6': lambda evt: self._handle_workout_program(evt),
-            'workout_work7': lambda evt: self._handle_workout_program(evt),
-            'workout_rest7': lambda evt: self._handle_workout_program(evt),
-            'workout_work8': lambda evt: self._handle_workout_program(evt),
-            'workout_rest8': lambda evt: self._handle_workout_program(evt),
-            'workout_work9': lambda evt: self._handle_workout_program(evt),
-            'workout_intervals': lambda evt: self._handle_workout_program(evt),
+        handlers: dict[str, tuple[Callable[[S4Event], None] | None, int | None]] = {
+            'stroke_start': (lambda evt: setattr(self, '_DrivePhase', True), logging.DEBUG),
+            'stroke_end': (lambda evt: setattr(self, '_DrivePhase', False), logging.DEBUG),
+            'workout_flags': (None, logging.INFO),
+            'intensity2_flags': (lambda evt: self._handle_zone_program(evt), logging.INFO), 
+            'distance1_flags': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'distance2_flags': (None, logging.INFO),
+            'program_flags': (None, logging.INFO),
+            'total_distance': (lambda evt: self._handle_total_distance(evt), logging.DEBUG),
+            'total_distance_dec': (lambda evt: self._handle_total_distance_dec(evt), logging.DEBUG),
+            'watts': (lambda evt: self._handle_watts(evt), logging.DEBUG),
+            'total_calories': (lambda evt: self.WRValues.update({'total_calories': evt.value}), logging.DEBUG),
+            'zone_hr_upper': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'zone_hr_lower': (lambda evt: self._handle_zone_program(evt), logging.INFO), 
+            'zone_int_mps_upper': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'zone_int_mps_lower': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'zone_int_mph_upper': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'zone_int_mph_lower': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'zone_int_500m_upper': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'zone_int_500m_lower': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'zone_int_2km_upper': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'zone_int_2km_lower': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'zone_sr_upper': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'zone_sr_lower': (lambda evt: self._handle_zone_program(evt), logging.INFO),
+            'tank_volume': (lambda evt: setattr(self, 'TankVolume', evt.value), logging.INFO),
+            'stroke_count': (lambda evt: self.WRValues.update({'stroke_count': evt.value}), logging.DEBUG),
+            'avg_time_stroke_whole': (lambda evt: self._handle_avg_time_stroke_whole(evt), logging.DEBUG),       # used to calculate the stroke rate more accurately than the stroke rate event
+            'avg_time_stroke_pull': (lambda evt: setattr(self, '_DriveDuration', evt.value * 25), logging.DEBUG),
+            'avg_distance_cmps': (lambda evt: self._handle_avg_distance_cmps(evt), logging.DEBUG),
+            'heart_rate': (lambda evt: self.WRValues.update({'heart_rate_bpm': evt.value}), logging.DEBUG),
+            '500m_pace': (lambda evt: self._handle_500m_pace(evt), logging.DEBUG),
+            #'stroke_rate': (lambda evt: self.WRValues.update({'stroke_rate_pm': evt.value}), logging.DEBUG),    # use avg_time_stroke_whole instead 
+            'display_sec': (lambda evt: setattr(self, '_secondsWR', evt.value), logging.DEBUG),
+            'display_min': (lambda evt: setattr(self, '_minutesWR', evt.value), logging.DEBUG),
+            'display_hr': (lambda evt: setattr(self, '_hoursWR', evt.value), logging.DEBUG),
+            'display_sec_dec': (lambda evt: setattr(self, '_secdecWR', evt.value), logging.DEBUG),
+            #'workout_total_time': (lambda evt: self.WRWorkout.update({'total_time': evt.value}), logging.DEBUG),
+            #'workout_total_metres': (lambda evt: self.WRWorkout.update({'total_metres': evt.value}), logging.DEBUG),
+            #'workout_total_strokes': (lambda evt: self.WRWorkout.update({'total_strokes': evt.value}), logging.DEBUG),
+            #'workout_limit': (lambda evt: self.WRWorkout.update({'limit': evt.value}), logging.DEBUG),
+            'workout_total_time': (None, logging.INFO),
+            'workout_total_metres': (None, logging.INFO),
+            'workout_total_strokes': (None, logging.INFO),
+            'workout_work1': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_rest1': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_work2': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_rest2': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_work3': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_rest3': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_work4': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_rest4': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_work5': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_rest5': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_work6': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_rest6': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_work7': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_rest7': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_work8': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_rest8': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_work9': (lambda evt: self._handle_workout_program(evt), logging.INFO),
+            'workout_intervals': (lambda evt: self._handle_workout_program(evt), logging.INFO),
         }
 
         with self._wr_lock:
@@ -345,7 +328,11 @@ class RowerState(object):
                 logger.warning(f"On Rower Event received unhandled event type: {event.type}")
                 return
             
-            handler(event)
+            handler_func, log_level = handler
+            if handler_func is not None:
+                handler_func(event)
+            if log_level is not None:
+                self._log_s4data(event, log_level)
             # In the memory map, the time components are listed in order of increasing signficance: dec, sec, min, hr
             # and so are requested and also responded in that order. Therefore the elapsed time can be calculated
             # on receipt of the hr response.
@@ -354,8 +341,6 @@ class RowerState(object):
                 
 
     def _handle_workout_flags(self, evt: S4Event) -> None:
-
-        self._print_data(evt)
 
         if evt.value is None:
             return # No bit field recieved. Cannot assume no flags are set and so discard this event.
@@ -372,7 +357,6 @@ class RowerState(object):
                     self._rower_interface.request_zones = True
 
     def _handle_workout_program(self, evt: S4Event) -> None:
-        self._print_data(evt)
 
         with self._wr_lock:
             self._workout_builder.update_from_event(evt)
@@ -382,7 +366,6 @@ class RowerState(object):
                 self.workout = deepcopy(self._workout_builder)
 
     def _handle_zone_program(self, evt: S4Event) -> None:
-        self._print_data(evt)
         
         with self._wr_lock:
             self._zone_builder.update_from_event(evt)
@@ -483,17 +466,33 @@ class RowerState(object):
                 strokeratio = round((self._StrokeDuration - self._DriveDuration) / (self._DriveDuration * 1.25) , 2)
                 self.WRValues['stroke_ratio'] = strokeratio
                     
-    def _print_data(self, evt: S4Event) -> None:
+    def _log_s4data(self, evt: S4Event, level: int = logging.INFO) -> None:
+        '''
+        Logs changes in values of the data from the s4 to the s4data logger defined in logging.conf.
+        How much data is logged is determined by the combination of the 'level' argument sent to this
+        function and the level of the s4data logger specified in logging.conf.
+        Primarily of use for debugging/developing
+        Args:
+            evt: the data from the S4
+            level: the logging level which the event will be treated as
+        Usage:
+            self._log_s4data(evt, logging.DEBUG)  # Logged only if DEBUG is enabled
+            self._log_s4data(evt, logging.INFO)   # Logged only if INFO is enabled
+        '''
+        if not self._data_logger.isEnabledFor(level):
+            return
+        
         eventtype = evt.type
         value = evt.value
-        oldvalue = self._TempLowFreq.get(eventtype)
+        oldvalue = self._logger_cache.get(eventtype)
+        
         if oldvalue is not None:
             if oldvalue != value:
-                self.data_logger.info(f"{eventtype} updated to: {value!r} from {oldvalue!r}")
-                self._TempLowFreq[eventtype] = value
+                self._data_logger.info(f"{eventtype} updated to: {value!r} from {oldvalue!r}")
+                self._logger_cache[eventtype] = value
         else:
-            self.data_logger.info(f"{eventtype} initialised at: {value!r}")
-            self._TempLowFreq[eventtype] = value
+            self._data_logger.info(f"{eventtype} initialised at: {value!r}")
+            self._logger_cache[eventtype] = value
 
     def pulse_monitor(self,event: S4Event) -> None:
         # As a callback, this function is called by the notifier each time any event 
