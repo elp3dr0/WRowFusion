@@ -72,7 +72,7 @@ heartbeat_signal = DigitalOutputDevice(HEARTBEAT_PIN, active_high=True, initial_
 NO_ROWING_PULSE_GAP = 300
 
 IGNORE_LIST = [
-    'wr', 'ok', 'ping', 'model', 'pulse', 'error', 'exit',
+    'wr', 'ok', 'ping', 'model', 'pulse', 'exit', #'error', 
     'none',
     #'workout_flags',
     #'intensity2_disp_flags', 
@@ -260,6 +260,7 @@ class RowerState(object):
             return
 
         handlers: dict[str, tuple[Callable[[S4Event], None] | None, int | None]] = {
+            'error': (None, logging.INFO),
             'screen_mode': (None, logging.INFO),
             'intervals_remaining': (None, logging.INFO),
             'function_flags': (None, logging.INFO),
