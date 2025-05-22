@@ -286,7 +286,7 @@ class RowerState(object):
             'tank_volume': (lambda evt: setattr(self, 'TankVolume', evt.value), logging.INFO),
             'stroke_count': (lambda evt: self.WRValues.update({'stroke_count': evt.value}), logging.DEBUG),
             'avg_time_stroke_whole': (lambda evt: self._handle_avg_time_stroke_whole(evt), logging.DEBUG),       # used to calculate the stroke rate more accurately than the stroke rate event
-            'avg_time_stroke_pull': (lambda evt: setattr(self, '_DriveDuration', evt.value * 25), logging.DEBUG),
+            'avg_time_stroke_pull': (lambda evt: setattr(self, '_DriveDuration', evt.value * 25) if evt.value is not None else None, logging.DEBUG),
             'avg_distance_cmps': (lambda evt: self._handle_avg_distance_cmps(evt), logging.DEBUG),
             'heart_rate': (lambda evt: self.WRValues.update({'heart_rate_bpm': evt.value}), logging.DEBUG),
             '500m_pace': (lambda evt: self._handle_500m_pace(evt), logging.DEBUG),
@@ -349,12 +349,14 @@ class RowerState(object):
             if self._workout_builder.update_if_flags_changed(evt.value):
                 self.workout = None
                 if self._rower_interface: 
-                    self._rower_interface.request_workouts = True
+                    self._rower_interface.set_request_category("workout", True)
+                    self._rower_interface.set_request_category("distance", True)
 
             if self._zone_builder.update_if_flags_changed(evt.value):
                 self.zone = None
                 if self._rower_interface:
-                    self._rower_interface.request_zones = True
+                    self._rower_interface.set_request_category("zone", True)
+                    self._rower_interface.set_request_category("intensity", True)
 
     def _handle_workout_program(self, evt: S4Event) -> None:
 
@@ -362,7 +364,8 @@ class RowerState(object):
             self._workout_builder.update_from_event(evt)
             if self._workout_builder.is_valid():
                 if self._rower_interface:
-                    self._rower_interface.request_workouts = False
+                    self._rower_interface.set_request_category("workout", False)
+                    self._rower_interface.set_request_category("distance", False)
                 self.workout = deepcopy(self._workout_builder)
 
     def _handle_zone_program(self, evt: S4Event) -> None:
@@ -371,7 +374,8 @@ class RowerState(object):
             self._zone_builder.update_from_event(evt)
             if self._zone_builder.is_valid():
                 if self._rower_interface:
-                    self._rower_interface.request_workouts = False
+                    self._rower_interface.set_request_category("zone", False)
+                    self._rower_interface.set_request_category("intensity", False)
                 self.zone = deepcopy(self._zone_builder)
         
     def _handle_total_distance(self, evt: S4Event) -> None:
@@ -471,7 +475,8 @@ class RowerState(object):
         Logs changes in values of the data from the s4 to the s4data logger defined in logging.conf.
         How much data is logged is determined by the combination of the 'level' argument sent to this
         function and the level of the s4data logger specified in logging.conf.
-        Primarily of use for debugging/developing
+        Primarily of use for debugging/developing, e.g. to by watching the values change at the terminal like:
+        less +F /opt/wrowfusion/logs/wrowfusion_s4_data.log
         Args:
             evt: the data from the S4
             level: the logging level which the event will be treated as

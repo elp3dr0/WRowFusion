@@ -40,16 +40,16 @@ It appears, however, that it is exactly the opposite.
 
 MEMORY_MAP = {
     # Flags
-    '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Describes the workout mode: extended zones and distance/duration modes.
-    '041': {'type': 'intensity2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout', 'exclude_from_poll_loop': False},  # Can be used to deduce the selected unit of intensity (m/s, mph, 500m pace, etc).
-    '042': {'type': 'distance1_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Can be used to deduce selected unit of distance (m, miles, km, stroke, cal, etc).
-    '043': {'type': 'distance2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': True},  # Can be used to deduce selected unit of distance
-    '044': {'type': 'program_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'exclude_from_poll_loop': False},  # Specifies the elements displayed in the program window of the S4
+    '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Describes the workout mode: extended zones and distance/duration modes.
+    '041': {'type': 'intensity2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'intensity', 'exclude_from_poll_loop': False},  # Can be used to deduce the selected unit of intensity (m/s, mph, 500m pace, etc).
+    '042': {'type': 'distance1_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': False},  # Can be used to deduce selected unit of distance (m, miles, km, stroke, cal, etc).
+    '043': {'type': 'distance2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': True},  # Can be used to deduce selected unit of distance
+    '044': {'type': 'program_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Specifies the elements displayed in the program window of the S4
     # Fundanental data
-    '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},          # distance in metres since reset
-    '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
-    '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},                   # instantaneous power
-    '08A': {'type': 'total_calories', 'size': 'triple', 'base': 16, 'endian': 'big', 'frequency': 'high'},          # calories since reset
+    '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},          # distance in metres since reset
+    '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
+    '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},                   # instantaneous power
+    '08A': {'type': 'total_calories', 'size': 'triple', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},          # calories since reset
     # Zone boundary values
     '090': {'type': 'zone_hr_upper', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the heartrate zone
     '091': {'type': 'zone_hr_lower', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound of the heartrate zone
@@ -66,27 +66,27 @@ MEMORY_MAP = {
     # Tank volume
     '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': False}, # tank volume in decilitres
     # Stroke counter
-    '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},            # total strokes since reset
-    '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},   # average time for a whole stroke measured in number of 25ms periods
-    '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},    # average time for a pull (acc to dec) measured in number of 25ms periods
+    '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},            # total strokes since reset
+    '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},   # average time for a whole stroke measured in number of 25ms periods
+    '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},    # average time for a pull (acc to dec) measured in number of 25ms periods
     # Speed
-    #'148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': True},        # total distance per second in cm
-    '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high'},       # instantaneous average distance in cm
-    #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': True},               # Probably the number of readings (or registers) over which the speed is averaged
+    #'148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},        # Total distance per second in cm. Thought to be the high frequency mps readings that will be averaged by internal s4 logic. 
+    '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},       # instantaneous average distance in cm
+    #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},               # Probably the number of readings (or registers) over which the speed is averaged by internal s4 logic.
     # Values stored for zone maths
-    '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high'},              # instantaneous heart rate
-    '1A5': {'type': '500m_pace', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'exclude_from_poll_loop': True},   # instantaneious 500m Pace (secs)
-    '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': True},    # instantaneous strokes per min (integer only: consider using avg_time_stroke_whole instead)
+    '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},              # instantaneous heart rate
+    '1A5': {'type': '500m_pace', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},   # instantaneious 500m Pace (secs). (available only when displayed on monitor: consider deriving from avg_time_stroke_whole instead)
+    '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},    # instantaneous strokes per min (integer only: consider deriving from avg_time_stroke_whole instead)
     # Clock Display - Capture time components in reverse order for time elapsed accuracy  
-    '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},              # hours 0-9
-    '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},             # minutes 0-59
-    '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high'},             # seconds 0-59
-    '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'exclude_from_poll_loop': False},   # tenths of seconds 0-9
+    '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},              # hours 0-9
+    '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},             # minutes 0-59
+    '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},             # seconds 0-59
+    '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': False},   # tenths of seconds 0-9
     # Workout total times/distances/limits
-    '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},       # total workout time
-    '1EA': {'type': 'workout_total_metres', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},     # total workout distance in metres
-    '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low'},    # total workout strokes
-    #'1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'exclude_from_poll_loop': True},         # limit value for workouts
+    '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout_stat'},       # total workout time
+    '1EA': {'type': 'workout_total_metres', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout_stat'},     # total workout distance in metres
+    '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout_stat'},    # total workout strokes
+    #'1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'workout', 'exclude_from_poll_loop': True},         # limit value for workouts
     # Intervals
     '1B0': {'type': 'workout_work1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
     '1B2': {'type': 'workout_rest1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
@@ -106,7 +106,7 @@ MEMORY_MAP = {
     '1CE': {'type': 'workout_rest8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
     '1D0': {'type': 'workout_work9', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
     # No. workout intervals
-    '1D9': {'type': 'workout_intervals', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low'},    # the total number of work and rest periods plus 1
+    '1D9': {'type': 'workout_intervals', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},    # the total number of work and rest periods plus 1
     }
 
 '''
@@ -749,10 +749,16 @@ class Rower(object):
         self._capture_thread = None
         self._response_event = threading.Event()  # For on-demand responses
         self._current_response = None
-        self.request_workouts = False
-        self.request_zones = False
-        self.request_miscellaneous = False
-
+        self._request_categories: dict[str, bool] = {
+            "rowing": True,
+            "state": True,
+            "workout": False,
+            "workout_stat": False,
+            "zone": False,
+            "intensity": False,
+            "distance": False,
+            "miscellaneous": False,
+        }
         self._start_threads()
 
     def _start_threads(self):
@@ -866,6 +872,9 @@ class Rower(object):
             else:
                 self._stop_event.wait(0.1)
 
+    def set_request_category(self, category: str, enabled: bool) -> None:
+        self._request_categories[category] = enabled
+        
     def _start_requesting(self, freq: str ="high"):
         counter = 0
         while not self._stop_event.is_set():
@@ -878,12 +887,8 @@ class Rower(object):
                         continue    # This address doesn't match the frequency we're looking for, so skip to the next address in the loop
                     if meta.get("exclude_from_poll_loop", False):
                         continue    # The Memory Map specifies that this address should be excluded from the polling loop, so skip to the next address in the loop
-                    if meta.get("category", "default") == "workout" and self.request_workouts is False:
-                        continue
-                    if meta.get("category", "default") == "zone" and self.request_zones is False:
-                        continue
-                    if meta.get("category", "default") == "miscellaneous" and self.request_miscellaneous is False:
-                        continue
+                    if self._request_categories.get(meta.get("category", "default")) is False:
+                        continue    # The address is in a category for which the flag has been set to false in the _request_categories dict, to the next address in the loop
 
                     self.request_address(address)
                     self._stop_event.wait(SERIAL_REQUEST_DELAY)
