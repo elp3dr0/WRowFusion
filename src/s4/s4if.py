@@ -889,6 +889,9 @@ class Rower(object):
                         continue    # The Memory Map specifies that this address should be excluded from the polling loop, so skip to the next address in the loop
                     if self._request_categories.get(meta.get("category", "default")) is False:
                         continue    # The address is in a category for which the flag has been set to false in the _request_categories dict, to the next address in the loop
+                    
+                    if address == "1B0":
+                        logger.debug(f"Requesting workout 1 data")
 
                     self.request_address(address)
                     self._stop_event.wait(SERIAL_REQUEST_DELAY)
