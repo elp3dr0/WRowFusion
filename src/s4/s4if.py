@@ -604,6 +604,8 @@ class S4Event:
             return cls.build(type='error', raw=cmd)
         elif cmd == WR_RESPONSE:
             return cls.build(type='wr', raw=cmd)
+        elif cmd == INTERACTIVE_KEYPAD_RESET_RESPONSE:
+            return cls.build(type='reset', raw=cmd)
         else:
             logger.warning(f"Unrecognised command line captured from S4: {cmd}")
             return None

@@ -16,7 +16,6 @@ from typing import Any, Callable
 from src.s4.s4if import (
     Rower,
     S4Event,
-    WorkoutMode, 
 )
 from src.s4.s4_workouts import (
     Workout,
@@ -78,7 +77,7 @@ IGNORE_LIST = [
     #'intensity2_disp_flags', 
     #'distance1_disp_flags',
     #'distance2_disp_flags',
-    #'program_flags',
+    #'program_disp_flags',
     #'total_distance_dec',
     #'total_distance',
     #'watts',
@@ -266,13 +265,15 @@ class RowerState(object):
             'intervals_remaining': (None, logging.INFO),
             'function_flags': (None, logging.INFO),
             'misc_disp_flags': (None, logging.INFO),
+            'reset': (lambda evt: self._zero_state(), logging.INFO),
             'stroke_start': (lambda evt: setattr(self, '_DrivePhase', True), logging.DEBUG),
             'stroke_end': (lambda evt: setattr(self, '_DrivePhase', False), logging.DEBUG),
             'workout_flags': (lambda evt: self._handle_workout_flags(evt), logging.INFO),
             'intensity2_disp_flags': (lambda evt: self._handle_zone_program(evt), logging.INFO), 
             'distance1_disp_flags': (lambda evt: self._handle_workout_program(evt), logging.INFO),
             'distance2_disp_flags': (None, logging.INFO),
-            'program_flags': (None, logging.INFO),
+            'program_disp_flags': (None, logging.INFO),
+            'misc_disp_flags': (None, logging.INFO),
             'total_distance': (lambda evt: self._handle_total_distance(evt), logging.DEBUG),
             'total_distance_dec': (lambda evt: self._handle_total_distance_dec(evt), logging.DEBUG),
             'watts': (lambda evt: self._handle_watts(evt), logging.DEBUG),
