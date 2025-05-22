@@ -22,7 +22,7 @@ keys=root,
     bleak
 
 [handlers]
-keys=consoleHandler,rotatingFileHandler
+keys=consoleHandler,rotatingFileHandler,dataFileHandler
 
 [formatters]
 keys=simpleFormatter
