@@ -56,7 +56,7 @@ MEMORY_MAP = {
     #'046': {'type': 'heart_rate_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'heart_rate', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the heart rate window.
     #'047': {'type': 'stroke_rate_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'stroke_rate', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the stroke rate window.
     #'047': {'type': 'zone_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the zone window.
-    #'047': {'type': 'misc_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various zone word and miscellanious display elements.
+    '047': {'type': 'misc_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various zone word and miscellanious display elements.
     # Fundanental data
     '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},          # distance in metres since reset
     '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
@@ -907,8 +907,11 @@ class Rower(object):
                     if self._request_categories.get(meta.get("category", "default")) is False:
                         continue    # The address is in a category for which the flag has been set to false in the _request_categories dict, to the next address in the loop
                     
-                    if address == "1B0":
-                        logger.debug(f"Requesting workout 1 data")
+                    # TODO: remove this code TK
+                    if address == "00D":
+                        logger.info(f"Requesting screen data")
+                    elif address == "00F":
+                        logger.info(f"Requesting interval remaining data")
 
                     self.request_address(address)
                     self._stop_event.wait(SERIAL_REQUEST_DELAY)

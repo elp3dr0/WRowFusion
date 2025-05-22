@@ -263,6 +263,7 @@ class RowerState(object):
             'screen_mode': (None, logging.INFO),
             'intervals_remaining': (None, logging.INFO),
             'function_flags': (None, logging.INFO),
+            'misc_disp_flags': (None, logging.INFO),
             'stroke_start': (lambda evt: setattr(self, '_DrivePhase', True), logging.DEBUG),
             'stroke_end': (lambda evt: setattr(self, '_DrivePhase', False), logging.DEBUG),
             'workout_flags': (lambda evt: self._handle_workout_flags(evt), logging.INFO),
@@ -487,12 +488,13 @@ class RowerState(object):
             self._log_s4data(evt, logging.DEBUG)  # Logged only if DEBUG is enabled
             self._log_s4data(evt, logging.INFO)   # Logged only if INFO is enabled
         '''
-        logger.debug("Entering log s4 data for event: {evt} with debug level {level}")
+        
         if not self._data_logger.isEnabledFor(level):
-            logger.debug("Debug level {level} is not enabled, so not logging {evt}")
+            #logger.debug("Debug level {level} is not enabled, so not logging {evt}")
             return
         
-
+        logger.debug(f"Entering log s4 data for event: {evt} with debug level {level}")
+        
         eventtype = evt.type
         value = evt.value
         oldvalue = self._logger_cache.get(eventtype)
