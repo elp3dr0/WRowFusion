@@ -35,6 +35,8 @@
 - [ ] Consider allowing None values for WRValue data, but keys should still be initialised even if their value is None because their presence will be expected by other parts of the code. I'd have to update other parts of the code to handle none values in WRValues.
 - [ ] Check what the rower replies with when an Exit and reset commands are sent 
 - [ ] Build the class to handle the workout progress including total strokes etc, and which records what interval we're on?
+- [ ] On S4 reset, clear the internal RowerState attributes that hold the time etc.
+- [ ] Handle the time during program settings etc. Because the display time toggles between the rest or work times. Which could upset the time tracking during a workout.
 
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)

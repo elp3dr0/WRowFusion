@@ -39,12 +39,24 @@ It appears, however, that it is exactly the opposite.
 '''
 
 MEMORY_MAP = {
+    # Screen
+    '00D': {'type': 'screen_mode', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Describes which screen is displayed on the S4 monitor
+    #'00E': {'type': 'screen_sub_mode', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'display', 'exclude_from_poll_loop': True},  # Describes sub menu screen selections displayed on the S4 monitor
+    '00F': {'type': 'intervals_remaining', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Number of intervals remaining
     # Flags
+    #'03D': {'type': 'display_cycle_control_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': True},  # S4 internal settings for the cycling of data fields that are displayed.
     '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Describes the workout mode: extended zones and distance/duration modes.
-    '041': {'type': 'intensity2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'intensity', 'exclude_from_poll_loop': False},  # Can be used to deduce the selected unit of intensity (m/s, mph, 500m pace, etc).
-    '042': {'type': 'distance1_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': False},  # Can be used to deduce selected unit of distance (m, miles, km, stroke, cal, etc).
-    '043': {'type': 'distance2_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': True},  # Can be used to deduce selected unit of distance
-    '044': {'type': 'program_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Specifies the elements displayed in the program window of the S4
+    '03F': {'type': 'function_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # S4 internal settings for buzzer control, zone animation, count down, and zone/workout toggle
+    #'040': {'type': 'intensity1_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'intensity', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the intensity window.
+    '041': {'type': 'intensity2_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'intensity', 'exclude_from_poll_loop': False},  # Can be used to deduce the selected unit of intensity (m/s, mph, 500m pace, etc).
+    '042': {'type': 'distance1_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': False},  # Can be used to deduce selected unit of distance (m, miles, km, stroke, cal, etc).
+    #'043': {'type': 'distance2_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': True},  # Can be used to deduce selected unit of distance
+    #'044': {'type': 'program_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'program', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the program window.
+    #'045': {'type': 'duration_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'duration', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the duration window.
+    #'046': {'type': 'heart_rate_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'heart_rate', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the heart rate window.
+    #'047': {'type': 'stroke_rate_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'stroke_rate', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the stroke rate window.
+    #'047': {'type': 'zone_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the zone window.
+    #'047': {'type': 'misc_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various zone word and miscellanious display elements.
     # Fundanental data
     '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},          # distance in metres since reset
     '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
@@ -105,7 +117,7 @@ MEMORY_MAP = {
     '1CC': {'type': 'workout_work8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
     '1CE': {'type': 'workout_rest8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
     '1D0': {'type': 'workout_work9', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
-    # No. workout intervals
+    # Number of workout intervals
     '1D9': {'type': 'workout_intervals', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},    # the total number of work and rest periods plus 1
     }
 
@@ -757,7 +769,12 @@ class Rower(object):
             "zone": False,
             "intensity": False,
             "distance": False,
+            "duration": False,
+            "program": False,
+            "heart_rate": False,
+            "stroke_rate": False,
             "miscellaneous": False,
+            "display": False,
         }
         self._start_threads()
 

@@ -63,7 +63,7 @@ class Workout:
             self.workout = max(evt.value - 1, 0)
             return
 
-        if evt.type == "distance1_flags":
+        if evt.type == "distance1_disp_flags":
             distance_flags = DistanceMode(evt.value)
             selected_unit = DistanceMode.get_single_unit_mode(distance_flags)
             if not selected_unit:
@@ -167,7 +167,7 @@ class Zone:
         if evt.value is None:
             return
 
-        if evt.type == "intensity2_flags":
+        if evt.type == "intensity2_disp_flags":
             intensity_flags = IntensityMode(evt.value)
             selected_unit = IntensityMode.get_single_unit_mode(intensity_flags)
             if not selected_unit:
