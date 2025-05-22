@@ -51,7 +51,7 @@ MEMORY_MAP = {
     '041': {'type': 'intensity2_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'intensity', 'exclude_from_poll_loop': False},  # Can be used to deduce the selected unit of intensity (m/s, mph, 500m pace, etc).
     '042': {'type': 'distance1_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': False},  # Can be used to deduce selected unit of distance (m, miles, km, stroke, cal, etc).
     #'043': {'type': 'distance2_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': True},  # Can be used to deduce selected unit of distance
-    #'044': {'type': 'program_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'program', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the program window.
+    '044': {'type': 'program_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'program', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the program window.
     #'045': {'type': 'duration_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'duration', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the duration window.
     #'046': {'type': 'heart_rate_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'heart_rate', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the heart rate window.
     #'047': {'type': 'stroke_rate_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'stroke_rate', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the stroke rate window.
@@ -770,7 +770,7 @@ class Rower(object):
             "intensity": False,
             "distance": False,
             "duration": False,
-            "program": False,
+            "program": True,
             "heart_rate": False,
             "stroke_rate": False,
             "miscellaneous": False,
@@ -906,12 +906,6 @@ class Rower(object):
                         continue    # The Memory Map specifies that this address should be excluded from the polling loop, so skip to the next address in the loop
                     if self._request_categories.get(meta.get("category", "default")) is False:
                         continue    # The address is in a category for which the flag has been set to false in the _request_categories dict, to the next address in the loop
-                    
-                    # TODO: remove this code TK
-                    if address == "00D":
-                        logger.info(f"Requesting screen data")
-                    elif address == "00F":
-                        logger.info(f"Requesting interval remaining data")
 
                     self.request_address(address)
                     self._stop_event.wait(SERIAL_REQUEST_DELAY)

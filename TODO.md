@@ -38,6 +38,7 @@
 - [ ] On S4 reset, clear the internal RowerState attributes that hold the time etc.
 - [ ] Handle the time during program settings etc. Because the display time toggles between the rest or work times. Which could upset the time tracking during a workout.
 - [ ] Remove temp code in s4if start requesting
+- [ ] Set "program": True, back to false in s4if
 
 ## 📡 Bluetooth & ANT+
 - [ ] Add peripheral Privacy Flag in advertisement and configure Pi to be able to handle address randomisation (see note 1)

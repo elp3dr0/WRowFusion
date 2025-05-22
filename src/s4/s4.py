@@ -261,6 +261,7 @@ class RowerState(object):
 
         handlers: dict[str, tuple[Callable[[S4Event], None] | None, int | None]] = {
             'error': (lambda evt: self._handle_error(evt), logging.INFO),
+            'screen_sub_mode': (None, logging.INFO),
             'screen_mode': (None, logging.INFO),
             'intervals_remaining': (None, logging.INFO),
             'function_flags': (None, logging.INFO),
@@ -346,7 +347,7 @@ class RowerState(object):
                 
     def _handle_error(self, evt: S4Event) -> None:
         logger.warning(f"Recieved error packet from S4: {evt}")
-        
+
     def _handle_workout_flags(self, evt: S4Event) -> None:
 
         if evt.value is None:
@@ -495,8 +496,6 @@ class RowerState(object):
         if not self._data_logger.isEnabledFor(level):
             #logger.debug("Debug level {level} is not enabled, so not logging {evt}")
             return
-        
-        logger.debug(f"Entering log s4 data for event: {evt} with debug level {level}")
         
         eventtype = evt.type
         value = evt.value
