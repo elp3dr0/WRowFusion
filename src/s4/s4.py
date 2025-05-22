@@ -504,13 +504,11 @@ class RowerState(object):
         
         if oldvalue is not None:
             if oldvalue != value:
-                logger.debug(f"Value has changed, so updating data logger for {evt}")
                 self._data_logger.info(f"{eventtype} updated to: {value!r} from {oldvalue!r}")
                 self._logger_cache[eventtype] = value
             else:
                 logger.debug(f"No change in value for {evt}")
         else:
-            logger.debug(f"No value has previously been recorded so updating the data logger for {evt}")
             self._data_logger.info(f"{eventtype} initialised at: {value!r}")
             self._logger_cache[eventtype] = value
 
