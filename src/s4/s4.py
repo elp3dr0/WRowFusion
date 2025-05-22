@@ -262,7 +262,7 @@ class RowerState(object):
         handlers: dict[str, tuple[Callable[[S4Event], None] | None, int | None]] = {
             'stroke_start': (lambda evt: setattr(self, '_DrivePhase', True), logging.DEBUG),
             'stroke_end': (lambda evt: setattr(self, '_DrivePhase', False), logging.DEBUG),
-            'workout_flags': (None, logging.INFO),
+            'workout_flags': (lambda evt: self._handle_workout_flags(evt), logging.INFO),
             'intensity2_flags': (lambda evt: self._handle_zone_program(evt), logging.INFO), 
             'distance1_flags': (lambda evt: self._handle_workout_program(evt), logging.INFO),
             'distance2_flags': (None, logging.INFO),
