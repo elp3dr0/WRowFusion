@@ -32,7 +32,8 @@ def compile_metrics(rower_state: RowerState, hr_monitor: HeartRateMonitor) -> di
         "elapsed_time": wr_values.get('elapsed_time_secs', 0),
         "instant_watts": wr_values.get('instant_watts', 0),
         "total_calories": round(wr_values.get('total_calories', 0)/1000,1),
-        "stroke_ratio": round(wr_values.get('stroke_ratio', 0),2)
+        "stroke_ratio": round(wr_values.get('stroke_ratio', 0),2),
+        "paddle_turning": wr_values.get('paddle_turning',"N/A"),
     }
 
 async def broadcast(rower_state: RowerState, hr_monitor: HeartRateMonitor) -> None:
