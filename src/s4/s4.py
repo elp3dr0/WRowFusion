@@ -237,6 +237,7 @@ class RowerState(object):
             self.tank_volume = 0
             self._logger_cache = {}
             self.WRValues_rst = {
+                'paddle_turning': False,  #TK Undo
                 'stroke_rate_pm': 0.0,
                 'stroke_count': 0,
                 'total_distance_m': 0,
@@ -578,6 +579,7 @@ class RowerState(object):
                 self._drive_phase = False
                 self._recent_strokes_max_power = []
                 self.WRValuesStandstill()
+            self.WRValues["paddle_turning"] = self._paddle_turning  #TK
 
     def reset_rower(self):
         if self._rower_interface:
@@ -602,8 +604,9 @@ class RowerState(object):
                 logger.debug("getWRValues handling PaddleTurning")
                 values = deepcopy(self.WRValues)
             else:
-                logger.debug("getWRValues handling standstill")
-                values = deepcopy(self.WRValues_standstill)
+                logger.debug("getWRValues handling standstill")     
+                #values = deepcopy(self.WRValues_standstill)    #tk undo
+                values = deepcopy(self.WRValues)                #tk undo
             #logger.debug("getWRValues ending lock")
         logger.debug("getWRValues lock ended")
         return values
