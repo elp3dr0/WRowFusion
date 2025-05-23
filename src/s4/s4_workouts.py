@@ -134,33 +134,77 @@ class Workout:
 class Zone:
     def __init__(self):
         self._workout_flags: int | None = None
+        self._zone_trigger_flags: int | None = None
         self.type: str | None = None
         self.units: str | None = None
-        self.upper_bound: int | None = None
-        self.lower_bound: int | None = None
+        self.bounds: dict[str, tuple[int | None, int | None]] = {}
 
     def reset(self) -> None:
         self.__init__()
+    
+    def _reset_bounds(self) -> None:
+        self.bounds = {
+            'bpm': (None, None), 
+            'mps': (None, None),
+            'mph': (None, None), 
+            '500m_pace': (None, None), 
+            '2km_pace': (None, None), 
+            'spm': (None, None),
+        }
 
-    def update_if_flags_changed(self, flags: int) -> bool:
+    def reset_bounds_if_flags_changed(self, flags: int) -> bool:
+        '''
+        Unlike workout, a user can change the upper or lower bounds of a zone without triggering
+        a change in the workout flags. Therefore we use a proxy (typically misc_display_flags) 
+        which we know will change whenever the user makes any change to the zone settings.
+        Returns:
+            True if the flags have changed.
+            False if the flags haven't changed.
+            False if a zone isn't selected by the workout flags 
+        '''
+        old_flags = self._zone_trigger_flags
+        if old_flags is not None and old_flags == flags:
+            # No change in workout flags
+            return False
+        
+        # The S4's workout settings have changed.
+        self._zone_trigger_flags = flags
+
+        mode = WorkoutMode(flags)
+        zone_type = mode.get_zone_type()
+        if zone_type is None:
+            # No zone is selected so ignore this change in misc_display_flags
+            return False
+        
+        # The S4 is configured to work within a zone, so this change in misc_display_flags
+        # could indicate that the user has chnaged zone bounds. Reset the bounds and tell
+        # the caller so that it can take action to refresh the bounds.
+        self._reset_bounds
+        return True
+
+    def update_type_if_flags_changed(self, flags: int) -> bool:
         '''
         Returns:
-            True if the Workout flags have changed
-            False if the Workout flags haven't changed
+            True if the Zone bits of the workout flags have changed
+            False if the Zone bits of the workout flags haven't changed
         '''
         if self._workout_flags is not None and not WorkoutMode.changed_zone_bits(self._workout_flags, flags):
             # No change in workout flags
             return False
         
-        # The S4's workout settings have changed.
-        self.reset()
+        # The S4's selected zone has changed.
+        self._workout_flags = flags
 
         mode = WorkoutMode(flags)
+        zone_type = mode.get_zone_type()
+        self.type = zone_type
+        self.units = None
+        if self.type == "heart_rate":
+            self.units = "bpm"
+        elif self.type == "stroke_rate":
+            self.units = "spm"
 
-        if mode.has_zone_set():
-            self.type = mode.get_zone_type()
-
-        self._workout_flags = flags
+        self._reset_bounds()
         return True
 
     def update_from_event(self, evt: S4Event) -> None:
@@ -179,29 +223,46 @@ class Zone:
                 IntensityMode.UNITS_MPH: "mph",
                 IntensityMode.UNITS_SECS_500m: "500m_pace",
                 IntensityMode.UNITS_SECS_2KM: "2km_pace",
-                IntensityMode.UNITS_WATTS: "watts",
-                IntensityMode.UNITS_CAL_HR: "calories_hr",
             }
             self.units = unit_map.get(selected_unit)
             return
         
-        match = re.match(r"zone_.*_(upper|lower)", evt.type)
+        label_map = {
+            'hr': 'bpm',
+            'mps': 'mps',
+            'mph': 'mph',
+            '500m_pace': '500m_pace',
+            '2km_pace': '2km_pace',
+            'sr': 'spm',
+        }
+
+        match = re.match(r"zone_(int_)?([a-z0-9]+)_(upper|lower)", evt.type)
         if not match:
             return  # Not a zone bound update
 
-        bound_type = match.group(1)
-        if bound_type == "upper":
-            self.upper_bound = evt.value
-        elif bound_type == "lower":
-            self.lower_bound = evt.value
-
+        short_label = match.group(2)
+        bound_type = match.group(3)
+        key = label_map.get(short_label)
+        
+        if key in self.bounds:
+            current_lower, current_upper = self.bounds[key]
+            if bound_type == 'lower':
+                self.bounds[key] = (evt.value, current_upper)
+            else:  # 'upper'
+                self.bounds[key] = (current_lower, evt.value)
 
     def is_valid(self) -> bool:
-        if any(x is None for x in [self.type, self.upper_bound, self.lower_bound]):
+        if any(x is None for x in [self.type, self.units]):
             return False
-        
-        if self.type == "intensity" and (self.units is None or self.units not in ["mps", "mph", "500m_pace", "2km_pace", "watts", "calories_hr"]):
+        assert self.units is not None
+
+        if self.type == "intensity" and self.units not in ["mps", "mph", "500m_pace", "2km_pace"]:
             logger.debug(f"Zone set as intensity but unexpected units: {self.units}")
             return False
-        
+
+        if any(None in bounds for bounds in self.bounds.values()):
+            # At least one Upper or lower bound is not yet set. The s4 monitor stores
+            # the upper and lower bounds for all types of zone regardless of which one
+            # (if any) is selected, so keep polling to get all of the bounds.
+            return False 
         return True

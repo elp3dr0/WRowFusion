@@ -260,7 +260,7 @@ class RowerState(object):
             'screen_mode': (None, logging.INFO),
             'intervals_remaining': (None, logging.INFO),
             'function_flags': (None, logging.INFO),
-            'misc_disp_flags': (None, logging.INFO),
+            'misc_disp_flags': (lambda evt: self._handle_misc_disp_flags(evt), logging.INFO),
             'reset': (lambda evt: self._zero_state(), logging.INFO),
             'stroke_start': (lambda evt: setattr(self, '_DrivePhase', True), logging.DEBUG),
             'stroke_end': (lambda evt: setattr(self, '_DrivePhase', False), logging.DEBUG),
@@ -357,11 +357,23 @@ class RowerState(object):
                     self._rower_interface.set_request_category("workout", True)
                     self._rower_interface.set_request_category("distance", True)
 
-            if self._zone_builder.update_if_flags_changed(evt.value):
+            if self._zone_builder.update_type_if_flags_changed(evt.value):
                 self.zone = None
                 if self._rower_interface:
                     self._rower_interface.set_request_category("zone", True)
                     self._rower_interface.set_request_category("intensity", True)
+
+    def _handle_misc_disp_flags(self, evt: S4Event) -> None:
+        if evt.value is None:
+            return # No bit field recieved. Cannot assume no flags are set and so discard this event.
+
+        with self._wr_lock:
+            if self._zone_builder.reset_bounds_if_flags_changed(evt.value):
+                self.zone = None
+                if self._rower_interface:
+                    self._rower_interface.set_request_category("zone", True)
+                    self._rower_interface.set_request_category("intensity", True)
+
 
     def _handle_workout_program(self, evt: S4Event) -> None:
 

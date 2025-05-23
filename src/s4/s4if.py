@@ -154,10 +154,10 @@ MEMORY_MAP = {
     '094': {'type': 'zone_int_mps_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the mps speed zone
     '096': {'type': 'zone_int_mph_upper', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the mph speed zone
     '098': {'type': 'zone_int_mph_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the mph speed zone
-    '09A': {'type': 'zone_int_500m_upper', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the 500m pace zone
-    '09C': {'type': 'zone_int_500m_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the 500m pace zone
-    '09E': {'type': 'zone_int_2km_upper', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the 2km pace zone
-    '0A0': {'type': 'zone_int_2km_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the 2km pace zone
+    '09A': {'type': 'zone_int_500m_pace_upper', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the 500m pace zone
+    '09C': {'type': 'zone_int_500m_pace_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the 500m pace zone
+    '09E': {'type': 'zone_int_2km_pace_upper', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the 2km pace zone
+    '0A0': {'type': 'zone_int_2km_pace_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the 2km pace zone
     '0A2': {'type': 'zone_sr_upper', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the strokerate zone
     '0A3': {'type': 'zone_sr_lower', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the strokerate zone
 ## Prognostics
@@ -517,15 +517,15 @@ class WorkoutMode(IntFlag):
     def is_interval(self) -> bool:
         return bool(self & (WorkoutMode.WORKOUT_DURATION_INTERVAL | WorkoutMode.WORKOUT_DISTANCE_INTERVAL))
 
-    def get_zone_type(self) -> str:
-        ''' Returns the name of the zone that is set, or an empty string if none of the zone bits are set'''
+    def get_zone_type(self) -> str | None:
+        ''' Returns the name of the zone that is set, or None if none of the zone bits are set'''
         if self & WorkoutMode.ZONE_INTENSITY:
             return "intensity"
         elif self & WorkoutMode.ZONE_HEARTRATE:
             return "heart_rate"
         elif self & WorkoutMode.ZONE_STROKERATE:
             return "stroke_rate"
-        return ""
+        return
     
     def describe(self) -> list[str | None]:
         """
@@ -862,7 +862,7 @@ class Rower(object):
         self._response_event = threading.Event()  # For on-demand responses
         self._current_response = None
         self._request_categories: dict[str, bool] = DEFAULT_REQUEST_CATEGORIES.copy()
-        
+
         self._start_threads()
 
     def _start_threads(self):
