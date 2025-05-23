@@ -138,37 +138,36 @@ class RowerState(object):
         self._stop_event = threading.Event()
         self._wr_lock = threading.RLock()
 
-        self._RecentStrokesMaxPower: list[int] = []
-        self._StrokeMaxPower: int | None = None
-        self._DrivePhase: bool | None = None         # Our _DrivePhase is set to True at when the S4 determines pulley accelleration
+        self._recent_strokes_max_power: list[int] = []
+        self._stroke_max_power: int | None = None
+        self._drive_phase: bool | None = None         # Our _drive_phase is set to True at when the S4 determines pulley accelleration
                                         # and set to False when S4 detects pulley decelleration. It is therefore True
                                         # throughout the whole Drive phase of the stroke and False during recovery phase. 
-        self._WattsEventValue: int | None = None
-        self._RollingAvgWatts: int | None = None
-        self._Concept2Watts: float | None = None
-        self._500mPace: int | None = None
-        self._LastCheckForPulse: int | None = None  # Timestamp in ms of last check for pulse 
-        self._PulseEventTime: int | None = None
-        self._PaddleTurning: bool | None = None
-        self._secondsWR: int | None = None
-        self._minutesWR: int | None = None
-        self._hoursWR: int | None = None
+        self._watts_event_value: int | None = None
+        self._rolling_avg_watts: int | None = None
+        self._concept2_watts: float | None = None
+        self._500m_pace: int | None = None
+        self._last_check_for_pulse: int | None = None  # Timestamp in ms of last check for pulse 
+        self._pulse_event_time: int | None = None
+        self._paddle_turning: bool | None = None
+        self._seconds_wr: int | None = None
+        self._minutes_wr: int | None = None
+        self._hours_wr: int | None = None
         self._secdecWR: int | None = None
-        self._ElapsedTime: float | None = None      # Elapsed time in seconds with 1 decimal place (note though that this is likely false accuracy due to serial communication process)
-        self._TotalDistanceM: int | None = None     # The total distance in m, ignoring the value in the dec register
-        self._TotalDistanceDec: int | None = None   # The cm component of the total distance (i.e. the component that would follow a decimal point)
-        self._TotalDistanceCM: int | None = None    # The total distance in cm (i.e. _TotalDistanceM * 100 + _TotalDistanceDec)
-        self._StrokeDuration: int | None = None     # Units: ms
-        self._DriveDuration: int | None = None      # Units: ms
-        self._WorkoutFlags: int | None = None       # Hold the workout flags to allow the code to detect a change in the flags
-        self._IntervalsSet: bool | None = None  
+        self._elapsed_time: float | None = None      # Elapsed time in seconds with 1 decimal place (note though that this is likely false accuracy due to serial communication process)
+        self._total_distance_m: int | None = None     # The total distance in m, ignoring the value in the dec register
+        self._total_distance_dec: int | None = None   # The cm component of the total distance (i.e. the component that would follow a decimal point)
+        self._total_distance_cm: int | None = None    # The total distance in cm (i.e. _total_distance_m * 100 + _total_distance_dec)
+        self._stroke_duration: int | None = None     # Units: ms
+        self._drive_duration: int | None = None      # Units: ms
+        self._workout_flags: int | None = None       # Hold the workout flags to allow the code to detect a change in the flags
         self._capture_work_targets: dict[int, int] = {} # Temporary dictionaries to capture the workout program as the intervals are recieved via the serial connection
         self._capture_rest_durations: dict[int, int] = {} # Temporary dictionaries to capture the workout program as the intervals are recieved via the serial connection
         self._workout_builder: Workout = Workout()
         self.workout: Workout | None = None
         self._zone_builder: Zone = Zone()
         self.zone: Zone | None = None
-        self.TankVolume: int | None = None          # Units: Decilitres
+        self.tank_volume: int | None = None          # Units: Decilitres
         self.WRValues_rst: dict[str, Any] = {}
         self.WRValues: dict[str, Any] = {}
         self.WRValues_standstill: dict[str, Any] = {}
@@ -202,31 +201,31 @@ class RowerState(object):
         logger.debug("RowerState._zero_state: Attempting lock")
         with self._wr_lock:
             logger.debug("RowerState._zero_state: Lock attained, setting values")
-            self._RecentStrokesMaxPower = []
-            self._StrokeMaxPower = 0
-            self._DrivePhase = False
-            self._WattsEventValue = 0
-            self._RollingAvgWatts = 0
-            self._Concept2Watts = 0.0
-            self._500mPace = 0
-            self._LastCheckForPulse = 0
-            self._PulseEventTime = 0
-            self._PaddleTurning = False
-            self._secondsWR = 0
-            self._minutesWR = 0
-            self._hoursWR = 0
+            self._recent_strokes_max_power = []
+            self._stroke_max_power = 0
+            self._drive_phase = False
+            self._watts_event_value = 0
+            self._rolling_avg_watts = 0
+            self._concept2_watts = 0.0
+            self._500m_pace = 0
+            self._last_check_for_pulse = 0
+            self._pulse_event_time = 0
+            self._paddle_turning = False
+            self._seconds_wr = 0
+            self._minutes_wr = 0
+            self._hours_wr = 0
             self._secdecWR = 0
-            self._ElapsedTime = 0.0
-            self._TotalDistanceM = 0
-            self._TotalDistanceDec = 0
-            self._TotalDistanceCM = 0
-            self._StrokeDuration = 0
-            self._DriveDuration = 0
+            self._elapsed_time = 0.0
+            self._total_distance_m = 0
+            self._total_distance_dec = 0
+            self._total_distance_cm = 0
+            self._stroke_duration = 0
+            self._drive_duration = 0
             self._workout_builder.reset()
             self.workout = None
             self._zone_builder.reset()
             self.zone = None
-            self.TankVolume = 0
+            self.tank_volume = 0
             self._logger_cache = {}
             self.WRValues_rst = {
                 'stroke_rate_pm': 0.0,
@@ -262,8 +261,8 @@ class RowerState(object):
             'function_flags': (None, logging.INFO),
             'misc_disp_flags': (lambda evt: self._handle_misc_disp_flags(evt), logging.INFO),
             'reset': (lambda evt: self._zero_state(), logging.INFO),
-            'stroke_start': (lambda evt: setattr(self, '_DrivePhase', True), logging.DEBUG),
-            'stroke_end': (lambda evt: setattr(self, '_DrivePhase', False), logging.DEBUG),
+            'stroke_start': (lambda evt: setattr(self, '_drive_phase', True), logging.DEBUG),
+            'stroke_end': (lambda evt: setattr(self, '_drive_phase', False), logging.DEBUG),
             'workout_flags': (lambda evt: self._handle_workout_flags(evt), logging.INFO),
             'intensity2_disp_flags': (lambda evt: self._handle_zone_program(evt), logging.INFO), 
             'distance1_disp_flags': (lambda evt: self._handle_workout_program(evt), logging.INFO),
@@ -286,17 +285,17 @@ class RowerState(object):
             'zone_int_2km_lower': (lambda evt: self._handle_zone_program(evt), logging.INFO),
             'zone_sr_upper': (lambda evt: self._handle_zone_program(evt), logging.INFO),
             'zone_sr_lower': (lambda evt: self._handle_zone_program(evt), logging.INFO),
-            'tank_volume': (lambda evt: setattr(self, 'TankVolume', evt.value), logging.INFO),
+            'tank_volume': (lambda evt: setattr(self, 'tank_volume', evt.value), logging.INFO),
             'stroke_count': (lambda evt: self.WRValues.update({'stroke_count': evt.value}), logging.DEBUG),
             'avg_time_stroke_whole': (lambda evt: self._handle_avg_time_stroke_whole(evt), logging.DEBUG),       # used to calculate the stroke rate more accurately than the stroke rate event
-            'avg_time_stroke_pull': (lambda evt: setattr(self, '_DriveDuration', evt.value * 25) if evt.value is not None else None, logging.DEBUG),
+            'avg_time_stroke_pull': (lambda evt: setattr(self, '_drive_duration', evt.value * 25) if evt.value is not None else None, logging.DEBUG),
             'instant_avg_speed_cmps': (lambda evt: self._handle_instant_avg_speed_cmps(evt), logging.DEBUG),
             'heart_rate': (lambda evt: self.WRValues.update({'heart_rate_bpm': evt.value}), logging.DEBUG),
             '500m_pace': (lambda evt: self._handle_500m_pace(evt), logging.DEBUG),
             #'stroke_rate': (lambda evt: self.WRValues.update({'stroke_rate_pm': evt.value}), logging.DEBUG),    # use avg_time_stroke_whole instead 
-            'display_sec': (lambda evt: setattr(self, '_secondsWR', evt.value), logging.DEBUG),
-            'display_min': (lambda evt: setattr(self, '_minutesWR', evt.value), logging.DEBUG),
-            'display_hr': (lambda evt: setattr(self, '_hoursWR', evt.value), logging.DEBUG),
+            'display_sec': (lambda evt: setattr(self, '_seconds_wr', evt.value), logging.DEBUG),
+            'display_min': (lambda evt: setattr(self, '_minutes_wr', evt.value), logging.DEBUG),
+            'display_hr': (lambda evt: setattr(self, '_hours_wr', evt.value), logging.DEBUG),
             'display_sec_dec': (lambda evt: setattr(self, '_secdecWR', evt.value), logging.DEBUG),
             #'workout_total_time': (lambda evt: self.WRWorkout.update({'total_time': evt.value}), logging.DEBUG),
             #'workout_total_metres': (lambda evt: self.WRWorkout.update({'total_metres': evt.value}), logging.DEBUG),
@@ -398,18 +397,18 @@ class RowerState(object):
     def _handle_total_distance(self, evt: S4Event) -> None:
         with self._wr_lock:
             self.WRValues['total_distance_m'] = evt.value
-            self._TotalDistanceM = evt.value
+            self._total_distance_m = evt.value
 
     def _handle_total_distance_dec(self, evt: S4Event) -> None:
         with self._wr_lock:
             value = evt.value
-            self._TotalDistanceDec = value
-            self._TotalDistanceCM = max(self._TotalDistanceCM or 0, (self._TotalDistanceM or 0) * 100 + (value or 0))
+            self._total_distance_dec = value
+            self._total_distance_cm = max(self._total_distance_cm or 0, (self._total_distance_m or 0) * 100 + (value or 0))
 
     def _handle_avg_time_stroke_whole(self, evt: S4Event) -> None:
         with self._wr_lock:
             duration_ms = (evt.value or 0) * 25
-            self._StrokeDuration = duration_ms
+            self._stroke_duration = duration_ms
             self.WRValues['stroke_rate_pm'] = round(60000 / duration_ms if duration_ms else 0, 2)
             self._compute_stroke_ratio()
 
@@ -428,12 +427,12 @@ class RowerState(object):
 
             # Prefer using the 500mPace from the S4 if it is being captured and not ignored.
             # Otherwise compute the 500m pace from the speed.
-            if not self._500mPace:
+            if not self._500m_pace:
                 pace_500m = 50000 / speed
                 self.WRValues['instant_500m_pace_secs'] = round(pace_500m)
 
             C2watts = round(2.80 / pow((100/speed), 3))
-            self._Concept2Watts = C2watts
+            self._concept2_watts = C2watts
             
             if USE_CONCEPT2_POWER:
                 self.WRValues['instant_watts'] = C2watts
@@ -441,19 +440,19 @@ class RowerState(object):
     def _handle_watts(self, evt: S4Event) -> None:
         with self._wr_lock:
             watts = evt.value
-            self._WattsEventValue = watts
-            if self._DrivePhase:
-                self._StrokeMaxPower = max(self._StrokeMaxPower or 0, watts or 0)
+            self._watts_event_value = watts
+            if self._drive_phase:
+                self._stroke_max_power = max(self._stroke_max_power or 0, watts or 0)
             else:
-                if self._StrokeMaxPower:
-                    self._RecentStrokesMaxPower.append(self._StrokeMaxPower)
-                    self._StrokeMaxPower = 0
-                while len(self._RecentStrokesMaxPower) > NUM_STROKES_FOR_ROLLING_AVG_WATTS:
-                    self._RecentStrokesMaxPower.pop(0)
+                if self._stroke_max_power:
+                    self._recent_strokes_max_power.append(self._stroke_max_power)
+                    self._stroke_max_power = 0
+                while len(self._recent_strokes_max_power) > NUM_STROKES_FOR_ROLLING_AVG_WATTS:
+                    self._recent_strokes_max_power.pop(0)
                 # Start reporting power from the first received value, rather than waiting for the buffer to fill
-                if self._RecentStrokesMaxPower:
-                    rolling_avg_watts = round(sum(self._RecentStrokesMaxPower) / len(self._RecentStrokesMaxPower))
-                    self._RollingAvgWatts = rolling_avg_watts
+                if self._recent_strokes_max_power:
+                    rolling_avg_watts = round(sum(self._recent_strokes_max_power) / len(self._recent_strokes_max_power))
+                    self._rolling_avg_watts = rolling_avg_watts
                     if USE_CONCEPT2_POWER == False:
                         self.WRValues['instant_watts'] = rolling_avg_watts
 
@@ -463,7 +462,7 @@ class RowerState(object):
         # prefer the value reported by the S4 over the value derived from the cm/s speed.
         # To always use the value derived from speed, add 500m_pace to the IGNORE_LIST. 
         with self._wr_lock:
-            self._500mPace = evt.value
+            self._500m_pace = evt.value
             if evt.value:
                 self.WRValues['instant_500m_pace_secs'] = evt.value
 
@@ -472,19 +471,19 @@ class RowerState(object):
         with self._wr_lock:
             #self.elapsetime = timedelta(seconds=self.secondsWR, minutes=self.minutesWR, hours=self.hoursWR)
             #self.elapsetime = int(self.elapsetime.total_seconds())
-            compiled_time = (self._hoursWR or 0) * 3600 + (self._minutesWR or 0) * 60 + (self._secondsWR or 0) + (self._secdecWR or 0)/10
+            compiled_time = (self._hours_wr or 0) * 3600 + (self._minutes_wr or 0) * 60 + (self._seconds_wr or 0) + (self._secdecWR or 0)/10
             # Try to mitigate the effects of the situation where the second ticks on in between getting all the components of time, which
             # can lead to large apparent jumps backwards in time (e.g. 1:59:59:59 going to 1:00:00:00 if the second ticks on between the
             # hour and the minute being fetched) 
-            elapsed_time = max((self._ElapsedTime or 0), compiled_time)
-            self._ElapsedTime = elapsed_time
+            elapsed_time = max((self._elapsed_time or 0), compiled_time)
+            self._elapsed_time = elapsed_time
             self.WRValues['elapsed_time_secs'] = int(elapsed_time)
 
     def _compute_stroke_ratio(self) -> None:
         with self._wr_lock:
-            if self._StrokeDuration and self._DriveDuration:
+            if self._stroke_duration and self._drive_duration:
                 # Use the documented WR formula, which has a 1.25 multiplier
-                strokeratio = round((self._StrokeDuration - self._DriveDuration) / (self._DriveDuration * 1.25) , 2)
+                strokeratio = round((self._stroke_duration - self._drive_duration) / (self._drive_duration * 1.25) , 2)
                 self.WRValues['stroke_ratio'] = strokeratio
                     
     def _log_s4data(self, evt: S4Event, level: int = logging.INFO) -> None:
@@ -530,22 +529,22 @@ class RowerState(object):
         # thereby allowing the time since the last pulse to be computed. If this is
         # longer than the NO_ROWING_PULSE_GAP in milliseconds (e.g. 300ms), then the 
         # paddle is assumed to be stationary and no rowing is taking place.
-        self._LastCheckForPulse = int(round(time.time() * 1000))
+        self._last_check_for_pulse = int(round(time.time() * 1000))
         with self._wr_lock:
             if event.type == 'pulse':
-                self._PulseEventTime = event.at
+                self._pulse_event_time = event.at
 
-            if self._PulseEventTime:
-                pulse_gap = self._LastCheckForPulse - self._PulseEventTime
+            if self._pulse_event_time:
+                pulse_gap = self._last_check_for_pulse - self._pulse_event_time
             else:
                 pulse_gap = float('inf')  # Assume paddle is not turning yet
 
             if pulse_gap <= NO_ROWING_PULSE_GAP:
-                self._PaddleTurning = True
+                self._paddle_turning = True
             else:
-                self._PaddleTurning = False
-                self._DrivePhase = False
-                self._RecentStrokesMaxPower = []
+                self._paddle_turning = False
+                self._drive_phase = False
+                self._recent_strokes_max_power = []
                 self.WRValuesStandstill()
 
     def reset_rower(self):
@@ -567,7 +566,7 @@ class RowerState(object):
     def get_WRValues(self) -> dict[str, Any]:
         logger.debug("getWRValues starting lock")
         with self._wr_lock:               
-            if self._PaddleTurning:
+            if self._paddle_turning:
                 logger.debug("getWRValues handling PaddleTurning")
                 values = deepcopy(self.WRValues)
             else:
