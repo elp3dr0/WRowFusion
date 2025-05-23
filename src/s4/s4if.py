@@ -15,19 +15,92 @@ import serial.tools.list_ports
 
 from enum import IntFlag
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 
 
 logger = logging.getLogger(__name__)
 
-'''
-The MEMORY_MAP details the organisation of data within the S4 memory registers, how many bytes each datum
-occupies, the numerical base of its encoding, the LSB/MSB byte order (endianess), and whether the datum 
-should be requested as part of the high-frequency thread that requests data from the S4.
+############################
+## Default Configurations ##
+############################
 
-By configuring a datum in the MEMORY MAP and equiping it with a key: value pair of 'exclude_from_poll_loop': True (e.g. for tank size), 
-the application can still request the a read of the datum on demand. However it will not be requested as part of the
-high frequency request thread, leading to improved efficiency. 
+'''
+The True/False settings for the categories below are just the defaults. They can be changed by 
+application logic at runtime.
+'''
+
+DEFAULT_REQUEST_CATEGORIES = {
+            "rowing": True,
+            "state": True,
+            "workout_config": True,
+            "workout": False,
+            "workout_stat": False,
+            "zone": False,
+            "menu_functions": False,
+            "intensity": False,
+            "distance": False,
+            "duration": False,
+            "program": True,
+            "heart_rate": False,
+            "stroke_rate": False,
+            "zone_animation": False,
+            "clock": False,
+            "miscellaneous": False,
+            "display_control": False,
+            "screen": False,
+            "testing": False,
+            "algorithm": False, 
+            "prognostics": False,
+            "zone_maths": False,
+        }
+
+'''
+Control the frequency of requests on the serial connection using the constants below. 
+'''
+
+# PROGRAM CONTROL DELAYS
+PORT_SCAN_RETRY_DELAY = 5       # Default = 5 secs
+SERIAL_OPEN_RETRY_DELAY = 5     # Default = 5 secs
+SERIAL_REQUEST_DELAY = 0.025    # The delay inserted between successive requests written to the serial device. Default = 0.025 secs
+SERIAL_READ_TIMEOUT = 0.01      # The maximum time allowed for each serial read. This ensures that the read operation 
+                                # does not block for too long, allowing the lock to be released promptly (e.g. in the case 
+                                # of an empty buffer or no data available). Reads typically take ~0.0015 and almost always <0.005.
+                                # Default = 0.01 secs 
+HIGH_FREQ_PAUSE = 0             # Delay inserted every 10 requests of high-frequency request loop.
+                                # Set a small value (e.g. 0.1) if incoming data appears sluggish or jerky
+                                # which could indicate the read thread is being starved of serial access.
+                                # Default = 0 secs 
+LOW_FREQ_PAUSE = 2              # Delay between successive polls of the low-frequency data set (e.g. workout parameters).
+                                # Default = 2 secs
+
+'''
+The MEMORY_MAP details the organisation of data within the S4 memory registers:
+* type: what the address holds
+* size: how many bytes each datum occupies
+* base: the numerical base of its encoding, 
+* endian: the LSB/MSB byte order (endianess)
+* freq: whether the datum should be requested as part of the high freqency thread or low frequency thread
+* category: an assignment which allows application-side control over whether the address should be requested
+* exclude_from_poll_loop: a switch that controls whether the datum is requested
+
+Two request loop threads are started, one for high-frequency (real-time rowing) data, and one for low-frequency
+(configuration-type) data.
+
+    THREAD      DELAY BETWEEN READS WITHIN A         DELAY BETWEEN PASSES
+                SINGLE PASS OF THE MEMORY MAP        OF THE MEMORY MAP 
+    High            25ms (default)                          0s (default)
+    Low             25ms (default)                          2s (default)
+
+There are two ways of controlling which addresses will be requested by the request loop threads. The exclude_from_poll_loop
+is a switch that can be set within this module. When switched to True, it can be considered as an override of application-side
+to prevent the address from being polled. The 'category' key:value pair provides the application-side logic with switches to
+include of exclude groups of addresses from the polling loops. Excluding addresses from the loop might yield improved efficiency 
+and data frequency. The intent of the category is to allow the application to request certain data only when the application
+needs it (e.g. when the user has changed workout settings), rather than clogging up the poll loops with unecessary requests.   
+
+All of the memory registers have been included in the memory map for completeness, but many are likely of relevance only to
+internal S4 computations or control, or hold values that are simple derivations from other memory addresses. Addresses that
+are unlikely to be useful for typical applications are commented out. Uncomment/comment out as desired.
 
 Note: The Water Rower S4 S5 USB Protocol Iss 1 04 specs incorrectly suggests that double digit data is 
 stored:
@@ -39,30 +112,42 @@ It appears, however, that it is exactly the opposite.
 '''
 
 MEMORY_MAP = {
-    # Screen
-    '00D': {'type': 'screen_mode', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Describes which screen is displayed on the S4 monitor
-    '00E': {'type': 'screen_sub_mode', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Describes sub menu screen selections displayed on the S4 monitor
-    '00F': {'type': 'intervals_remaining', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Number of intervals remaining
-    # Flags
-    #'03D': {'type': 'display_cycle_control_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': True},  # S4 internal settings for the cycling of data fields that are displayed.
-    '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # Describes the workout mode: extended zones and distance/duration modes.
-    '03F': {'type': 'function_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # S4 internal settings for buzzer control, zone animation, count down, and zone/workout toggle
-    #'040': {'type': 'intensity1_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'intensity', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the intensity window.
+## Screen
+    #'00D': {'type': 'screen_mode', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'screen', 'exclude_from_poll_loop': True},  # Describes which screen is displayed on the S4 monitor
+    #'00E': {'type': 'screen_sub_mode', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'screen', 'exclude_from_poll_loop': True},  # Describes sub menu screen selections displayed on the S4 monitor
+    #'00F': {'type': 'intervals_remaining', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'screen', 'exclude_from_poll_loop': True},  # Number of intervals remaining
+## Flags
+    #'03D': {'type': 'display_cycle_control_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'display_control', 'exclude_from_poll_loop': True},  # S4 internal settings for data field cycling and flashing states (e.g., during unit selection).
+    '03E': {'type': 'workout_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout_config', 'exclude_from_poll_loop': False},  # Describes workout zone type (heart rate/intensity/stroke rate) and mode (distance/duration/interval).
+    '03F': {'type': 'function_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'menu_functions', 'exclude_from_poll_loop': False},  # S4 internal settings for buzzer control, zone animation, count down, and zone/workout toggle
+    #'040': {'type': 'intensity1_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'intensity', 'exclude_from_poll_loop': False},  # S4 internal settings for the display of various elements of the intensity window.
     '041': {'type': 'intensity2_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'intensity', 'exclude_from_poll_loop': False},  # Can be used to deduce the selected unit of intensity (m/s, mph, 500m pace, etc).
     '042': {'type': 'distance1_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': False},  # Can be used to deduce selected unit of distance (m, miles, km, stroke, cal, etc).
-    #'043': {'type': 'distance2_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': True},  # Can be used to deduce selected unit of distance
-    '044': {'type': 'program_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'program', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the program window.
+    #'043': {'type': 'distance2_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'distance', 'exclude_from_poll_loop': True},  # Indicates whether displayed distance is km/miles (redundant)
+    #'044': {'type': 'program_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'program', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the program window.
     #'045': {'type': 'duration_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'duration', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the duration window.
     #'046': {'type': 'heart_rate_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'heart_rate', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the heart rate window.
     #'047': {'type': 'stroke_rate_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'stroke_rate', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the stroke rate window.
-    #'047': {'type': 'zone_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various elements of the zone window.
-    '047': {'type': 'misc_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': True},  # S4 internal settings for the display of various zone word and miscellanious display elements.
-    # Fundanental data
+    #'047': {'type': 'zone_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone_animation', 'exclude_from_poll_loop': True},  # S4 internal settings for displaying the elements that make the scrolling zone annimation.
+    '047': {'type': 'misc_disp_flags', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'state', 'exclude_from_poll_loop': False},  # S4 internal settings for the display 'zone word and miscellanious' display elements (useful for catching when zone limits are changed).
+## Distance
     '055': {'type': 'total_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},          # distance in metres since reset
     '054': {'type': 'total_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},      # centimetres component of distance to nearest 5cm (i.e. 0-95).
+    #'057': {'type': 'displayed_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'distance', 'exclude_from_poll_loop': True},      # distance shown on the display. Probably relates to whatever is being viewed on the monitor (e.g. setting a workout distance) rather than the rowed distance.
+    #'059': {'type': 'test_count', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'testing', 'exclude_from_poll_loop': True},      # Used by manufacturer test routines. 
+## Clock count down
+    #'05A': {'type': 'clock_count_down_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'clock', 'exclude_from_poll_loop': True},      # first decimal place of the clock countdown.
+    #'05B': {'type': 'clock_count_down_secs', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'clock', 'exclude_from_poll_loop': True},      # clock countdown in seconds
+## Odometer
+    #'081': {'type': 'odometer_distance', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': True},          # Total distance that has been rowed on the machine ever (stored between power offs). Max: 65535m
+    #'080': {'type': 'odometer_distance_dec', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': True},      # centimetres component of distance.
+## S4 Algorithm constants
+    #'083': {'type': 'pins_per_xxcm', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'algorithm', 'exclude_from_poll_loop': True},      # Number of pin edges allowed to equal xxcm. Used by internal S4 algorithm.
+    #'084': {'type': 'distance_xxcm', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'algorithm', 'exclude_from_poll_loop': True},      # Number of cm per flagged xxcm no. of pins. Used by internal S4 algorithm.
+## Power and calories
     '088': {'type': 'watts', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},                   # instantaneous power
     '08A': {'type': 'total_calories', 'size': 'triple', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},          # calories since reset
-    # Zone boundary values
+## Zone boundary values
     '090': {'type': 'zone_hr_upper', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the heartrate zone
     '091': {'type': 'zone_hr_lower', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound of the heartrate zone
     '092': {'type': 'zone_int_mps_upper', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the mps speed zone
@@ -75,31 +160,36 @@ MEMORY_MAP = {
     '0A0': {'type': 'zone_int_2km_lower', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the 2km pace zone
     '0A2': {'type': 'zone_sr_upper', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # upper bound for the strokerate zone
     '0A3': {'type': 'zone_sr_lower', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'zone', 'exclude_from_poll_loop': False}, # lower bound for the strokerate zone
-    # Tank volume
+## Prognostics
+    '0A4': {'type': 'prognostic_secs', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'prognostics', 'exclude_from_poll_loop': False}, # Prognostic seconds
+    '0A6': {'type': 'prognostic_cmps_100', 'size': 'triple', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'prognostics', 'exclude_from_poll_loop': False}, # Prognostic cm/s (multiplied by 100) used for the maths
+## Tank volume
     '0A9': {'type': 'tank_volume', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'miscellaneous', 'exclude_from_poll_loop': False}, # tank volume in decilitres
-    # Stroke counter
+## Stroke counter
     '140': {'type': 'stroke_count', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},            # total strokes since reset
     '142': {'type': 'avg_time_stroke_whole', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},   # average time for a whole stroke measured in number of 25ms periods
     '143': {'type': 'avg_time_stroke_pull', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},    # average time for a pull (acc to dec) measured in number of 25ms periods
-    # Speed
+## Speed
     #'148': {'type': 'total_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},        # Total distance per second in cm. Thought to be the high frequency mps readings that will be averaged by internal s4 logic. 
-    '14A': {'type': 'avg_distance_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},       # instantaneous average distance in cm
+    '14A': {'type': 'instant_avg_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},       # instantaneous speed in cm/sec thought to be calculated internally by averaging many high-frequency (40Hz) readings
     #'14C': {'type': 'ms_stored', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},               # Probably the number of readings (or registers) over which the speed is averaged by internal s4 logic.
-    # Values stored for zone maths
+    #'14D': {'type': 'avg_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},               # Overall average speed in cm/s for projected distance/duration maths  
+## Zone maths
+    #'190': {'type': 'zone_high', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone_maths', 'exclude_from_poll_loop': True},          # high byte for zone maths
+    #'192': {'type': 'zone_low', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone_maths', 'exclude_from_poll_loop': True},           # low byte for zone maths
+    #'194': {'type': 'zone_sector_size', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone_maths', 'exclude_from_poll_loop': True},   # sector soze to perform scaling (maybe to inform which elements to light up in the scrolling zone animation?)
+    #'196': {'type': 'zone_value', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'category': 'zone_maths', 'exclude_from_poll_loop': True},         # Value of operation
+    #'198': {'type': 'zone_high_scaled', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone_maths', 'exclude_from_poll_loop': True},   # Range scaled for high byte
+    #'19A': {'type': 'zone_low_scaled', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'zone_maths', 'exclude_from_poll_loop': True},    # Range scalled for low byte
+    #'19C': {'type': 'zone_value_scaled', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'category': 'zone_maths', 'exclude_from_poll_loop': True},  # Value of operation
+## Values stored for zone maths
     '1A0': {'type': 'heart_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},              # instantaneous heart rate
-    '1A5': {'type': '500m_pace', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},   # instantaneious 500m Pace (secs). (available only when displayed on monitor: consider deriving from avg_time_stroke_whole instead)
-    '1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},    # instantaneous strokes per min (integer only: consider deriving from avg_time_stroke_whole instead)
-    # Clock Display - Capture time components in reverse order for time elapsed accuracy  
-    '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},              # hours 0-9
-    '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},             # minutes 0-59
-    '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},             # seconds 0-59
-    '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': False},   # tenths of seconds 0-9
-    # Workout total times/distances/limits
-    '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout_stat'},       # total workout time
-    '1EA': {'type': 'workout_total_metres', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout_stat'},     # total workout distance in metres
-    '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout_stat'},    # total workout strokes
-    #'1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'workout', 'exclude_from_poll_loop': True},         # limit value for workouts
-    # Intervals
+    #'1A1': {'type': 'zone_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},   # instantaneous speed in cm/s. (Possibly available only when displayed on monitor: consider using instant_avg_speed_cmps instead)
+    #'1A1': {'type': 'zone_speed_cmps', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},   # instantaneous mph. (Possibly available only when displayed on monitor: consider using instant_avg_speed_cmps instead)
+    #'1A5': {'type': '500m_pace', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},   # instantaneous 500m Pace (secs). (available only when displayed on monitor: consider deriving from avg_time_stroke_whole instead)
+    #'1A7': {'type': '2km_pace', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},   # instantaneous 2km Pace (secs). (Possibly available only when displayed on monitor: consider deriving from avg_time_stroke_whole instead)
+    #'1A9': {'type': 'stroke_rate', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': True},    # instantaneous strokes per min (integer only: consider deriving from avg_time_stroke_whole instead)
+## Intervals
     '1B0': {'type': 'workout_work1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
     '1B2': {'type': 'workout_rest1', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
     '1B4': {'type': 'workout_work2', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
@@ -117,17 +207,32 @@ MEMORY_MAP = {
     '1CC': {'type': 'workout_work8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
     '1CE': {'type': 'workout_rest8', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
     '1D0': {'type': 'workout_work9', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},
-    # Number of workout intervals
+## Number of workout intervals
     '1D9': {'type': 'workout_intervals', 'size': 'single', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout'},    # the total number of work and rest periods plus 1
+## Clock Display - Capture time components in reverse order for time elapsed accuracy  
+    '1E3': {'type': 'display_hr', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},              # hours 0-9
+    '1E2': {'type': 'display_min', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},             # minutes 0-59
+    '1E1': {'type': 'display_sec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing'},             # seconds 0-59
+    '1E0': {'type': 'display_sec_dec', 'size': 'single', 'base': 10, 'endian': 'big', 'frequency': 'high', 'category': 'rowing', 'exclude_from_poll_loop': False},   # tenths of seconds 0-9
+## Workout total times/distances/limits
+    '1E8': {'type': 'workout_total_time', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout_stat'},       # total workout time
+    '1EA': {'type': 'workout_total_metres', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout_stat'},     # total workout distance in metres
+    '1EC': {'type': 'workout_total_strokes', 'size': 'double', 'base': 16, 'endian': 'big', 'frequency': 'low', 'category': 'workout_stat'},    # total workout strokes
+    #'1EE': {'type': 'workout_limit', 'size': 'double', 'base': 16, 'endian': 'little', 'frequency': 'low', 'category': 'workout', 'exclude_from_poll_loop': True},         # limit value for workouts
     }
 
 '''
 Notes:
+(*) screen flags seem static. screen_mode = 0x02, screen_sub_mode = 0x00, screen_interval = 0x00
 (*) workout_flags specify the type of workout (e.g. duration, distance, intervals) and what (if any) zones (heartrate, strokes, etc) 
-    are active. The workout flags are updated only once a whole workout has been programmed and the user clicks 'OK' to 
-    get the program into its initialised state (i.e. flashing and ready to start rowing). At the end of the workout
-    all buttons are unresponsive except OK. The workout flags are cleared when the user presses OK at the end of a workout
-    or when the users presses and holds OK to reset at any time.
+    are active. workout_flags change whenever the workout parameters are changed, but are updated only once a whole workout has been
+    fully programmed and the user clicks 'OK' to get the program into its initialised state (i.e. flashing and ready to start rowing).
+    At the end of the workout all buttons are unresponsive except OK. The workout flags are cleared when the user presses OK at the 
+    end of a workout or when the users presses and holds OK to reset at any time.
+    workout_flags can be used as a reliable trigger to poll for workout interval settings.
+    It also changes when the user selects a different zone mode: heart rate, intensity, stroke rate, off. However, it does not
+    change when the user changes the upper and lower bounds of a zone that has already been selected. Therefore it is not a reliable
+    trigger to poll for zone bounds. Consider using misc_disp_flags as the trigger for zone bound changes.
 (*) The distance1_flags specifies which distance unit names (m, km, etc) are shown on the screen and so it can be used
     to deduce which unit a user has selected for a workout or a just row session.
     - When a user has selected a unit for a workout or just row session:
@@ -144,11 +249,16 @@ Notes:
     Even when bit 7 is set (i.e. distance display is hidden), the unit that is selected is still stored with a true in the
     corresponding unit name bit of the bit field (e.g. 10000110 -> Distance display supressed, Metres selected, 'Distance' header true).
 (*) The distance2_flags appear to record only whether miles or km is the selected unit (or the unit with focus during 
-    selection). The field is 1000000 (or 64 in decimal) when either miles or km is selected (or has focus) and is 0 otherwise. 
+    selection). The field is 1000000 (or 64 in decimal) when either miles or km is selected (or has focus) and is 0 otherwise.
+    Note: This does not change the actual values in the total_distance memory address 055 or the workout_work memory addresses 
+    (when workouts are not based on stroke counts) which are always in metres irrespective of the display unit.
 (*) For distance workouts, the distance1_flags must be consulted in order to know the units (metres or strokes) that the
     value in the workout_work fields represents. The value stored in the workout_workX registers is in metres when any of
     metres, miles or km are selected. A workout cannot be configured for calories. For duration workouts, the units of the
     workout_work fields are always seconds.
+(*) misc_disp_flags changes whenever the user enters the zone configuration. It does also change when the user interacts with
+    non-zone related settings. Nevertheless a change in its value can be used as a reliable indication that the user might have
+    changed the zone upper and lower bounds.
 (*) total_distance_dec holds the centimetres part of the distance to the nearest 5cm, not "0.1m count (only counts up from 0-9)"
     as documented in Water Rower S4 S5 USB Protocol Iss 1 04.pdf.
 (*) Any effort to combine the cm value with the metres value will be complicated by the serial delivery. As the values are recieved 
@@ -179,13 +289,13 @@ Notes:
 (*) total_speed_cmps is highly volatile. On the test rower, it appeared to oscilate between a bigger reading and a smaller reading.
     During light rowing, a single drive phase of the stroke might see values of 140 +/-35 (smaller reading) and 350 +/-35 (higher 
     reading), while a single recovery phase might see values of 35 +/-35 (smaller reading) 210 +/-35 (higher reading).
-    The avg_distance_cmps is much smoother, and might be more useful for computing meaningful speed/pace etc.
-    Note that m_s_stored value appears to fill to 32 and then tops out, so maybe avg_distance_cmps aims to average over 32 readings
+    The instant_avg_speed_cmps (is much smoother, and might be more useful for computing meaningful speed/pace etc.
+    Note that m_s_stored value appears to fill to 32 and then tops out, so maybe instant_avg_speed_cmps aims to average over 32 readings
     of the total_speed_cmps, or perhaps 16 readings (32 octets) which matches up with the wording in Water Rower Series 4 Rowing 
     Algorithm pdf.
 (*) 500m Pace is computed by the S4 only when units of /500m are selected on screen. If other units are being displayed, the 
     value of 0 is stored in the 500m pace memory register and 0 is returned over the serial connection. To have availability
-    at all times, compute the 500m pace from the avg_distance_cmps.
+    at all times, compute the 500m pace from the instant_avg_speed_cmps.
 (*) The stroke_rate field is an integer representation of the stroke rate. The waterrower itself displays stroke rate to the
     nearest 0.5. A more accurate stroke rate per min can be obtained by using the avg_time_stroke_whole field:
         stroke rate = 60000 / (avg_time_stroke_whole * 25)
@@ -340,18 +450,6 @@ EXPECTED_RESPONSE_MAP = {
     RESET_REQUEST: OK_RESPONSE,
     READ_MEMORY_REQUEST: READ_MEMORY_RESPONSE,
 }
-
-# PROGRAM CONTROL DELAYS
-PORT_SCAN_RETRY_DELAY = 5   
-SERIAL_OPEN_RETRY_DELAY = 5
-SERIAL_REQUEST_DELAY = 0.025    # The delay inserted between successive requests written to the serial device. Default is 0.025
-SERIAL_READ_TIMEOUT = 0.01      # The maximum time allowed for each serial read. This ensures that the read operation 
-                                # does not block for too long, allowing the lock to be released promptly (e.g. in the case 
-                                # of an empty buffer or no data available). Default is 0.01 as reads typically take ~0.0015 and almost always <0.005
-HIGH_FREQ_PAUSE = 0             # Delay inserted every 10 requests of high-frequency request loop.
-                                # Default is 0. Set a small value (e.g. 0.1) if incoming data appears sluggish or jerky 
-                                # which may indicate the read thread is being starved of serial access.
-LOW_FREQ_PAUSE = 2.0            # Delay between successive polls of the low-frequency data set (e.g. workout parameters).
 
 # FLAG BIT FIELDS
 class WorkoutMode(IntFlag):
@@ -611,7 +709,7 @@ class S4Event:
             return None
 
 # HELPER FUNCTIONS
-def find_port():
+def find_port() -> str:
     logger.info(f"Searching for serial port...")
     attempts = 0
     while True:
@@ -642,14 +740,14 @@ def get_address_of_data_type(data_type: str) -> str:
     raise ValueError(f"Data type {data_type} not found in MEMORY MAP")
     
 
-def build_daemon(target):
+def build_daemon(target: Callable[[], Any]) -> threading.Thread:
     t = threading.Thread(target=target)
     t.daemon = True
     return t
 
 
-def is_live_thread(t):
-    return t and t.is_alive()
+def is_live_thread(t: Optional[threading.Thread]) -> bool:
+    return t is not None and t.is_alive()
 
 
 def read_reply(cmd: str) -> Optional[S4Event]:
@@ -763,21 +861,8 @@ class Rower(object):
         self._capture_thread = None
         self._response_event = threading.Event()  # For on-demand responses
         self._current_response = None
-        self._request_categories: dict[str, bool] = {
-            "rowing": True,
-            "state": True,
-            "workout": False,
-            "workout_stat": False,
-            "zone": False,
-            "intensity": False,
-            "distance": False,
-            "duration": False,
-            "program": True,
-            "heart_rate": False,
-            "stroke_rate": False,
-            "miscellaneous": False,
-            "display": False,
-        }
+        self._request_categories: dict[str, bool] = DEFAULT_REQUEST_CATEGORIES.copy()
+        
         self._start_threads()
 
     def _start_threads(self):
@@ -790,7 +875,7 @@ class Rower(object):
         self._capture_thread.start()
         logger.debug("S4 data request and capture threads started.")
 
-    def is_connected(self):
+    def is_connected(self) -> bool:
         with self._serial_lock:
             serial_open = self._serial.is_open
         return (
@@ -799,7 +884,7 @@ class Rower(object):
             is_live_thread(self._capture_thread)
         )
 
-    def _find_serial(self):
+    def _find_serial(self) -> None:
         while True:
             if not self._demo:
                 with self._serial_lock:
@@ -820,7 +905,7 @@ class Rower(object):
                     except Exception as e_close:
                         logger.warning(f"Failed to close serial during retry: {e_close}")
                 
-    def open(self):
+    def open(self) -> None:
         # Any caller asking for Rower.open() will not recieve control back until:
         # - the port is found, otherwise the code loops in find_port()
         # - and the serial is open without error, otherwise the code loops in _find_serial()
@@ -843,7 +928,7 @@ class Rower(object):
         logger.info("Initiating communication with S4 monitor.")
         self.write(USB_REQUEST)
 
-    def close(self):
+    def close(self) -> None:
         logger.debug("Closing serial communications with S4.")
         self.notify_callbacks(S4Event.build("exit"))
         if self._stop_event:
@@ -854,7 +939,7 @@ class Rower(object):
                 time.sleep(0.1)  # time for capture and request loops to stop running
                 self._serial.close()
 
-    def write(self, raw: str):
+    def write(self, raw: str) -> None:
         try:
             with self._serial_lock:
                 self._serial.write(str.encode(raw.upper() + '\r\n'))
@@ -863,7 +948,7 @@ class Rower(object):
             logger.error(f"Serial write communication error: {e}. Trying to reconnect.")
             self.open()
 
-    def _start_capturing(self):
+    def _start_capturing(self) -> None:
         while not self._stop_event.is_set():
             if self._serial.is_open:
                 try:
@@ -894,7 +979,7 @@ class Rower(object):
     def set_request_category(self, category: str, enabled: bool) -> None:
         self._request_categories[category] = enabled
         
-    def _start_requesting(self, freq: str ="high"):
+    def _start_requesting(self, freq: str ="high") -> None:
         counter = 0
         while not self._stop_event.is_set():
             with self._serial_lock:
@@ -923,11 +1008,11 @@ class Rower(object):
                 self._stop_event.wait(0.1)
 
 
-    def request_reset(self):
+    def request_reset(self) -> None:
         logger.debug("Sending reset request to S4 via serial connection.")
         self.write(RESET_REQUEST)
 
-    def request_address(self, address: str):
+    def request_address(self, address: str) -> None:
         """
         Requests a datum from the S4 monitor by its memory address.
         Args: address (str): The address of the S4 memory register where the desired datum is stored (e.g., '055').
@@ -972,7 +1057,7 @@ class Rower(object):
             raise
 
 
-    def capture_on_demand_response(self, expected_response_prefix: str, timeout=2) -> Optional[S4Event]:
+    def capture_on_demand_response(self, expected_response_prefix: str, timeout: float=2) -> Optional[S4Event]:
         """
         Reads from the serial port until a response with the expected prefix is received, or timeout.
         Args:
@@ -1014,15 +1099,15 @@ class Rower(object):
         logger.warning(f"Timeout waiting for response with prefix {expected_response_prefix}")
         raise TimeoutError(f"Timeout waiting for response with prefix {expected_response_prefix}")
 
-    def register_callback(self, cb):
+    def register_callback(self, cb: Callable[[S4Event], None]) -> None:
         logger.debug(f"Registering serial communication callback - {cb}")
         self._callbacks.add(cb)
 
-    def remove_callback(self, cb):
+    def remove_callback(self, cb: Callable[[S4Event], None]) -> None:
         logger.debug(f"De-registering serial communication callback - {cb}")
         self._callbacks.remove(cb)
 
-    def notify_callbacks(self, event: S4Event):
+    def notify_callbacks(self, event: S4Event) -> None:
 #        logger.debug(f"Rower.notify_callbacks: Notifing callbacks of event {event}")
         for cb in self._callbacks:
 #            logger.debug(f"Rower.notify_callbacks: Notifying callback {cb} of event {event}")

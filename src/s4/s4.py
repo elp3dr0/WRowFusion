@@ -99,7 +99,7 @@ IGNORE_LIST = [
     #'avg_time_stroke_whole',
     #'avg_time_stroke_pull',
     'total_speed_cmps',     # Recommend ignore (useful only for s4 monitor's internal logic)
-    #'avg_distance_cmps',
+    #'instant_avg_speed_cmps',
     'ms_stored'             # Recommend ignore (useful only for s4 monitor's internal logic)
     #'heart_rate',
     '500m_pace',            # Recommend ignore (derive from avg_time_stroke_whole instead)
@@ -150,7 +150,6 @@ class RowerState(object):
         self._LastCheckForPulse: int | None = None  # Timestamp in ms of last check for pulse 
         self._PulseEventTime: int | None = None
         self._PaddleTurning: bool | None = None
-        self._RowerReset: bool | None = None
         self._secondsWR: int | None = None
         self._minutesWR: int | None = None
         self._hoursWR: int | None = None
@@ -173,7 +172,6 @@ class RowerState(object):
         self.WRValues_rst: dict[str, Any] = {}
         self.WRValues: dict[str, Any] = {}
         self.WRValues_standstill: dict[str, Any] = {}
-        self.ResetRower: bool | None = None
 
         self._logger_cache: dict[str, Any] = {}
         self._data_logger = logging.getLogger('s4data')
@@ -214,7 +212,6 @@ class RowerState(object):
             self._LastCheckForPulse = 0
             self._PulseEventTime = 0
             self._PaddleTurning = False
-            self._RowerReset = True
             self._secondsWR = 0
             self._minutesWR = 0
             self._hoursWR = 0
@@ -245,7 +242,6 @@ class RowerState(object):
                 }
             self.WRValues = deepcopy(self.WRValues_rst)
             self.WRValues_standstill = deepcopy(self.WRValues_rst)
-            self.ResetRower = False
             logger.debug("RowerState._zero_state: Values set")
             logger.debug(f"RowerState._zero_state: WRValues = {self.WRValues}")
             logger.debug("RowerState._zero_state: Releasing lock")
@@ -294,7 +290,7 @@ class RowerState(object):
             'stroke_count': (lambda evt: self.WRValues.update({'stroke_count': evt.value}), logging.DEBUG),
             'avg_time_stroke_whole': (lambda evt: self._handle_avg_time_stroke_whole(evt), logging.DEBUG),       # used to calculate the stroke rate more accurately than the stroke rate event
             'avg_time_stroke_pull': (lambda evt: setattr(self, '_DriveDuration', evt.value * 25) if evt.value is not None else None, logging.DEBUG),
-            'avg_distance_cmps': (lambda evt: self._handle_avg_distance_cmps(evt), logging.DEBUG),
+            'instant_avg_speed_cmps': (lambda evt: self._handle_instant_avg_speed_cmps(evt), logging.DEBUG),
             'heart_rate': (lambda evt: self.WRValues.update({'heart_rate_bpm': evt.value}), logging.DEBUG),
             '500m_pace': (lambda evt: self._handle_500m_pace(evt), logging.DEBUG),
             #'stroke_rate': (lambda evt: self.WRValues.update({'stroke_rate_pm': evt.value}), logging.DEBUG),    # use avg_time_stroke_whole instead 
@@ -405,7 +401,7 @@ class RowerState(object):
             self.WRValues['stroke_rate_pm'] = round(60000 / duration_ms if duration_ms else 0, 2)
             self._compute_stroke_ratio()
 
-    def _handle_avg_distance_cmps(self, evt: S4Event) -> None:
+    def _handle_instant_avg_speed_cmps(self, evt: S4Event) -> None:
         speed = evt.value   # cm per sec
 
         with self._wr_lock:
@@ -526,7 +522,6 @@ class RowerState(object):
         with self._wr_lock:
             if event.type == 'pulse':
                 self._PulseEventTime = event.at
-                self._RowerReset = False
 
             if self._PulseEventTime:
                 pulse_gap = self._LastCheckForPulse - self._PulseEventTime
@@ -560,10 +555,7 @@ class RowerState(object):
     def get_WRValues(self) -> dict[str, Any]:
         logger.debug("getWRValues starting lock")
         with self._wr_lock:               
-            if self._RowerReset:
-                logger.debug("getWRValues handling rowerreset")
-                values = deepcopy(self.WRValues_rst)
-            elif self._PaddleTurning:
+            if self._PaddleTurning:
                 logger.debug("getWRValues handling PaddleTurning")
                 values = deepcopy(self.WRValues)
             else:

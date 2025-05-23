@@ -8,6 +8,7 @@
 - [ ] Ensure the threads are terminated properly on sigterm from wrowfusion.py. Including stopping the ble discovery which will otherwise persist when wrowfusion is stopped, and will then prevent the ble hrm discovery process from starting again unless a reboot or bluetooth restart is issued.
 - [ ] Change from dbus-python to dbus_fast, which would be more robust, futureproof, and allow the removal of dependencies, which themselves are a bit dicey like GObject and GLib.
 - [ ] In install script, don't nuke the database file. and maybe keep logs
+- [ ] Add type attributes to the attributes of the Rower class in s4if.py (all the rest of the module has type attributes now.)
 
 ## New functionality
 - [ ] Turn USB ports off after 10mins of no rowing. Add a button that turns the USB ports back on.
