@@ -964,4 +964,24 @@ When the full S4 workout flag logic is added, make it update the tracker accordi
 
 Would you like me to sketch out rough code for SessionTracker and DBWriter next?
 
-## 
+## 12. Dangers of instantaneous pace of 0
+Reminder to my self
+
+Might wanna set the instantaneous pace to 65535 (0xff 0xff) if the Waterrower is at standstill. This is due to the fact that the Com module sends 0xff 0xff as it stands still. In coxswain the speed is calc as follows:
+
+if (fields.flag(3)) {
+	setSpeed(500 * 100 / fields.get(Fields.UINT16)); // instantaneous pace
+
+If instantaneous pace is 0 this results in the equation being divided by 0 which brakes the code. This results in the code part to check reset has been performed not to be executed and then not working properly. Solution :
+
+either set during standstill the instantaneous pace to 65535 (0xff 0xff) or Coxswain fixes the code in order to be more robust against dividing by 0:
+
+if (fields.flag(3)) {
+    if (fields.get(Fields.UINT16 == 0 || (fields.get(Fields.UINT16 == 65536){ // check if instantaneous pace is zero or 65536 to avoid to divid by 0
+        setSpeed(0);
+    }else{
+        setSpeed(500 * 100 / fields.get(Fields.UINT16)); // instantaneous pace
+    }
+} 
+
+##

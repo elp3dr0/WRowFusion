@@ -1,10 +1,10 @@
 # ✅ TODO List for WRowFusion
 
 ## 📌 Current Focus
+- [ ] Create session tracker.
 - [ ] Debug bluetooth server
 
 ## 🧱 Infrastructure
-- [ ] Split out constants from BLEif so that they are available to standard services or vice versa
 - [ ] Ensure the threads are terminated properly on sigterm from wrowfusion.py. Including stopping the ble discovery which will otherwise persist when wrowfusion is stopped, and will then prevent the ble hrm discovery process from starting again unless a reboot or bluetooth restart is issued.
 - [ ] Change from dbus-python to dbus_fast, which would be more robust, futureproof, and allow the removal of dependencies, which themselves are a bit dicey like GObject and GLib.
 - [ ] In install script, don't nuke the database file. and maybe keep logs
@@ -60,6 +60,7 @@
 - [ ] Had to add the following to /boot/firmware/config.txt when the bluetooth adapter refused to come up:
         [all]
         enable_uart=1
+- [ ] Check whether I need to guard against dividing by 0 for Coxswain by never sending instantaneous pace of 0. See note 12
 
 
 ## 🖧 Comms with S4
@@ -106,6 +107,7 @@
 - [x] Remove hrm monitor argument from s4 data task. Heart rate will be injected at publish time (bluetooth/ant/etc).
 - [x] Replace deque with shared RowerState instance
 ### Infrastructure
+- [x] Split out constants from BLEif so that they are available to standard services or vice versa
 - [x] Build systemd service for auto-start
 - [x] Create install script to handle venv setup
 - [x] Setup logging config file with rotation

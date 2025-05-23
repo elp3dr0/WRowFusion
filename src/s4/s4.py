@@ -23,6 +23,13 @@ from src.s4.s4_workouts import (
 )
 from src.hr.heart_rate import HeartRateMonitor
 
+from src.rows.row_tracker import RowSessionTracker
+
+from src.rows.row_signals import (
+    StrokeStarted, SpeedChanged, ResetDetected, IntervalStarted,
+    IntervalEnded, WorkoutCompleted, ZoneChanged,
+)
+
 logger = logging.getLogger(__name__)
 
 '''
@@ -171,6 +178,8 @@ class RowerState(object):
         self.WRValues_rst: dict[str, Any] = {}
         self.WRValues: dict[str, Any] = {}
         self.WRValues_standstill: dict[str, Any] = {}
+
+        self.session_tracker = RowSessionTracker()
 
         self._logger_cache: dict[str, Any] = {}
         self._data_logger = logging.getLogger('s4data')
@@ -518,6 +527,29 @@ class RowerState(object):
         else:
             self._data_logger.info(f"{eventtype} initialised at: {value!r}")
             self._logger_cache[eventtype] = value
+
+
+    def _emit_session_signal(self, event: S4Event) -> None:
+        match event.type:
+            case 'stroke_start':
+                self.session_tracker.process(StrokeStarted(event.at))
+            case 'instant_avg_speed_cmps':
+                speed = event.value  # Adjust to how you extract it
+                if speed is not None:
+                    self.session_tracker.process(SpeedChanged(event.at, speed))
+            case 'reset':
+                self.session_tracker.process(ResetDetected(event.at))
+            case 'interval_start':
+                self.session_tracker.process(IntervalStarted(index=event.data["index"], is_rest=False))
+            case 'interval_rest':
+                self.session_tracker.process(IntervalStarted(index=event.data["index"], is_rest=True))
+            case 'interval_end':
+                self.session_tracker.process(IntervalEnded(index=event.data["index"]))
+            case 'workout_end':
+                self.session_tracker.process(WorkoutCompleted(event.at))
+            case 'zone':
+                self.session_tracker.process(ZoneChanged(zone=event.data["zone"]))
+
 
     def pulse_monitor(self,event: S4Event) -> None:
         # As a callback, this function is called by the notifier each time any event 
